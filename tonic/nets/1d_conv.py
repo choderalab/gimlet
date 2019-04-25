@@ -3,8 +3,6 @@
 
 MIT License
 
-MIT License
-
 Copyright (c) 2019 Chodera lab // Memorial Sloan Kettering Cancer Center
 and Authors
 
