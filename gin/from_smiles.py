@@ -148,7 +148,7 @@ def smiles_to_organic_topological_molecule(smiles):
     # ==========================
     # get rid of the longer bits
     # ==========================
-    # 'Br' to 'r'
+    # 'Br' to 'R'
     smiles = tf.strings.regex_replace(
         smiles, 'Br', 'R')
 
@@ -168,7 +168,6 @@ def smiles_to_organic_topological_molecule(smiles):
     # =================================
     # translate atoms notations to idxs
     # =================================
-
     # carbon
     # aromatic or not
     smiles_atoms_only = tf.strings.regex_replace(
@@ -201,7 +200,7 @@ def smiles_to_organic_topological_molecule(smiles):
     # aromatic or not
     smiles_atoms_only = tf.strings.regex_replace(
         smiles_atoms_only,
-        'P|p',
+        'P|p', # NOTE: although not common, adding this doesn't hurt speed
         '4')
 
     # fluorine
@@ -234,8 +233,9 @@ def smiles_to_organic_topological_molecule(smiles):
     # ===================
     # handle the topology
     # ===================
-    # initialize the connectivity map
-    
+    # initialize the adjacency map
+    adjacency_map = tf.eye()
+
     smiles_topology_only = tf.strings.regex_replace(
         smiles,
         ALL_ORGANIC_ATOMS_STR,
