@@ -345,45 +345,39 @@ def smiles_to_organic_topological_molecule(smiles):
                 '#')),
         [-1])
 
-    # use while loop to update
-    # double bonds
-    idx = tf.constant(0)
-    max_iter = tf.shape(double_bond_idxs)[0]
+    # update double bonds
+    adjacency_map.scatter_nd_update(
+        tf.transpose(
+            tf.concat(
+                [
+                    tf.expand_dims(
+                        double_bond_idxs,
+                        0),
+                    tf.expand_dims(
+                        double_bond_idxs + 1,
+                        0)
+                ],
+                axis=0)),
+        tf.ones_like(
+            double_bond_idxs,
+            dtype=tf.float32) * 2)
 
-    def loop_body(idx):
-        # get the double bond idx
-        chr_idx = double_bond_idxs[idx]
-
-        # change the bond order in the adjaceny map to 2
-        adjacency_map[chr_idx, chr_idx + 1].assign(
-            tf.constant(2, dtype=tf.float32))
-
-        return idx + 1
-
-    tf.while_loop(
-        lambda idx: idx < max_iter,
-        lambda idx: loop_body(idx),
-        loop_vars=[idx],
-        shape_invariants=[idx.get_shape()])
-
-    # triple bonds
-    idx = 0
-    max_iter = tf.shape(triple_bond_idxs)[0]
-    def loop_body(idx):
-        # get the triple bond idx
-        chr_idx = triple_bond_idxs[idx]
-
-        # change the bond order in the adjaceny map to 2
-        adjacency_map[chr_idx, chr_idx + 1].assign(
-            tf.constant(3, dtype=tf.float32))
-
-        # increment
-        return idx + 1
-
-    tf.while_loop(
-        lambda idx: tf.less(idx, max_iter),
-        loop_body,
-        [idx])
+    # update triple bonds
+    adjacency_map.scatter_nd_update(
+        tf.transpose(
+            tf.concat(
+                [
+                    tf.expand_dims(
+                        triple_bond_idxs,
+                        0),
+                tf.expand_dims(
+                    triple_bond_idxs + 1,
+                    0)
+                ],
+                axis=0)),
+        tf.ones_like(
+            triple_bond_idxs,
+            dtype=tf.float32) * 3)
 
     # ========
     # branches
@@ -394,111 +388,153 @@ def smiles_to_organic_topological_molecule(smiles):
     #   is dropped
     # - a bond is formed between the right bracket and the atom left to the
     #   left bracket
-    left_bracket_idxs = tf.reshape(
-        tf.where(
+
+    # init a queue
+    bracket_queue = tf.constant([], dtype=tf.int64)
+
+    # get a large matrix to record the pairs
+    bracket_pairs = tf.constant(
+        [[0, 0]],
+        tf.int64)
+
+    first_right = tf.constant(True)
+    def if_left(idx, bracket_queue, bracket_pairs):
+        # if a certain position
+        # it is a left bracket
+        # put that bracket in the queue
+        # NOTE: queue is not supported in graph
+        # bracket_queue.enqueue(idx)
+        bracket_queue = tf.concat(
+            [
+                bracket_queue,
+                [idx]
+            ],
+            axis=0)
+
+        return idx, bracket_queue, bracket_pairs
+
+    def if_right(idx, bracket_queue, bracket_pairs,
+            topology_idxs=topology_idxs,
+            ):
+        # if at a certain position
+        # it is a right bracket
+        # we need to do the following things
+        #   - get a left bracket out of the queue
+        #   - modify the adjaceny matrix
+        right_idx = topology_idxs[idx]
+        left_idx = topology_idxs[bracket_queue[-1]]
+        bracket_queue = bracket_queue[:-1]
+        bracket_pairs = tf.concat(
+            [
+                bracket_pairs,
+                tf.expand_dims(
+                    [left_idx, right_idx],
+                    axis=0)
+            ],
+            axis=0)
+
+        return idx, bracket_queue, bracket_pairs
+
+    def loop_body(idx, bracket_queue, bracket_pairs,
+            topology_chrs=topology_chrs):
+        # get the flag
+        chr_flag = topology_chrs[idx]
+
+        # if left
+        idx, bracket_queue, bracket_pairs = tf.cond(
             tf.equal(
-                topology_chrs,
-                '(')),
-        [-1])
+                chr_flag,
+                '('),
 
-    has_branches = tf.greater(
-        tf.shape(
-            left_bracket_idxs)[0],
-        0)
+            # if chr_flag == '('
+            lambda: if_left(idx, bracket_queue, bracket_pairs),
 
+            # else:
+            lambda: (idx, bracket_queue, bracket_pairs))
 
-    def handle_branches():
-        # if there is any brackets in the SMILES string, handle it
-        # if not,
-        # do nothing
+        # if right
+        idx, bracket_queue, bracket_pairs = tf.cond(
+            tf.equal(
+                chr_flag,
+                ')'),
 
-        # initialize a queue to put the positions of the parenthesis in
-        bracket_queue = tf.queue.FIFOQueue(
-            capacity=length,
-            dtypes=tf.int32)
+            # if chr_flag == '('
+            lambda: if_right(idx, bracket_queue, bracket_pairs),
 
-        def if_left(idx):
-            # if a certain position
-            # it is a left bracket
-            # put that bracket in the queue
-            bracket_queue.enqueue(idx)
-            return tf.constant(0, dtype=tf.float32)
+            # else:
+            lambda: (idx, bracket_queue, bracket_pairs))
 
-        def if_right(idx):
-            # if at a certain position
-            # it is a right bracket
-            # we need to do the following things
-            #   - get a left bracket out of the queue
-            #   - modify the adjaceny matrix
-            right_idx = topology_idxs[idx]
-            left_idx = topology_idxs[bracket_queue.dequeue()]
+        # increment
+        return idx+1, bracket_queue, bracket_pairs
 
-            # NOTE: it is impossible for a bracket to be at the end of
-            #       the smiles string
-            current_bond_order = adjacency_map[
-                right_idx, right_idx + 1]
+    # get rid of the first row
+    bracket_pairs = bracket_pairs[1:, ]
 
-            # drop the connection between right bracket and the atom right to it
-            adjacency_map[right_idx, right_idx + 1].assign(
-                tf.constant(0, dtype=tf.float32))
+    # while loop
+    max_iter = tf.shape(topology_idxs)[0]
+    idx = tf.constant(0)
+    _, _, bracket_pairs = tf.while_loop(
+        # condition
+        lambda idx, _0, _1: tf.less(idx, max_iter),
 
-            # connect the atom right of the right bracket to the atom left of
-            # the left bracket
-            adjacency_map[left_idx, right_idx + 1].assign(
-                current_bond_order)
+        # body
+        lambda idx, bracket_queue, bracket_pairs: \
+            loop_body(idx, bracket_queue, bracket_pairs),
 
-            return tf.constant(0, dtype=tf.float32)
+        # var
+        [idx, bracket_queue, bracket_pairs],
 
-        def loop_body(idx):
-            # get the flag
-            chr_flag = topology_chrs[idx]
-
-            tf.cond(
-                tf.equal(
-                    chr_flag,
-                    '('),
-
-                # if chr_flag == '('
-                lambda: if_left(idx),
-
-                # else:
-                lambda: tf.constant(0, tf.float32))
-
-            tf.cond(
-                tf.equal(
-                    chr_flag,
-                    ')'),
-
-                # if chr_flag ==')'
-                lambda: if_right(idx),
-
-                # else:
-                lambda: tf.constant(0, tf.float32))
-
-            # increment
-            return idx + 1
+        shape_invariants = [
+            idx.get_shape(),
+            tf.TensorShape((None, )),
+            tf.TensorShape((None, 2))
+        ])
 
 
-        # while loop to fill in the matrix
-        idx = tf.constant(0) # note that here we need to specify
-        max_iter = tf.constant(n_atoms)
+    left_bracket_idxs = bracket_pairs[:, 0]
+    right_bracket_idxs = bracket_pairs[:, 1]
 
-        tf.while_loop(
-            lambda idx: idx < max_iter,
-            lambda idx: loop_body(idx),
-            [idx])
+    # NOTE: it is impossible for a bracket to be at the end of
+    #       the smiles string
+    current_bond_idxs = tf.transpose(
+        tf.concat(
+            [
+                tf.expand_dims(
+                    right_bracket_idxs,
+                    0),
+                tf.expand_dims(
+                    right_bracket_idxs + 1,
+                    0)
+            ],
+            axis=0))
 
-        return tf.constant(0, dtype=tf.float32)
+    current_bond_order = tf.gather_nd(
+        adjacency_map,
+        current_bond_idxs)
 
-    # handle the branches if there is any
-    tf.cond(
-        # if has_branches == True:
-        has_branches,
+    new_bond_idxs = tf.transpose(
+        tf.concat(
+            [
+                tf.expand_dims(
+                    left_bracket_idxs,
+                    0),
+                tf.expand_dims(
+                    right_bracket_idxs + 1,
+                    0)
+            ],
+            axis=0))
 
-        lambda: handle_branches(),
+    # drop the connection between right bracket and the atom right to it
+    adjacency_map.scatter_nd_update(
+        current_bond_idxs,
+        tf.zeros_like(current_bond_order)
+    )
 
-        # else
-        lambda: tf.constant(0, dtype=tf.float32))
+    # connect the atom right of the right bracket to the atom left of
+    # the left bracket
+    adjacency_map.scatter_nd_update(
+        new_bond_idxs,
+        tf.ones_like(current_bond_order))
 
     # =====
     # rings
@@ -537,13 +573,29 @@ def smiles_to_organic_topological_molecule(smiles):
                     connection_chr)),
             [-1])
 
-        # NOTE: the bond closing the ring is always single bond
-        adjacency_map[
-            connection_idxs[0], connection_idx[1]].assign(
-                tf.constant(1, dtype=tf.float32s))
+        tf.cond(
+            tf.greater(
+                tf.shape(connection_idxs)[0],
+                0),
+
+            # if connection_idxs.shape[0] > 0
+            # NOTE: the bond closing the ring is always single bond
+            lambda: adjacency_map[
+                connection_idxs[0], connection_idxs[1]].assign(
+                    tf.constant(1, dtype=tf.float32)),
+
+            # else:
+            lambda: tf.constant(0, tf.float32))
+
 
         # increment
         return idx + 1
+
+    # NOTE:
+    #    tf.while_loop sometimes throws bugs here
+
+    for idx in range(max_iter):
+         loop_body(idx)
 
     # ===========
     # aromaticity
@@ -563,46 +615,38 @@ def smiles_to_organic_topological_molecule(smiles):
                 'A')),
         [-1])
 
+
     # we change the bond order of the aromatic atoms
     # to 1.5
     # now all the aromatic atoms should still be adjacent to each other
-    # while loop
-    idx = 0
-    max_iter = tf.shape(aromatic_idxs)[0]
+    current_bond_idxs = tf.transpose(
+        tf.concat(
+            [
+                tf.expand_dims(
+                    aromatic_idxs,
+                    0),
+                tf.expand_dims(
+                    aromatic_idxs+1,
+                    0)
+            ],
+            axis=0))
+
+    current_bond_order = tf.gather(
+        adjacency_map,
+        current_bond_idxs)
+
+    modified_bond_order = tf.where( # if
+        tf.greater_equal(
+            current_bond_order,
+            tf.constant(1, dtype=tf.float32)),
+
+        # if current_bond_order >= 1:
+        current_bond_order - 0.5,
+
+        # else:
+        # if there is no bond right now, then we don't do anything
+        current_bond_order)
 
 
-    def loop_body(idx):
-        # get the current aromatic idx
-        aromatic_idx = aromatic_idxs[idx]
-
-        # get the current bond order to see if they are connected
-        current_bond_order = adjacency_map[
-            aromatic_idx, aromatic_idx + 1]
-
-        tf.cond( # if
-            # the condition
-            tf.greater_equal(
-                current_bond_order,
-                tf.constant(
-                    1,
-                    dtype=tf.float32)),
-
-            # if true, minus one
-            lambda: adjacency_map[
-                aromatic_idx, aromatic_idx + 1].assign(
-                    current_bond_order\
-                    - tf.constant(0.5, dtype=tf.float32)),
-
-            # if false, do nothing
-            lambda: tf.constant(0, dtype=tf.float32)
-        )
-
-        # increment
-        return idx + 1
-
-    tf.while_loop(
-        lambda idx: tf.less(idx, max_iter), # condition
-        loop_body,
-        [idx])
 
     return atoms, adjacency_map
