@@ -36,49 +36,43 @@ tf.enable_eager_execution
 # utility classes
 # =============================================================================
 class Molecule(object):
-    """ An object signifying a molecule.
+    """ A base object signifying a molecule.
 
     Attributes
+    ----------
     atoms : tf.Tensor, shape = (n_atoms, ), dtype = tf.int64,
-        each entry is the index of one atom
-    bonds : tf.Tensor, shape = (n_bonds, 3), dtype = tf.int64,
-        each entry is (atom0, atom1, bond_order)
+        each entry is the index of one atom.
+    adjacency_map : tf.Tensor, shape = (n_atoms, n_atoms, ), dtype = tf.float32,
+        each entry $A_{ij}$ denotes the bond order between atom $i$ and $j$.
     """
 
     def __init__(
-        self,
-        include_charges=False,
-        include_chiralities=False):
+            self,
+            atoms=None,
+            adjacency_map=None):
 
         # initialize atoms and bonds object
-        self._atoms = tf.Variable([], dtype=tf.int64)
-        self._bonds = tf.Variable([[]], d type=tf.int64)
-
-        if include_charges == True:
-            self._charges = tf.Variable([], dtype=tf.int64)
-
-        if include_chiralities == True:
-            self._chiralities = tf.Variable([], dtype=tf.int64)
+        self._atoms = atoms
+        self._adjacency_map = adjacency_map
 
     @property
     def atoms(self):
         return self._atoms
 
+    @property
+    def adjacency_map(self):
+        return self._adjacency_map
+
     @atoms.setter
-    def atoms(self, atoms):
-        self._atoms = atoms
+    def atoms(self, _atoms):
+        self._atoms = _atoms
 
-    @property
-    def bonds(self):
-        return self._bonds
+    @adjacency_map.setter
+    def adjacency_map(self, _adjacency_map):
+        self._adjacency_map = _adjacency_map
 
-    @property
-    def charges(self):
-        return self._charges
 
-    @property
-    def chiralities(self):
-        return self._chiralities
-
-    def is_valid(self):
-        return True
+    def from_smiles(self, smiles):
+        import from_smiles
+        self._atoms, self._adjacency_map = \
+            from_smiles.smiles_to_organic_topological_molecule(smiles)
