@@ -39,7 +39,7 @@ import tensorflow as tf
 tf.enable_eager_execution()
 
 # packages
-# from gin.molecule import *
+from gin import molecule
 
 # =============================================================================
 # CONSTANTS
@@ -128,7 +128,7 @@ N_ATOM_COUNTER_STR = '|'.join(
     '@'
 ])
 
-
+dummy_list = []
 
 # =============================================================================
 # utility functions
@@ -174,29 +174,32 @@ def smiles_to_organic_topological_molecule(smiles):
                     '')),
             tf.int64)
 
-        # initialize the adjacency map
-        # the adjaceny map, by default,
-        # (a.k.a. where no topology characters presented,)
-        # should be an upper triangular matrix $A$,
-        # with
-        #
-        # $$
-        # A_{ij} = \begin{cases}
-        # 1, i = j + 1;
-        # 0, \mathtt{elsewhere}.
-        # \end{cases}
-        # $$
-        #
-        # for speed,
-        # we achieve this by
-        # deleting the first column and the last row
-        # of an identity matrix with one more column & row
+    # initialize the adjacency map
+    # the adjaceny map, by default,
+    # (a.k.a. where no topology characters presented,)
+    # should be an upper triangular matrix $A$,
+    # with
+    #
+    # $$
+    # A_{ij} = \begin{cases}
+    # 1, i = j + 1;
+    # 0, \mathtt{elsewhere}.
+    # \end{cases}
+    # $$
+    #
+    # for speed,
+    # we achieve this by
+    # deleting the first column and the last row
+    # of an identity matrix with one more column & row
 
-        # (n_atoms, n_atoms)
-        adjacency_map = tf.Variable(
-            tf.eye(
-                n_atoms + 1,
-                dtype=tf.float32)[1:, :-1]) # to enable aromatic bonds
+    # (n_atoms, n_atoms)
+    adjacency_map = tf.Variable(
+        lambda: tf.eye(
+            n_atoms + 1,
+            dtype=tf.float32)[1:, :-1]) # to enable aromatic bonds
+
+    dummy_list.append(adjacency_map)
+
 
     # ==========================
     # get rid of the longer bits
@@ -292,6 +295,7 @@ def smiles_to_organic_topological_molecule(smiles):
     atoms = tf.strings.to_number(
         atoms,
         tf.int64) # NOTE: int64 to be compatible
+
 
     # ==============================
     # handle the topology characters
@@ -394,6 +398,7 @@ def smiles_to_organic_topological_molecule(smiles):
             triple_bond_idxs,
             dtype=tf.float32) * 3)
 
+
     # ========
     # branches
     # ========
@@ -409,7 +414,7 @@ def smiles_to_organic_topological_molecule(smiles):
 
     # get a large matrix to record the pairs
     bracket_pairs = tf.constant(
-        [[0, 0]],
+        [[-1, -1]],
         tf.int64)
 
     first_right = tf.constant(True)
@@ -482,12 +487,11 @@ def smiles_to_organic_topological_molecule(smiles):
         # increment
         return idx+1, bracket_queue, bracket_pairs
 
-    # get rid of the first row
-    bracket_pairs = bracket_pairs[1:, ]
 
     # while loop
     max_iter = tf.shape(topology_idxs)[0]
     idx = tf.constant(0)
+
     _, _, bracket_pairs = tf.while_loop(
         # condition
         lambda idx, _0, _1: tf.less(idx, max_iter),
@@ -499,10 +503,13 @@ def smiles_to_organic_topological_molecule(smiles):
         # var
         [idx, bracket_queue, bracket_pairs],
 
-        shape_invariants = [
+        shape_invariants=[
             idx.get_shape(),
             tf.TensorShape([None, ]),
             tf.TensorShape([None, 2])])
+
+    # get rid of the first row
+    bracket_pairs = bracket_pairs[1:, ]
 
     # split into left and right brackets
     left_bracket_idxs = bracket_pairs[:, 0]
@@ -552,6 +559,7 @@ def smiles_to_organic_topological_molecule(smiles):
         new_bond_idxs,
         tf.ones_like(current_bond_order))
 
+
     # =====
     # rings
     # =====
@@ -565,8 +573,8 @@ def smiles_to_organic_topological_molecule(smiles):
     # two labeled atoms
 
     # while loop
-    idx = 0
-    max_iter = 5
+    idx = tf.constant(0, dtype=tf.int64)
+    max_iter = tf.constant(5, dtype=tf.int64)
     connection_chrs = tf.constant([
         '1',
         '2',
@@ -577,12 +585,13 @@ def smiles_to_organic_topological_molecule(smiles):
 
     # init bond indices and orders
     bond_idxs_to_update = tf.constant([[-1, -1]], dtype=tf.int64)
-    bond_orders_to_update = tf.constant([-1], dypte=tf.int64)
+    bond_orders_to_update = tf.constant([-1], dtype=tf.float32)
 
     def loop_body(
             idx,
             bond_idxs_to_update,
-            bond_orders_to_update):
+            bond_orders_to_update,
+            connection_chrs=connection_chrs):
 
         # get the connection character
         connection_chr = connection_chrs[idx]
@@ -597,21 +606,14 @@ def smiles_to_organic_topological_molecule(smiles):
                     connection_chr)),
             [-1])
 
-        bond_idxs_to_update = tf.cond(
-            tf.greater(
-                tf.shape(connection_idxs)[0],
-                0),
-
-            lambda: tf.concat(
-                [
-                    bond_idxs_to_update,
-                    tf.expand_dims(
-                        connection_idxs,
-                        0)
-                ],
-            axis=0),
-
-            lambda: bond_idxs_to_update)
+        bond_idxs_to_update = tf.concat(
+            [
+                bond_idxs_to_update,
+                tf.expand_dims(
+                    connection_idxs,
+                    0)
+            ],
+            axis=0)
 
         bond_orders_to_update = tf.cond(
             tf.greater(
@@ -631,12 +633,18 @@ def smiles_to_organic_topological_molecule(smiles):
             lambda: bond_orders_to_update)
 
         # increment
-        return idx + 1
+        return idx + 1, bond_idxs_to_update, bond_orders_to_update
 
     # for idx in range(max_iter):
     #      loop_body(idx)
+
     idx, bond_idxs_to_update, bond_orders_to_update = tf.while_loop(
-        lambda idx, _1, _2: tf.less(idx, max_iter),
+        lambda idx, _1, _2: tf.logical_and(
+            tf.less(idx, max_iter),
+            tf.reduce_any(
+                tf.equal(
+                    topology_chrs[idx],
+                    connection_chrs))),
 
         # loop body
         loop_body,
@@ -646,8 +654,10 @@ def smiles_to_organic_topological_molecule(smiles):
 
         shape_invariants=[
             idx.get_shape(),
-            tf.TensorShape([None, ]),
-            tf.TensorShape([None, 2])])
+            tf.TensorShape([None, 2]),
+            tf.TensorShape([None, ])],
+
+        parallel_iterations=5)
 
     # discard the first row
     bond_idxs_to_update = bond_idxs_to_update[1:, ]
@@ -1107,5 +1117,4 @@ def smiles_to_organic_topological_molecule(smiles):
         bond_idxs_to_update,
         bond_orders_to_update)
 
-
-    return molecule.Moleucle(atoms, adjacency_map)
+    return atoms, adjacency_map
