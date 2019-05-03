@@ -32,45 +32,52 @@ SOFTWARE.
 import tensorflow as tf
 tf.enable_eager_execution
 
-# =============================================================================
-# utility classes
-# =============================================================================
-class Molecule(object):
-    """ A base object signifying a molecule.
+import gin.molecule
 
-    Attributes
-    ----------
-    atoms : tf.Tensor, shape = (n_atoms, ), dtype = tf.int64,
-        each entry is the index of one atom.
-    adjacency_map : tf.Tensor, shape = (n_atoms, n_atoms, ), dtype = tf.float32,
-        each entry $A_{ij}$ denotes the bond order between atom $i$ and $j$.
+class MoleculesTrainable(Object):
+    """ A wrapper class for a list of molecules.
+
     """
+    def __init__(self):
+        pass
 
-    def __init__(
-            self,
-            atoms=None,
-            adjacency_map=None):
+    def from_list_of_smiles(list_of_smiles, batch_size=-1):
+        """ Parsing from a list of smiles string.
 
-        # initialize atoms and bonds object
-        self._atoms = atoms
-        self._adjacency_map = adjacency_map
+        Parameters
+        ----------
+        list_of_smiles : list
 
-    @property
-    def atoms(self):
-        return self._atoms
+        """
+        from gin.i_o import from_smiles
 
-    @property
-    def adjacency_map(self):
-        return self._adjacency_map
+        # init a empty dataset
+        ds = None
 
-    @atoms.setter
-    def atoms(self, _atoms):
-        self._atoms = _atoms
+        # decide batch_size
+        if batch_size == -1:
+            batch_size = len(ds_smiles)
 
-    @adjacency_map.setter
-    def adjacency_map(self, _adjacency_map):
-        self._adjacency_map = _adjacency_map
+        # calculate the number of batches
+        n_batches = int(len(ds_smiles) // batch_size) + 1
 
-    @property
-    def as_list(self):
-        return [self._atoms, self._adjacency_map]
+        for idx_batch in n_batches: # loop through batches
+            # process on batch
+            batch = list_of_smiles[idx * batch_size : (idx + 1) * batch_size]
+
+            # init atoms and edges
+            atoms_idxs = tf.constant([], dtype=tf.int64)
+            atoms_types = tf.constant([], dtype=tf.int64)
+            bonds = tf.constant([], dtype=tf.int64)
+            globals = tf.constant([], dtype=tf.int64)
+
+            # get the molecules
+            molecules = tf.map_fn(
+                from_smiles.smiles_to_organic_topological_molecule,
+                batch)
+
+            def loop_body(idx, atoms, bonds, molecules=molecules):
+                # get that specific molecule
+                molecule = molecules[idx]
+
+                #

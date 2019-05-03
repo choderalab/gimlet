@@ -30,47 +30,17 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution
+tf.enable_eager_execution()
+import gin.deterministic.typing
 
 # =============================================================================
-# utility classes
+# utility functions
 # =============================================================================
-class Molecule(object):
-    """ A base object signifying a molecule.
+def add_hydrogen(mol):
+    """ Add hydrogen to the molecule.
 
-    Attributes
+    Parameters
     ----------
-    atoms : tf.Tensor, shape = (n_atoms, ), dtype = tf.int64,
-        each entry is the index of one atom.
-    adjacency_map : tf.Tensor, shape = (n_atoms, n_atoms, ), dtype = tf.float32,
-        each entry $A_{ij}$ denotes the bond order between atom $i$ and $j$.
+    mol : gin.molecule.Molecule object
     """
-
-    def __init__(
-            self,
-            atoms=None,
-            adjacency_map=None):
-
-        # initialize atoms and bonds object
-        self._atoms = atoms
-        self._adjacency_map = adjacency_map
-
-    @property
-    def atoms(self):
-        return self._atoms
-
-    @property
-    def adjacency_map(self):
-        return self._adjacency_map
-
-    @atoms.setter
-    def atoms(self, _atoms):
-        self._atoms = _atoms
-
-    @adjacency_map.setter
-    def adjacency_map(self, _adjacency_map):
-        self._adjacency_map = _adjacency_map
-
-    @property
-    def as_list(self):
-        return [self._atoms, self._adjacency_map]
+    
