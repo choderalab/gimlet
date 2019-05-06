@@ -39,10 +39,10 @@ class TypingBase(object):
     """ Wrapper class for atom typing in General Amber Force Field.
 
     Organic atoms:
-    [C, N, O, S, P, F, Cl, Br]
+    [C, N, O, S, P, F, Cl, Br, I, H]
 
     Corresponding indices:
-    [0, 1, 2, 3, 4, 5, 6, 7]
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
     Methods
     -------
@@ -133,7 +133,7 @@ class TypingBase(object):
     @property
     def is_flourine(self):
         if not hasattr(self, '__is_flourine'):
-            self.__is_flourine = self.is_flourine()
+            self.__is_flourine = self._is_flourine()
 
         return self.__is_flourine
 
@@ -145,9 +145,56 @@ class TypingBase(object):
     @property
     def is_chlorine(self):
         if not hasattr(self, '__is_chlorine'):
-            self.__is_chlorine = self.is_chlorine
+            self.__is_chlorine = self._is_chlorine()
 
         return self.__is_chlorine
+
+    def _is_bromine(self):
+        return tf.equal(
+            self.atoms,
+            tf.constant(7, dtype=tf.int64))
+
+    @property
+    def is_bromine(self):
+        if not hasattr(self, '__is_chlorine'):
+            self.__is_bromine = self._is_bromine()
+
+        return self.__is_bromine
+
+    def _is_iodine(self):
+        return tf.equal(
+            self.atoms,
+            tf.constant(8, dtype=tf.int64))
+    @property
+    def is_iodine(self):
+        if not hasattr(self, '__is_iodine'):
+            self.__is_iodine = self._is_iodine()
+
+        return self.__is_iodine
+
+    def _is_hydrogen(self):
+        return tf.equal(
+            self.atoms,
+            tf.constant(9, dtype=tf.int64)
+        )
+
+    @property
+    def is_hydrogen(self):
+        if not hasattr(self, '__is_hydrogen'):
+            self.__is_hydrogen = self._is_hydrogen()
+
+        return self.__is_hydrogen
+
+    def _is_heavy(self):
+        return tf.logical_not(
+            tf.equal(
+                self.atoms,
+                tf.constant(8, dtype=tf.int64)))
+
+    @property
+    def is_heavy(self):
+        if not hasattr(self, '__is_heavy'):
+            self.__is_heavy = self._is_heavy()
 
     def _is_sp1(self):
         return tf.reduce_any(
@@ -165,10 +212,15 @@ class TypingBase(object):
 
     def _is_sp2(self):
         return tf.reduce_any(
-            tf.greater(
-                self.adjacency_map_full,
-                tf.constant(1, dtype=tf.float32)),
-            axis=0)
+            tf.logical_and(
+                tf.greater(
+                    self.adjacency_map_full,
+                    tf.constant(1, dtype=tf.float32)),
+                tf.less(
+                    self.adjacency_map_full,
+                    tf.constant(3, dtype=tf.float32)
+                ),
+            axis=0))
 
     @property
     def is_sp2(self):
@@ -182,7 +234,6 @@ class TypingBase(object):
             tf.less_equal(
                 self.adjacency_map_full,
                 tf.constant(1, dtype=tf.float32)))
-
     @property
     def is_sp3(self):
         if not hasattr(self, '__is_sp3'):
@@ -227,10 +278,28 @@ class TypingBase(object):
 
         return self.__is_connected_to_sulfur
 
+    def _is_connected_to_carbon(self):
+        carbon_connection_idxs = tf.boolean_mask(
+            self.adjacency_map_full,
+            self.is_carbon)
+        return tf.reduce_any(
+            tf.greater(
+                carbon_connection_idxs,
+                tf.constant(0, dtype=tf.float32)),
+            axis=1)
+
+    @property
+    def is_connected_to_carbon(self):
+        if not hasattr(self, '__is_connected_to_carbon'):
+            self.__is_connected_to_carbon \
+                = self._is_connected_to_carbon()
+
+        return self.__is_connected_to_carbon
+
     def _is_connected_to_sp1_carbon(self):
-        is_sp2_carbon = tf.logical_and(
-            self.is_carbon(),
-            self.is_sp1())
+        is_sp1_carbon = tf.logical_and(
+            self.is_carbon,
+            self.is_sp1)
         sp1_carbon_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
             is_sp1_carbon)
@@ -250,8 +319,8 @@ class TypingBase(object):
 
     def _is_connected_to_sp2_carbon(self):
         is_sp2_carbon = tf.logical_and(
-            self.is_carbon(),
-            self.is_sp2())
+            self.is_carbon,
+            self.is_sp2)
         sp2_carbon_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
             is_sp2_carbon)
@@ -271,8 +340,8 @@ class TypingBase(object):
 
     def _is_connected_to_sp3_carbon(self):
         is_sp3_carbon = tf.logical_and(
-            self.is_carbon(),
-            self.is_sp3())
+            self.is_carbon,
+            self.is_sp3)
         sp3_carbon_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
             is_sp2_carbon)
@@ -289,6 +358,114 @@ class TypingBase(object):
                 = self._is_connected_to_sp3_carbon()
 
         return self.__is_connected_to_sp3_carbon
+
+    def _is_connected_to_nitrogen(self):
+        nitrogen_connection_idxs = tf.boolean_mask(
+            self.adjacency_map_full,
+            self.is_nitrogen)
+        return tf.reduce_any(
+            tf.greater(
+                nitrogen_connection_idxs,
+                tf.constant(0, dtype=tf.float32)),
+            axis=1)
+
+    @property
+    def is_connected_to_nitrogen(self):
+        if not hasattr(self, '__is_connected_to_nitrogen'):
+            self.__is_connected_to_nitrogen \
+                = self._is_connected_to_nitrogen()
+
+        return self.__is_connected_to_nitrogen
+
+    def _is_connected_to_phosphorus(self):
+        phosphorus_connection_idxs = tf.boolean_mask(
+            self.adjacency_map_full,
+            self.is_phosphorus)
+        return tf.reduce_any(
+            tf.greater(
+                phosphorus_connection_idxs,
+                tf.constant(0, dtype=tf.float32)),
+            axis=1)
+
+    @property
+    def is_connected_to_phosphorus(self):
+        if not hasattr(self, '__is_connected_to_phosphorus'):
+            self.__is_connected_to_phosphorus \
+                = self._is_connected_to_phosphorus()
+
+        return self.__is_connected_to_nitrogen
+
+    def _is_connected_to_1_heavy(self):
+        return tf.equal(
+            tf.count_nonzero(
+                tf.boolean_mask(
+                    self.adjacency_map_full,
+                    self.is_heavy,
+                    axis=1),
+                axis=0),
+            tf.constant(1, dtype=tf.int64))
+
+    @property
+    def _is_connected_to_1_heavy(self):
+        if not hasattr(self, '__is_connected_to_1_heavy'):
+            self.__is_connected_to_1_heavy \
+                = self._is_connected_to_1_heavy()
+
+        return self.__is_connected_to_1_heavy
+
+    def _is_connected_to_2_heavy(self):
+        return tf.equal(
+            tf.count_nonzero(
+                tf.boolean_mask(
+                    self.adjacency_map_full,
+                    self.is_heavy,
+                    axis=1),
+                axis=0),
+            tf.constant(2, dtype=tf.int64))
+
+    @property
+    def _is_connected_to_2_heavy(self):
+        if not hasattr(self, '__is_connected_to_2_heavy'):
+            self.__is_connected_to_2_heavy \
+                = self._is_connected_to_2_heavy()
+
+        return self.__is_connected_to_3_heavy
+
+    def _is_connected_to_3_heavy(self):
+        return tf.equal(
+            tf.count_nonzero(
+                tf.boolean_mask(
+                    self.adjacency_map_full,
+                    self.is_heavy,
+                    axis=1),
+                axis=0),
+            tf.constant(3, dtype=tf.int64))
+
+    @property
+    def _is_connected_to_3_heavy(self):
+        if not hasattr(self, '__is_connected_to_3_heavy'):
+            self.__is_connected_to_3_heavy \
+                = self._is_connected_to_3_heavy()
+
+        return self.__is_connected_to_3_heavy
+
+    def _is_connected_to_4_heavy(self):
+        return tf.equal(
+            tf.count_nonzero(
+                tf.boolean_mask(
+                    self.adjacency_map_full,
+                    self.is_heavy,
+                    axis=1),
+                axis=0),
+            tf.constant(4, dtype=tf.int64))
+
+    @property
+    def _is_connected_to_4_heavy(self):
+        if not hasattr(self, '__is_connected_to_4_heavy'):
+            self.__is_connected_to_4_heavy \
+                = self._is_connected_to_4_heavy()
+
+        return self.__is_connected_to_4_heavy
 
     @tf.contrib.eager.defun
     def _is_in_ring(self):
@@ -985,6 +1162,27 @@ class TypingBase(object):
 
         return self.__is_aromatic
 
+    def _is_connected_to_aromatic(self):
+        return tf.greater(
+            tf.count_nonzero(
+                tf.boolean_mask(
+                    self.adjacency_map_full,
+                    self.is_aromatic,
+                    axis=1),
+                axis=0),
+            tf.constant(0, dtype=tf.int64))
+
+    @property
+    def is_connected_to_aromatic(self):
+        if not hasattr(self, '__is_connected_to_aromatic'):
+            self.__is_connected_to_aromatic \
+                = self._is_connected_to_aromatic()
+
+        return self.__is_connected_to_aromatic
+
+    def _is_hydrogen(self):
+
+
 class Typing(TypingBase):
     def __init__(self, mol):
         super(Typing, self).__init__(mol)
@@ -1104,13 +1302,7 @@ class TypingGAFF(TypingBase):
             self.is_nitrogen,
             tf.logical_and(
                 self.is_sp3,
-                tf.equal(
-                    tf.count_nonzero(
-                        tf.greater(
-                            self.adjacency_map_full,
-                            tf.constant(0, dtype=tf.float32),
-                        axis=0)),
-                    tf.constant(3, dtype=tf.int64))))
+                self.is_connected_to_3_heavy))
 
     def is_10(self):
         """ n4
@@ -1120,13 +1312,7 @@ class TypingGAFF(TypingBase):
             self.is_nitrogen,
             tf.logical_and(
                 self.is_sp3,
-                tf.equal(
-                    tf.count_nonzero(
-                        tf.greater(
-                            self.adjacency_map_full,
-                            tf.constant(0, dtype=tf.float32),
-                        axis=0)),
-                    tf.constant(4, dtype=tf.int64))))
+                self.is_connected_to_4_heavy))
 
     def is_11(self):
         """ na
@@ -1136,39 +1322,18 @@ class TypingGAFF(TypingBase):
             self.is_nitrogen,
             tf.logical_and(
                 self.is_sp2,
-                tf.equal(
-                    tf.count_nonzero(
-                        tf.greater(
-                            self.adjacency_map_full,
-                            tf.constant(0, dtype=tf.float32),
-                        axis=0)),
-                    tf.constant(3, dtype=tf.int64))))
+                self.is_connected_to_3_heavy))
 
     def is_12(self):
         """ nh
         amine nitrogen connected to aromatic rings
         """
-        is_amine_nitrogen = tf.logical_and(
-            self.is_nitrogen,
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(0, dtype=tf.int64)))
-
-        is_connected_to_aromatic_atom = tf.reduce_all(
-            tf.greater(
-                tf.boolean_mask(
-                    self.adjacency_map,
-                    self.is_aromatic),
-                tf.constant(0, dtype=tf.float32)),
-            axis=0)
-
         return tf.logical_and(
-            is_amine_nitrogen,
-            is_connected_to_atomic_atom)
+            self.is_nitrogen,
+            tf.logical_and(
+                tf.logical_and(
+                    self.is_connected_to_1_heavy,
+                    self.is_connected_to_aromatic)))
 
     def is_13(self):
         """ no
@@ -1197,13 +1362,7 @@ class TypingGAFF(TypingBase):
             tf.logical_and(
                 self.is_oxygen,
                 self.is_sp3),
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(0, dtype=tf.int64)))
+            self.is_connected_to_1_heavy)
 
     def is_16(self):
         """ os
@@ -1213,13 +1372,7 @@ class TypingGAFF(TypingBase):
             tf.logical_and(
                 self.is_oxygen,
                 self.is_sp3),
-            tf.greater(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(0, dtype=tf.int64)))
+            self.is_connected_to_2_heavy)
 
     def is_17(self):
         """ s2
@@ -1237,13 +1390,7 @@ class TypingGAFF(TypingBase):
             tf.logical_and(
                 self.is_sulfur,
                 self.is_sp3),
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(0, dtype=tf.int64)))
+            self.is_connected_to_1_heavy)
 
     def is_19(self):
         """ ss
@@ -1253,13 +1400,7 @@ class TypingGAFF(TypingBase):
             tf.logical_and(
                 self.is_sulfur,
                 self.is_sp3),
-            tf.greater(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(0, dtype=tf.int64)))
+            self.is_connected_to_2_heavy)
 
     def is_20(self):
         """ s4
@@ -1267,27 +1408,15 @@ class TypingGAFF(TypingBase):
         """
         return tf.logical_and(
             self.is_sulfur,
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(3, dtype=tf.int64)))
+            self.is_connected_to_3_heavy)
 
     def is_21(self):
         """ s4
-        hypervalent sulfur, 3 subst.
+        hypervalent sulfur, 4 subst.
         """
         return tf.logical_and(
             self.is_sulfur,
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(4, dtype=tf.int64)))
+            self.is_connected_to_4_heavy)
 
     def is_22(self):
         """ p2
@@ -1305,13 +1434,7 @@ class TypingGAFF(TypingBase):
             tf.logical_and(
                 self.is_phosphorus,
                 self.is_sp3),
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(3, dtype=tf.int64)))
+            self.is_connected_to_3_heavy)
 
     def is_24(self):
         """ p4
@@ -1322,24 +1445,93 @@ class TypingGAFF(TypingBase):
                 self.is_phosphorus,
                 tf.logical_not(
                     self.is_sp3)),
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(3, dtype=tf.int64)))
+            self.is_connected_to_3_heavy)
 
     def is_25(self):
         """ p5
         hypervalent phosphorus, 4 subst.
         """
         return tf.logical_and(
-            self.is_phosphorus,
-            tf.equal(
-                tf.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(0, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(3, dtype=tf.int64)))
+            tf.logical_and(
+                self.is_phosphorus,
+                tf.logical_not(
+                    self.is_sp3)),
+            self.is_connected_to_4_heavy)
+
+    def is_26(self):
+        """ hc
+        hydrogen on aliphatic carbon.
+        """
+        return tf.logical_and(
+            self.is_hydrogen,
+            tf.logical_and(
+                self.is_conncted_to_carbon,
+                tf.logical_not(
+                    self.is_aromatic)))
+
+    def is_27(self):
+        """ ha
+        hydrogen on aromatic carbon
+        """
+        return tf.logical_and(
+            self.is_hydrogen,
+            tf.logical_and(
+                self.is_connected_to_carbon,
+                self.is_aromatic))
+
+    def is_28(self):
+        """ hn
+        hydrogen on nitrogen.
+        """
+        return tf.logical_and(
+            self.is_hydrogen,
+            self.is_connected_to_nitrogen)
+
+    def is_29(self):
+        """ ho
+        hydrogen on oxygen
+        """
+        return tf.logical_and(
+            self.is_hydrogen,
+            self.is_connected_to_oxygen)
+
+    def is_30(self):
+        """ hs
+        hydrogen on sulfur
+        """
+        return tf.logical_and(
+            self.is_hydrogen,
+            self.is_connected_to_sulfur)
+
+    def is_31(self):
+        """ hp
+        hydrogen on phosphorus
+        """
+        return tf.logical_and(
+            self.is_hydrogen,
+            self.is_connected_to_phosphorus)
+
+    def is_32(self):
+        """ f
+        any fluorine
+        """
+        return self.is_flourine
+
+    def is_33(self):
+        """ cl
+        any chlorine
+        """
+        return self.is_chlorine
+
+    def is_34(self):
+        """ br
+        any bromine
+        """
+        return self.is_bromine
+
+    def is_35(self):
+        """ i
+        any iodine
+        """
+        return self.is_iodine
+        
