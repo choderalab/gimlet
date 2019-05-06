@@ -138,10 +138,10 @@ def smiles_to_organic_topological_molecule(smiles):
     """ Decode a SMILES string to a molecule object.
 
     Organic atoms:
-    [C, N, O, S, P, F, Cl, Br]
+    [C, N, O, S, P, F, Cl, Br, I]
 
     Corresponding indices:
-    [0, 1, 2, 3, 4, 5, 6, 7]
+    [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     NOTE: to speed things up, this is the minimalistic function to
           parse a small molecule, with no flags and assertions whatsoever.
@@ -286,6 +286,12 @@ def smiles_to_organic_topological_molecule(smiles):
         smiles_atoms_only,
         'R',
         '7')
+
+    # iodine
+    smiles_atoms_only = tf.strings.regex_replace(
+        smiles_atoms_only,
+        'I',
+        '8')
 
     # split it in order to convert to tf.Tensor with dtype=tf.int64
     atoms = tf.string_split(
