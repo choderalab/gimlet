@@ -89,10 +89,15 @@ ATOMS = [
 
 ORGANIC_ATOMS = [
     'C',
+    'c',
     'N',
+    'n',
     'O',
+    'o',
     'S',
+    's',
     'P',
+    'p',
     'F',
     'R', # Br
     'L', # Cl
@@ -224,7 +229,7 @@ def smiles_to_organic_topological_molecule(smiles):
         '')
 
     smiles_aromatic = tf.strings.regex_replace(
-        smiles,
+        smiles_atoms_only,
         'c|n|o|p',
         'A')
 
@@ -598,19 +603,19 @@ def smiles_to_organic_topological_molecule(smiles):
             bond_idxs_to_update,
             bond_orders_to_update,
             connection_chrs=connection_chrs):
-
         # get the connection character
         connection_chr = connection_chrs[idx]
-
         # search for this in the SMILES string
         # NOTE: we assume that there are two of them,
         #       again, unapologetically, we don't put any assertion here
-        connection_idxs = tf.reshape(
-            tf.where(
-                tf.equal(
-                    topology_chrs,
-                    connection_chr)),
-            [-1])
+        connection_idxs = tf.gather(
+            topology_idxs,
+            tf.reshape(
+                tf.where(
+                    tf.equal(
+                        topology_chrs,
+                        connection_chr)),
+                [-1]))
 
         bond_idxs_to_update = tf.concat(
             [
@@ -641,29 +646,37 @@ def smiles_to_organic_topological_molecule(smiles):
         # increment
         return idx + 1, bond_idxs_to_update, bond_orders_to_update
 
-    # for idx in range(max_iter):
-    #      loop_body(idx)
+    idx, bond_idxs_to_update, bond_orders_to_update = tf.case(
+        [(
+            tf.greater(
+                tf.shape(topology_chrs)[0],
+                0),
 
-    idx, bond_idxs_to_update, bond_orders_to_update = tf.while_loop(
-        lambda idx, _1, _2: tf.logical_and(
-            tf.less(idx, max_iter),
-            tf.reduce_any(
-                tf.equal(
-                    topology_chrs[idx],
-                    connection_chrs))),
+            lambda: tf.while_loop(
+                lambda idx, _1, _2: tf.logical_and(
+                    tf.less(idx, max_iter),
+                    tf.logical_and(
+                        tf.reduce_any(
+                            tf.equal(
+                                connection_chrs[idx],
+                                topology_chrs)),
+                        tf.greater(tf.shape(topology_chrs)[0], 0))),
 
-        # loop body
-        loop_body,
+                # loop body
+                loop_body,
 
-        # vars
-        [idx, bond_idxs_to_update, bond_orders_to_update],
+                # vars
+                [idx, bond_idxs_to_update, bond_orders_to_update],
 
-        shape_invariants=[
-            idx.get_shape(),
-            tf.TensorShape([None, 2]),
-            tf.TensorShape([None, ])],
+                shape_invariants=[
+                    idx.get_shape(),
+                    tf.TensorShape([None, 2]),
+                    tf.TensorShape([None, ])],
 
-        parallel_iterations=5)
+                parallel_iterations=5)
+        )],
+
+        default=lambda: (idx, bond_idxs_to_update, bond_orders_to_update))
 
     # discard the first row
     bond_idxs_to_update = bond_idxs_to_update[1:, ]
@@ -672,6 +685,7 @@ def smiles_to_organic_topological_molecule(smiles):
     adjacency_map.scatter_nd_update(
         bond_idxs_to_update,
         bond_orders_to_update)
+
 
     # ===========
     # aromaticity
@@ -692,21 +706,50 @@ def smiles_to_organic_topological_molecule(smiles):
                 'A')),
         [-1])
 
-
     # we change the bond order of the aromatic atoms
     # to 1.5
     # now all the aromatic atoms should still be adjacent to each other
-    current_bond_idxs = tf.transpose(
-        tf.concat(
-            [
-                tf.expand_dims(
-                    aromatic_idxs,
-                    0),
-                tf.expand_dims(
-                    aromatic_idxs+1,
-                    0)
-            ],
-            axis=0))
+    aromatic_adjacency_map = tf.gather(
+        tf.gather(
+            adjacency_map,
+            aromatic_idxs,
+            axis=0),
+        aromatic_idxs,
+        axis=1)
+
+    # dirty stuff to get the bond indices to update
+    aromatic_idxs_x, aromatic_idxs_y = tf.meshgrid(
+        tf.range(
+            tf.cast(
+                tf.shape(aromatic_idxs)[0],
+                tf.int64),
+            dtype=tf.int64),
+        tf.range(
+            tf.cast(
+                tf.shape(aromatic_idxs)[0],
+                tf.int64),
+            dtype=tf.int64))
+
+    aromatic_idxs_stack = tf.stack(
+        [
+            aromatic_idxs_x,
+            aromatic_idxs_y
+        ],
+        axis=2)
+
+    aromatic_idxs_2d = tf.boolean_mask(
+        aromatic_idxs_stack,
+        aromatic_adjacency_map)
+
+    current_bond_idxs = tf.reverse(
+        tf.reshape(
+            tf.gather(
+                aromatic_idxs,
+                tf.reshape(
+                    aromatic_idxs_2d,
+                    [-1])),
+            shape=tf.shape(aromatic_idxs_2d)),
+        axis=[1])
 
     current_bond_order = tf.gather_nd(
         adjacency_map,
