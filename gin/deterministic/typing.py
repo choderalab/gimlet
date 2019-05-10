@@ -196,6 +196,8 @@ class TypingBase(object):
         if not hasattr(self, '__is_heavy'):
             self.__is_heavy = self._is_heavy()
 
+        return self.__is_heavy
+
     def _is_sp1(self):
         return tf.reduce_any(
             tf.greater_equal(
@@ -242,7 +244,7 @@ class TypingBase(object):
         return self.__is_sp3
 
     def _is_connected_to_oxygen(self):
-        is_oxygen = self.is_oxygen()
+        is_oxygen = self.is_oxygen
         oxygen_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
             is_oxygen)
@@ -251,7 +253,7 @@ class TypingBase(object):
             tf.greater(
                 oxygen_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_oxygen(self):
@@ -261,7 +263,7 @@ class TypingBase(object):
         return self.__is_connected_to_oxygen
 
     def _is_connected_to_sulfur(self):
-        is_oxygen = self.is_oxygen()
+        is_oxygen = self.is_oxygen
         oxygen_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
             is_oxygen)
@@ -269,7 +271,7 @@ class TypingBase(object):
             tf.greater(
                 oxygen_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_sulfur(self):
@@ -286,7 +288,7 @@ class TypingBase(object):
             tf.greater(
                 carbon_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_carbon(self):
@@ -307,7 +309,7 @@ class TypingBase(object):
             tf.greater(
                 sp1_carbon_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_sp1_carbon(self):
@@ -328,12 +330,12 @@ class TypingBase(object):
             tf.greater(
                 sp2_carbon_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_sp2_carbon(self):
         if not hasattr(self, '__is_connected_to_sp2_carbon'):
-            self.__is_connected_to_sp1_carbon \
+            self.__is_connected_to_sp2_carbon \
                 = self._is_connected_to_sp2_carbon()
 
         return self.__is_connected_to_sp2_carbon
@@ -349,7 +351,7 @@ class TypingBase(object):
             tf.greater(
                 sp3_carbon_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_sp3_carbon(self):
@@ -367,7 +369,7 @@ class TypingBase(object):
             tf.greater(
                 nitrogen_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_nitrogen(self):
@@ -385,7 +387,7 @@ class TypingBase(object):
             tf.greater(
                 phosphorus_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
-            axis=1)
+            axis=0)
 
     @property
     def is_connected_to_phosphorus(self):
@@ -406,7 +408,7 @@ class TypingBase(object):
             tf.constant(1, dtype=tf.int64))
 
     @property
-    def _is_connected_to_1_heavy(self):
+    def is_connected_to_1_heavy(self):
         if not hasattr(self, '__is_connected_to_1_heavy'):
             self.__is_connected_to_1_heavy \
                 = self._is_connected_to_1_heavy()
@@ -424,12 +426,12 @@ class TypingBase(object):
             tf.constant(2, dtype=tf.int64))
 
     @property
-    def _is_connected_to_2_heavy(self):
+    def is_connected_to_2_heavy(self):
         if not hasattr(self, '__is_connected_to_2_heavy'):
             self.__is_connected_to_2_heavy \
                 = self._is_connected_to_2_heavy()
 
-        return self.__is_connected_to_3_heavy
+        return self.__is_connected_to_2_heavy
 
     def _is_connected_to_3_heavy(self):
         return tf.equal(
@@ -442,7 +444,7 @@ class TypingBase(object):
             tf.constant(3, dtype=tf.int64))
 
     @property
-    def _is_connected_to_3_heavy(self):
+    def is_connected_to_3_heavy(self):
         if not hasattr(self, '__is_connected_to_3_heavy'):
             self.__is_connected_to_3_heavy \
                 = self._is_connected_to_3_heavy()
@@ -460,14 +462,14 @@ class TypingBase(object):
             tf.constant(4, dtype=tf.int64))
 
     @property
-    def _is_connected_to_4_heavy(self):
+    def is_connected_to_4_heavy(self):
         if not hasattr(self, '__is_connected_to_4_heavy'):
             self.__is_connected_to_4_heavy \
                 = self._is_connected_to_4_heavy()
 
         return self.__is_connected_to_4_heavy
 
-    # @tf.contrib.eager.defun
+    @tf.contrib.eager.defun
     def _is_in_ring(self):
         """ Determine whether an atom in a molecule is in a ring or not.
         """
@@ -488,18 +490,11 @@ class TypingBase(object):
             idx = queue[-1]
             queue = queue[:-1]
 
-            print('root')
-            print(root)
-            print('idx')
-            print(idx)
-            print('queue')
-            print(queue)
-
             # flag the position of self
             is_self = tf.equal(
                 tf.range(
                     tf.cast(
-                        tf.shape(adjacency_map_full)[0],
+                        self.adjacency_map_full.shape[0],
                         tf.int64),
                     dtype=tf.int64),
                 idx)
@@ -507,14 +502,14 @@ class TypingBase(object):
             is_root = tf.equal(
                 tf.range(
                     tf.cast(
-                        tf.shape(adjacency_map_full)[0],
+                        self.adjacency_map_full.shape[0],
                         tf.int64),
                     dtype=tf.int64),
                 root)
 
             # flag the neighbors
             is_neighbors = tf.greater(
-                adjacency_map_full[idx, :],
+                self.adjacency_map_full[idx, :],
                 tf.constant(0, dtype=tf.float32))
 
             # check whether root is in the neighbors
@@ -564,7 +559,7 @@ class TypingBase(object):
             neighbors_unvisited = tf.boolean_mask(
                 tf.range(
                     tf.cast(
-                        tf.shape(adjacency_map_full)[0],
+                        self.adjacency_map_full.shape[0],
                         tf.int64),
                     dtype=tf.int64),
                 is_unvisited_neighbors)
@@ -573,18 +568,15 @@ class TypingBase(object):
             queue = tf.concat(
                 [
                     queue,
-                    neighbors_unvisited,
+                    neighbors_unvisited
                 ],
                 axis=0)
 
             # put self as the parent for the neighbors that are not visited
             parents = tf.where(
-                is_unvisited_neighbors,
+                is_neighbors,
 
-                # if is_unvisited_neighbors
-                idx * tf.ones(
-                    (tf.shape(is_unvisited_neighbors)[0], ),
-                    dtype=tf.int64),
+                tf.ones_like(parents) * idx,
 
                 parents)
 
@@ -618,7 +610,7 @@ class TypingBase(object):
                     False,
                     0),
                 tf.expand_dims(
-                    tf.shape(adjacency_map_full)[0],
+                    self.adjacency_map_full.shape[0],
                     0))
 
             # put the root in the queue
@@ -628,7 +620,7 @@ class TypingBase(object):
 
             # init parents
             parents = tf.ones(
-                (tf.shape(adjacency_map_full)[0]),
+                (self.adjacency_map_full.shape[0]),
                 dtype=tf.int64) \
                 * -1
 
@@ -678,7 +670,7 @@ class TypingBase(object):
             lambda root, _: tf.less(
                 root,
                 tf.cast(
-                    tf.shape(self.adjacency_map_full)[0],
+                    self.adjacency_map_full.shape[0],
                     tf.int64)),
 
             # body
@@ -707,7 +699,7 @@ class TypingBase(object):
         """ Determine whether an atom in a molecule is in a conjugated
         system or not.
         """
-
+        # TODO: when compiling this into a graph, it throws error
         sp2_idxs = tf.boolean_mask(
             tf.range(
                 tf.cast(
@@ -940,7 +932,9 @@ class TypingBase(object):
                     visited)),
 
             # loop_body
-            loop_body_outer,
+            lambda conjugate_systems, visited: loop_body_outer(
+                conjugate_systems, visited,
+                sp2_adjacency_map=sp2_adjacency_map),
 
             # loop var
             [conjugate_systems, visited],
@@ -1024,7 +1018,8 @@ class TypingBase(object):
                 parents,
                 queue,
                 is_in_ring_,
-                adjacency_map_full=adjacency_map_conjugate_system):
+                ring_detected,
+                adjacency_map_conjugate_system=adjacency_map_conjugate_system):
 
             # dequeue
             idx = queue[-1]
@@ -1034,14 +1029,22 @@ class TypingBase(object):
             is_self = tf.equal(
                 tf.range(
                     tf.cast(
-                        tf.shape(adjacency_map_full)[0],
+                        adjacency_map_conjugate_system.shape[0],
                         tf.int64),
                     dtype=tf.int64),
                 idx)
 
+            is_root = tf.equal(
+                tf.range(
+                    tf.cast(
+                        adjacency_map_conjugate_system.shape[0],
+                        tf.int64),
+                    dtype=tf.int64),
+                root)
+
             # flag the neighbors
             is_neighbors = tf.greater(
-                adjacency_map_full[idx, :],
+                adjacency_map_conjugate_system[idx, :],
                 tf.constant(0, dtype=tf.float32))
 
             # check whether root is in the neighbors
@@ -1058,7 +1061,6 @@ class TypingBase(object):
                 tf.logical_not(
                     parent_is_root))
 
-
             # put self and root in the ring
             is_in_ring_ = tf.cond(
                 ring_detected,
@@ -1067,12 +1069,13 @@ class TypingBase(object):
                 lambda: tf.where(
                     tf.logical_or(
                         is_self,
-                        parent_is_root),
+                        is_root),
 
                     tf.tile(
                         tf.expand_dims(
                             tf.constant(True),
                             0),
+
                         tf.expand_dims(
                             tf.shape(is_in_ring_)[0],
                             0)),
@@ -1087,40 +1090,54 @@ class TypingBase(object):
                 tf.logical_not(
                     visited))
 
-            idxs_unvisited_neighbors = tf.boolean_mask(
+            # get the states of the neighbors
+            neighbors_unvisited = tf.boolean_mask(
                 tf.range(
                     tf.cast(
-                        tf.shape(adjacency_map_full)[0],
-                        tf.int64)),
+                        adjacency_map_conjugate_system.shape[0],
+                        tf.int64),
+                    dtype=tf.int64),
                 is_unvisited_neighbors)
-
 
             # enqueue
             queue = tf.concat(
                 [
                     queue,
-                    idxs_unvisited_neighbors,
+                    neighbors_unvisited
                 ],
                 axis=0)
 
             # put self as the parent for the neighbors that are not visited
             parents = tf.where(
-                is_unvisited_neighbors,
+                is_neighbors,
 
-                # if is_unvisited_neighbors
-                idx * tf.ones(
-                    (tf.shape(is_unvisited_neighbors)[0], ),
-                    dtype=tf.int64),
+                tf.ones_like(parents) * idx,
 
                 parents)
 
-            return root, visited, parents, queue, is_in_ring_
+            visited = tf.where(
+                tf.logical_or(
+                    is_self,
+                    is_unvisited_neighbors),
+
+                    tf.tile(
+                        tf.expand_dims(
+                            tf.constant(True),
+                            0),
+
+                        tf.expand_dims(
+                            tf.shape(is_unvisited_neighbors)[0],
+                            0)),
+
+                    visited)
+
+            return root, visited, parents, queue, is_in_ring_, ring_detected
 
         # define outer loop body
         def loop_body_outer(
                 root,
                 is_in_ring_,
-                adjacency_map_full=adjacency_map_conjugate_system):
+                adjacency_map_conjugate_system=adjacency_map_conjugate_system):
 
             # init visited flags as all False
             visited = tf.tile(
@@ -1128,7 +1145,7 @@ class TypingBase(object):
                     False,
                     0),
                 tf.expand_dims(
-                    tf.shape(adjacency_map_full)[0],
+                    adjacency_map_conjugate_system.shape[0],
                     0))
 
             # put the root in the queue
@@ -1138,31 +1155,35 @@ class TypingBase(object):
 
             # init parents
             parents = tf.ones(
-                (tf.shape(adjacency_map_full)[0]),
+                (adjacency_map_conjugate_system.shape[0]),
                 dtype=tf.int64) \
                 * -1
 
+            ring_detected = tf.constant(False)
+
             # execute inner loop
-            root, visited, parents, queue, is_in_ring_\
+            root, visited, parents, queue, is_in_ring_, ring_detected\
                 = tf.while_loop(
                     # condition
-                    lambda root, visited, parents, queue, is_in_ring_:\
-                        tf.greater(
-                            tf.shape(queue)[0],
-                            0),
+                    lambda root, visited, parents, queue,
+                        is_in_ring_, ring_detected:\
+                            tf.greater(
+                                tf.shape(queue)[0],
+                                0),
 
                     # loop body
                     loop_body_inner,
 
                     # loop var
-                    [root, visited, parents, queue, is_in_ring_],
+                    [root, visited, parents, queue, is_in_ring_, ring_detected],
 
                     shape_invariants=[
                         root.get_shape(),
                         visited.get_shape(),
                         parents.get_shape(),
                         tf.TensorShape([None, ]),
-                        is_in_ring_.get_shape()
+                        is_in_ring_.get_shape(),
+                        ring_detected.get_shape()
                     ])
 
             # increment
@@ -1172,11 +1193,11 @@ class TypingBase(object):
         root = tf.constant(0, dtype=tf.int64)
         is_in_ring_ = tf.tile(
             tf.expand_dims(
-                tf.constant(True),
+                tf.constant(False),
                 0),
 
             tf.expand_dims(
-                tf.shape(self.adjacency_map_full)[0],
+                tf.shape(adjacency_map_conjugate_system)[0],
                 0))
 
         _, is_in_ring_ = tf.while_loop(
@@ -1184,7 +1205,7 @@ class TypingBase(object):
             lambda root, _: tf.less(
                 root,
                 tf.cast(
-                    tf.shape(self.adjacency_map_full)[0],
+                    adjacency_map_conjugate_system.shape[0],
                     tf.int64)),
 
             # body
@@ -1202,11 +1223,15 @@ class TypingBase(object):
         # get the aromatic indices
         aromatic_idxs = tf.gather(
             tf.range(
-                tf.shape(self.adjacency_map_full)[0],
+                tf.cast(
+                    tf.shape(self.adjacency_map_full)[0],
+                    tf.int64),
                 dtype=tf.int64),
             tf.boolean_mask(
                 tf.range(
-                    tf.shape(adjacency_map_conjugate_system)[0],
+                    tf.cast(
+                        tf.shape(adjacency_map_conjugate_system)[0],
+                        tf.int64),
                     dtype=tf.int64),
                 is_in_ring_))
 
@@ -1214,8 +1239,10 @@ class TypingBase(object):
         is_aromatic_ = tf.reduce_any(
             tf.equal(
                 tf.range(
-                    tf.shape(self.adjacency_map_full)[0],
-                    tf.int64),
+                    tf.cast(
+                        tf.shape(self.adjacency_map_full)[0],
+                        tf.int64),
+                    dtype=tf.int64),
 
                 tf.tile(
                     tf.expand_dims(
@@ -1224,8 +1251,7 @@ class TypingBase(object):
                     [
                         1,
                         tf.shape(self.adjacency_map_full)[0]
-                    ],
-                    axis=0)),
+                    ])),
             axis=0)
 
         return is_aromatic_
@@ -1244,7 +1270,7 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     self.is_aromatic,
                     axis=1),
-                axis=0),
+                axis=1),
             tf.constant(0, dtype=tf.int64))
 
     @property
@@ -1255,10 +1281,16 @@ class TypingBase(object):
 
         return self.__is_connected_to_aromatic
 
+    def get_assignment(self):
+        """ Assign the typing in the forcefield in to atoms.
+
+        """
+        pass
+
 
 class Typing(TypingBase):
     def __init__(self, mol):
-        super(Typing, self).__init__(mol)
+        super(Typing, self).__init__()
 
 class TypingGAFF(TypingBase):
     """ Produce typing for GAFF.
@@ -1268,8 +1300,8 @@ class TypingGAFF(TypingBase):
 
 
     """
-    def __init__(self):
-        super(Typing, self).__init__(mol)
+    def __init__(self, mol):
+        super(TypingGAFF, self).__init__(mol)
 
     def is_1(self):
         """ c
@@ -1279,10 +1311,9 @@ class TypingGAFF(TypingBase):
             self.is_carbon,
             tf.logical_and(
                 self.is_sp2,
-                tf.logical_and(
-                    tf.logical_or(
-                        self.is_connected_to_oxygen,
-                        self.is_connected_to_sulfur))))
+                tf.logical_or(
+                    self.is_connected_to_oxygen,
+                    self.is_connected_to_sulfur)))
 
     def is_2(self):
         """ c1
@@ -1331,13 +1362,15 @@ class TypingGAFF(TypingBase):
 
         carbonyl_carbon_idxs = tf.boolean_mask(
             tf.range(
-                tf.shape(self.adjacency_map_full)[0],
+                tf.cast(
+                    tf.shape(self.adjacency_map_full)[0],
+                    tf.int64),
                 dtype=tf.int64),
             is_carbonyl_carbon)
 
         return tf.logical_and(
             self.is_nitrogen,
-            tf.logical_any(
+            tf.reduce_any(
                 tf.greater(
                     tf.gather(
                         self.adjacency_map_full,
@@ -1363,8 +1396,8 @@ class TypingGAFF(TypingBase):
                 tf.count_nonzero(
                     tf.greater(
                         self.adjacency_map_full,
-                        tf.constant(1, dtype=tf.float32),
-                    axis=0)),
+                        tf.constant(1, dtype=tf.float32)),
+                    axis=0),
                 tf.constant(2, dtype=tf.int64)))
 
     def is_9(self):
@@ -1404,9 +1437,8 @@ class TypingGAFF(TypingBase):
         return tf.logical_and(
             self.is_nitrogen,
             tf.logical_and(
-                tf.logical_and(
-                    self.is_connected_to_1_heavy,
-                    self.is_connected_to_aromatic)))
+                self.is_connected_to_1_heavy,
+                self.is_connected_to_aromatic))
 
     def is_13(self):
         """ no
@@ -1538,7 +1570,7 @@ class TypingGAFF(TypingBase):
         return tf.logical_and(
             self.is_hydrogen,
             tf.logical_and(
-                self.is_conncted_to_carbon,
+                self.is_connected_to_carbon,
                 tf.logical_not(
                     self.is_aromatic)))
 
@@ -1607,3 +1639,40 @@ class TypingGAFF(TypingBase):
         any iodine
         """
         return self.is_iodine
+
+    def get_assignment(self):
+        fn_array = [getattr(self, 'is_' + str(idx)) for idx in range(1, 36)]
+
+        # use paralleled while loop for this assignment
+        idx = tf.constant(1, dtype=tf.int64)
+        assignment = tf.constant(-1, dtype=tf.int64) \
+            * tf.ones(
+                (self.n_atoms, ),
+                dtype=tf.int64)
+
+        def loop_body(idx, assignment):
+            # get the function
+            fn = fn_array[idx - 1]
+            is_this_type = fn()
+            assignment = tf.where(
+                is_this_type,
+
+                # when it is of this type
+                idx * tf.ones(
+                    (tf.shape(assignment)[0], ),
+                    dtype=tf.int64),
+
+                # when it is not
+                assignment)
+
+            return idx + 1, assignment
+
+        _, assignment = tf.while_loop(
+            lambda idx, _: tf.less(idx, 36),
+
+            loop_body,
+
+            [idx, assignment])
+
+        self.assignment = assignment
+        return self.assignment
