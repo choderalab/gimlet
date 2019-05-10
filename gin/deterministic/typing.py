@@ -221,21 +221,22 @@ class TypingBase(object):
                 tf.less(
                     self.adjacency_map_full,
                     tf.constant(3, dtype=tf.float32)
-                ),
-            axis=0))
+                )),
+            axis=1)
 
     @property
     def is_sp2(self):
         if not hasattr(self, '__is_sp2'):
-            self.__is_sp1 = self._is_sp1()
+            self.__is_sp2 = self._is_sp2()
 
-        return self.__is_sp1
+        return self.__is_sp2
 
     def _is_sp3(self):
         return tf.reduce_all(
             tf.less_equal(
                 self.adjacency_map_full,
-                tf.constant(1, dtype=tf.float32)))
+                tf.constant(1, dtype=tf.float32)),
+            axis=0)
     @property
     def is_sp3(self):
         if not hasattr(self, '__is_sp3'):
