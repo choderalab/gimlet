@@ -695,7 +695,7 @@ class TypingBase(object):
 
         return self.__is_in_ring
 
-    # @tf.contrib.eager.defun
+    @tf.contrib.eager.defun
     def _is_in_conjugate_system(self):
         """ Determine whether an atom in a molecule is in a conjugated
         system or not.
@@ -749,6 +749,8 @@ class TypingBase(object):
             sp2_idxs,
             axis=1)
 
+        self.sp2_adjacency_map = sp2_adjacency_map
+
         # init conjugate_systems
         conjugate_systems = tf.expand_dims(
             tf.ones_like(sp2_idxs) \
@@ -774,14 +776,14 @@ class TypingBase(object):
             is_self = tf.equal(
                 tf.range(
                     tf.cast(
-                        tf.shape(sp2_adjacency_map)[0],
+                        tf.shape(self.sp2_adjacency_map)[0],
                         tf.int64),
                     dtype=tf.int64),
                 idx)
 
             # flag the neighbors
             is_neighbors = tf.greater(
-                sp2_adjacency_map[idx, :],
+                self.sp2_adjacency_map[idx, :],
                 tf.constant(0, dtype=tf.float32))
 
             # flag the neighbors that are not visited
@@ -814,7 +816,7 @@ class TypingBase(object):
             neighbors_unvisited = tf.boolean_mask(
                 tf.range(
                     tf.cast(
-                        tf.shape(sp2_adjacency_map)[0],
+                        tf.shape(self.sp2_adjacency_map)[0],
                         tf.int64),
                     dtype=tf.int64),
                 is_unvisited_neighbors)
@@ -865,7 +867,7 @@ class TypingBase(object):
                 tf.boolean_mask(
                     tf.range(
                         tf.cast(
-                            tf.shape(sp2_adjacency_map)[0],
+                            tf.shape(self.sp2_adjacency_map)[0],
                             tf.int64),
                         dtype=tf.int64),
                     tf.logical_not(visited))[0],
@@ -988,7 +990,7 @@ class TypingBase(object):
 
         return self.__is_in_conjugate_system
 
-    # @tf.contrib.eager.defun
+    @tf.contrib.eager.defun
     def _is_aromatic(self):
         """ Determine whether the atoms are in an aromatic system.
 
@@ -1008,6 +1010,8 @@ class TypingBase(object):
                 axis=0),
             is_in_conjugate_system_,
             axis=1)
+
+        self.adjacency_map_conjugate_system = adjacency_map_conjugate_system
 
         # TODO: currently this is kinda slow since we do this for each
         #       atom. Think about another way to do this!
@@ -1030,7 +1034,7 @@ class TypingBase(object):
             is_self = tf.equal(
                 tf.range(
                     tf.cast(
-                        adjacency_map_conjugate_system.shape[0],
+                        tf.shape(self.adjacency_map_conjugate_system)[0],
                         tf.int64),
                     dtype=tf.int64),
                 idx)
@@ -1038,14 +1042,14 @@ class TypingBase(object):
             is_root = tf.equal(
                 tf.range(
                     tf.cast(
-                        adjacency_map_conjugate_system.shape[0],
+                        tf.shape(self.adjacency_map_conjugate_system)[0],
                         tf.int64),
                     dtype=tf.int64),
                 root)
 
             # flag the neighbors
             is_neighbors = tf.greater(
-                adjacency_map_conjugate_system[idx, :],
+                self.adjacency_map_conjugate_system[idx, :],
                 tf.constant(0, dtype=tf.float32))
 
             # check whether root is in the neighbors
@@ -1095,7 +1099,7 @@ class TypingBase(object):
             neighbors_unvisited = tf.boolean_mask(
                 tf.range(
                     tf.cast(
-                        adjacency_map_conjugate_system.shape[0],
+                        tf.shape(self.adjacency_map_conjugate_system)[0],
                         tf.int64),
                     dtype=tf.int64),
                 is_unvisited_neighbors)
@@ -1146,7 +1150,7 @@ class TypingBase(object):
                     False,
                     0),
                 tf.expand_dims(
-                    adjacency_map_conjugate_system.shape[0],
+                    tf.shape(self.adjacency_map_conjugate_system)[0],
                     0))
 
             # put the root in the queue
@@ -1156,7 +1160,7 @@ class TypingBase(object):
 
             # init parents
             parents = tf.ones(
-                (adjacency_map_conjugate_system.shape[0]),
+                (tf.shape(self.adjacency_map_conjugate_system)[0], ),
                 dtype=tf.int64) \
                 * -1
 
@@ -1198,7 +1202,7 @@ class TypingBase(object):
                 0),
 
             tf.expand_dims(
-                tf.shape(adjacency_map_conjugate_system)[0],
+                tf.shape(self.adjacency_map_conjugate_system)[0],
                 0))
 
         _, is_in_ring_ = tf.while_loop(
@@ -1206,7 +1210,7 @@ class TypingBase(object):
             lambda root, _: tf.less(
                 root,
                 tf.cast(
-                    adjacency_map_conjugate_system.shape[0],
+                    tf.shape(self.adjacency_map_conjugate_system)[0],
                     tf.int64)),
 
             # body
@@ -1231,7 +1235,7 @@ class TypingBase(object):
             tf.boolean_mask(
                 tf.range(
                     tf.cast(
-                        tf.shape(adjacency_map_conjugate_system)[0],
+                        tf.shape(self.adjacency_map_conjugate_system)[0],
                         tf.int64),
                     dtype=tf.int64),
                 is_in_ring_))

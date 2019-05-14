@@ -31,47 +31,41 @@ SOFTWARE.
 # =============================================================================
 import tensorflow as tf
 tf.enable_eager_execution()
+import gin
+import gin.deterministic.forcefield
 
-class MoleculeDistanceGeometrySystem(gin.molecule.Molecule):
-    """ A molecule system that could be calculated under distance geometry.
+# =============================================================================
+# utility functions
+# =============================================================================
+def topological_molecule_to_3d_conformation_distance_geometry(
+        mol,
+        forcefiled='gaff'):
+    """ Generate the 3d conformation of a small molecule based on its
+    adjacency map using distance geometry.
+
 
     """
-    def __init__(self, forcefield):
-        super(MoleculeDistanceGeometrySystem, self).__init__()
-        self.forcefield = forcefield
+    
 
-    def get_typing(self, typing_object):
-        """ Get the atom typing corresponding to the specific forcefield.
+# =============================================================================
+# utility classes
+# =============================================================================
+class MoleculeMDSystem(gin.molecule.Molecule):
+    """
+    A single molecule system that could be calculated in MD calculation.
+    """
+    def __init__(self):
+        super(MoleculeMDSystem, self).__init__()
+
+    def get_3d_conformation(
+            self,
+            forcefield=gin.forcefields.gaff,
+            n_conformations=1):
+        """ Generate 3D conformation of a small molecule based on
+        its topology.
 
         Parameters
         ----------
-        typing_object : gin.typing.Typing obejct
 
         """
-
-
-    def get_bond_constraint(self):
-        """ Get the equilibrium bond length as initial bond length.
-
-        """
-        # find the positions at which there is a bond
-        is_bond = tf.greater(
-            self.adjacency_map,
-            tf.constant(0, dtype=tf.float32))
-
-        # dirty stuff to get the bond indices to update
-        all_idxs_x, all_idxs_y = tf.meshgrid(
-            tf.range(self.n_atoms, dtype=tf.int64),
-            tf.range(self.n_atoms, dtype=tf.int64))
-
-        all_idxs_stack = tf.stack(
-            [
-                all_idxs_y,
-                all_idxs_x
-            ],
-            axis=2)
-
-        # get the bond indices
-        bond_idxs = tf.boolean_mask(
-            all_idxs_stack,
-            is_bond)
+        pass
