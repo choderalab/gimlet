@@ -37,6 +37,8 @@ SOFTWARE.
 # dependencies
 import tensorflow as tf
 tf.enable_eager_execution()
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # packages
 from gin import molecule
@@ -166,6 +168,9 @@ def smiles_to_organic_topological_molecule(smiles):
         # we need to get:
         #     - number of atoms
         #     - number of brackets
+
+        # strip it
+        smiles = tf.strings.strip(smiles)
 
         # get the total length
         length = tf.strings.length(smiles)
@@ -761,7 +766,7 @@ def smiles_to_organic_topological_molecule(smiles):
             tf.constant(1, dtype=tf.float32)),
 
         # if current_bond_order >= 1:
-        current_bond_order - 0.5,
+        current_bond_order + 0.5,
 
         # else:
         # if there is no bond right now, then we don't do anything
