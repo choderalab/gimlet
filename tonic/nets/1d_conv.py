@@ -36,7 +36,7 @@ import tensorflow as tf
 tf.enable_eager_execution()
 
 # ===========================================================================
-# utility classes
+# module classes
 # ===========================================================================
 
 class OneDConvNet(tf.keras.Model):

@@ -38,7 +38,28 @@ import tensorflow as tf
 tf.enable_eager_execution()
 
 # ===========================================================================
-# utility classes
+# module functions
+# ===========================================================================
+def symmetry_specified(self, x, bond_order):
+    """ Specify the symmetry of the bond and then calculate seperately,
+    before concatenating them together.
+
+    """
+    return tf.cond(
+        lambda: tf.greater(
+            bond_order,
+            tf.constant(1, dtype=tf.float32)),
+
+        tf.concat(
+            [
+                self.sigma_fn(x),
+                self.pi_fn(x)
+            ]),
+
+        self.sigma_fn(x))
+
+# ===========================================================================
+# module classes
 # ===========================================================================
 class ConcatThenFullyConnect(tf.keras.Model):
     """ Project all the input to the same dimension and then concat, followed
@@ -144,8 +165,6 @@ class ConcatThenFullyConnect(tf.keras.Model):
 
     @tf.contrib.eager.defun
     def _call(self, *args):
-        """ The function to be compiled into TensorFlow graph computation.
-        """
         x = tf.concat(
             # list of the projected first layer input
             [getattr(self, 'D_0_%s' % idx)(args[idx]) for idx in range(n_vars)],
@@ -157,8 +176,6 @@ class ConcatThenFullyConnect(tf.keras.Model):
         return x
 
     def call(self, *args):
-        """ The wrapper function for __call__.
-        """
         # build the graph if this is the first time this is called
         if self.is_virgin:
             n_vars = len(args)

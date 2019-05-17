@@ -80,7 +80,7 @@ GAFF_XML_PATH = os.path.join(os.path.dirname(__file__),'data/gaff.xml')
 GAFF2_XML_PATH = os.path.join(os.path.dirname(__file__),'data/gaff2.xml')
 
 # =============================================================================
-# utility classes
+# module classes
 # =============================================================================
 class ForceFieldBase(object):
     """ Base class for forcefield.

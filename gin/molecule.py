@@ -33,7 +33,7 @@ import tensorflow as tf
 tf.enable_eager_execution
 
 # =============================================================================
-# utility classes
+# module classes
 # =============================================================================
 class Molecule(object):
     """ A base object signifying a molecule.

@@ -45,10 +45,10 @@ def topological_molecule_to_3d_conformation_distance_geometry(
 
 
     """
-    
+
 
 # =============================================================================
-# utility classes
+# module classes
 # =============================================================================
 class MoleculeMDSystem(gin.molecule.Molecule):
     """
