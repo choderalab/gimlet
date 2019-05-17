@@ -35,9 +35,8 @@ import tensorflow as tf
 tf.enable_eager_execution()
 
 # ===========================================================================
-# utility classes
+# module classes
 # ===========================================================================
-
 class Attention(tf.keras.Model):
     """
     multi-head attention mechanism

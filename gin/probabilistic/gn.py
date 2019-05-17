@@ -35,7 +35,7 @@ tf.enable_eager_execution
 import gin.molecule
 
 # =============================================================================
-# utility classes
+# module classes
 # =============================================================================
 class GCN(tf.keras.Model):
     """ A group of functions trainable under back-propagation to update atoms
@@ -104,7 +104,7 @@ class GCN(tf.keras.Model):
         self.repeat=repeat
 
     @tf.contrib.eager.defun
-    def propagate(
+    def _call(
             self,
             molecules, # note that the molecules here could be featurized
             repeat=3):
@@ -125,8 +125,8 @@ class GCN(tf.keras.Model):
             mol = molecules[idx]
 
             # get the attributes of the molecule
-            adjacency_map = mol.adjacency_map
-            atoms = mol.atoms
+            adjacency_map = mol[0]
+            atoms = mol[1]
 
             n_atoms = tf.cast(tf.shape(atoms)[0], tf.int64)
 
@@ -324,3 +324,6 @@ class GCN(tf.keras.Model):
         y_bar_all = y_bar_all[1:]
 
         return y_bar_all
+
+    def call(self, molecules, repeat=3):
+        return self._call(molecules, repeat=repeat)
