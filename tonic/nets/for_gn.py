@@ -52,8 +52,8 @@ def symmetry_specified(self, x, bond_order):
 
         tf.concat(
             [
-                self.sigma_fn(x),
-                self.pi_fn(x)
+                sigma_fn(x),
+                pi_fn(x)
             ]),
 
         self.sigma_fn(x))
@@ -61,18 +61,18 @@ def symmetry_specified(self, x, bond_order):
 # ===========================================================================
 # module classes
 # ===========================================================================
-class ConcatThenFullyConnect(tf.keras.Model):
+class ConcatenateThenFullyConnect(tf.keras.Model):
     """ Project all the input to the same dimension and then concat, followed
     by subsequent fully connected layers.
 
     """
     def __init__(self, config):
-        super(ProjectToSameDimensionThenConcat, self).__init__()
+        super(ConcatenateThenFullyConnect, self).__init__()
         self.config = config
-        self.flow = flow
+        self.flow = []
         self.is_virgin = True
 
-    def build(self, n_vars):
+    def _build(self, n_vars):
         """ Build the network.
 
         Note that this function is called when the first data point is
@@ -90,7 +90,7 @@ class ConcatThenFullyConnect(tf.keras.Model):
             setattr(
                 self,
                 'D_0_%s' % idx,
-                tf.keras.layers.Dense(config[0]))
+                tf.keras.layers.Dense(self.config[0]))
 
             # NOTE:
             # here we don't put the name into the workflow
@@ -98,32 +98,32 @@ class ConcatThenFullyConnect(tf.keras.Model):
             # self.flow.append('D_0_%s' % idx)
 
         # the rest of the flow
-        for idx in range(1, len(config)):
-            if isinstance(config[idx], int):
+        for idx in range(1, len(self.config)):
+            if isinstance(self.config[idx], int):
                 # put the layer as attribute of the model
                 setattr(
                     self,
                     'D_%s' % idx,
-                    tf.keras.layers.Dense(config[idx]))
+                    tf.keras.layers.Dense(self.config[idx]))
 
                 # put the name into the workflow
                 self.flow.append('D_%s' % idx)
 
-            elif isinstance(config[idx], float):
-                assert config[idx] < 1
+            elif isinstance(self.config[idx], float):
+                assert self.config[idx] < 1
 
                 # put the layer as attribute of the model
                 setattr(
                     self,
                     'O_%s' % idx,
-                    tf.keras.layers.Dense(config[idx]))
+                    tf.keras.layers.Dense(self.config[idx]))
 
                 # put the name into the workflow
                 self.flow.append('O_%s' % idx)
 
-            elif isinstance(config[idx], str):
+            elif isinstance(self.config[idx], str):
                 # put the layer as attribute of the model
-                activation = config[idx]
+                activation = self.config[idx]
 
                 if activation == 'tanh':
                     setattr(
@@ -163,11 +163,16 @@ class ConcatThenFullyConnect(tf.keras.Model):
 
                 self.flow.append('A_%s' % idx)
 
-    @tf.contrib.eager.defun
+    # @tf.contrib.eager.defun
     def _call(self, *args):
+        # NOTE: not sure why all the args were rendered as a tuple
+        #       I think this is something with tensorflow.
+        args = args[0]
+
         x = tf.concat(
             # list of the projected first layer input
-            [getattr(self, 'D_0_%s' % idx)(args[idx]) for idx in range(n_vars)],
+            [getattr(self, 'D_0_%s' % idx)(args[idx]) for idx in range(
+                self.n_vars)],
             axis=-1) # note that here we concat it at the last dimension
 
         for fn in self.flow:
@@ -178,8 +183,9 @@ class ConcatThenFullyConnect(tf.keras.Model):
     def call(self, *args):
         # build the graph if this is the first time this is called
         if self.is_virgin:
-            n_vars = len(args)
-            self.build(n_vars)
+            n_vars = int(len(args))
+            self.n_vars = n_vars
+            self._build(n_vars)
             self.is_virgin = False
 
-        return self._call(x)
+        return self._call(args)
