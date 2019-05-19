@@ -134,7 +134,10 @@ N_ATOM_COUNTER_STR = '|'.join(
     'r',
     '\[',
     '\]',
-    '@'
+    '@',
+    'H',
+    '\/',
+    r'\\'
 ])
 
 dummy_list = []
@@ -1236,11 +1239,10 @@ def smiles_to_mol(
         chiral=False):
     """ Wrapper function for translating one SMILES string to molecule.
     """
-    atoms, adjacency_map = smiles_to_organic_topological_molecule(smiles)
+    if chiral == False:
+        mol = smiles_to_organic_topological_molecule(smiles)
 
-    # mol = gin.molecule.Molecule(atoms, adjacency_map)
-
-    return adjacency_map
+    return mol
 
 
 def smiles_to_mols(
@@ -1254,9 +1256,29 @@ def smiles_to_mols(
     ds_smiles = tf.data.Dataset.from_tensor_slices(smiles_array)
 
     ds = ds_smiles.map(lambda x: tf.contrib.eager.py_func(
-        smiles_to_organic_topological_molecule,
+        smiles_to_mol,
         [x],
         [tf.int64, tf.float32]),
+    num_parallel_calls=4*N_CPUS)
+
+    return ds
+
+def smiles_to_mols_with_attributes(
+        smiles_array,
+        attributes_array,
+        chiral=False):
+    """ Wrapper function for translating multiple SMILES strings to molecules.
+    """
+    # put the smiles into a large tensor
+    smiles_array = tf.convert_to_tensor(smiles_array, dtype=tf.string)
+    attributes_array = tf.convert_to_tensor(attributes_array, dtype=tf.float32)
+
+    ds = tf.data.Dataset.from_tensor_slices((smiles_array, attributes_array))
+
+    ds = ds.map(lambda x, y: tf.contrib.eager.py_func(
+        lambda x,y: (smiles_to_mol(x)[0], smiles_to_mol(x)[1], y),
+        [x, y],
+        [tf.int64, tf.float32, tf.float32]),
     num_parallel_calls=4*N_CPUS)
 
     return ds
