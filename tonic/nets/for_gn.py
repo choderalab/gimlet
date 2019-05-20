@@ -84,6 +84,8 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
             number of variables taken in this layer.
 
         """
+        self.identity = (lambda x: x)
+
         # concatenation step
         for idx in range(n_vars):
             # put the layer as attribute of the model
@@ -189,3 +191,17 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
             self.is_virgin = False
 
         return self._call(args)
+
+    def switch(self, to_test=True):
+        if to_test == True:
+            for idx, name in enumerate(self.workflow):
+                if name.startswith('O'):
+                    seattr(self, name, 'identity')
+
+        else:
+            for idx, value in enumerate(self.config):
+                if isinstance(value, float):
+                    setattr(
+                        self,
+                        'O_%s' % value,
+                        tf.layers.Dropout(value))

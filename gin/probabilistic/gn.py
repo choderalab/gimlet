@@ -71,15 +71,40 @@ class GraphNet(tf.keras.Model):
             self,
 
             # building blocks for GCN
-            phi_e=lambda x: x,
-            rho_e_v=lambda x: x,
-            phi_v=lambda x: x,
-            rho_e_u=lambda x: x,
-            rho_v_u=lambda x: x,
-            phi_u=lambda x: x,
+            # update function
+            phi_e=lambda *x: x[0],
+            phi_u=lambda *x: x[0],
+            phi_v=lambda *x: x[0],
+
+            # aggregate functions, default to be sum
+            rho_e_v=(lambda h_e, atom_is_connected_to_bonds: tf.reduce_sum(
+                tf.where(
+                    tf.tile(
+                        tf.expand_dims(
+                            atom_is_connected_to_bonds,
+                            2),
+                        [1, 1, h_e.shape[1]]),
+                    tf.tile(
+                        tf.expand_dims(
+                            h_e,
+                            0),
+                        [
+                            atom_is_connected_to_bonds.shape[0], # n_atoms
+                            1,
+                            1
+                        ]),
+                    tf.zeros((
+                        atom_is_connected_to_bonds.shape[0],
+                        h_e.shape[0],
+                        h_e.shape[1]))),
+                axis=1)),
+
+            rho_e_u=(lambda x: tf.expand_dims(tf.reduce_sum(x, axis=0), 0)),
+
+            rho_v_u=(lambda x: tf.expand_dims(tf.reduce_sum(x, axis=0), 0)),
 
             # readout phase
-            f_r=lambda x:x,
+            f_r=lambda *x:x[0],
 
             # featurization
             f_e=lambda x:x,
@@ -229,7 +254,7 @@ class GraphNet(tf.keras.Model):
             # $$
 
             # (n_atoms, ...)
-            h_v = self.phi_v(h_e_bar_i, h_v,
+            h_v = self.phi_v(h_v, h_e_bar_i,
                 tf.tile(
                     h_u,
                     [n_atoms, 1]))
@@ -256,7 +281,7 @@ class GraphNet(tf.keras.Model):
             # $$
 
             # (...)
-            h_u = self.phi_u(h_e_bar, h_v_bar, h_u)
+            h_u = self.phi_u(h_u, h_e_bar, h_v_bar)
 
             return h_e, h_v, h_u, iter_idx + 1
 

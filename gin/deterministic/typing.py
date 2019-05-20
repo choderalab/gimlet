@@ -55,13 +55,13 @@ class TypingBase(object):
     """
     def __init__(self, mol):
         # get the adjacency_map
-        adjacency_map = mol.adjacency_map
+        adjacency_map = mol.[1]
 
         # use the full adjacency map for atom typing
         self.adjacency_map_full = adjacency_map \
             + tf.transpose(adjacency_map)
 
-        self.atoms = mol.atoms
+        self.atoms = mol[0]
 
         self.n_atoms = mol.atoms.numpy().shape[0]
 
