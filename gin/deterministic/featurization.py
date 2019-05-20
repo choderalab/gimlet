@@ -1,8 +1,8 @@
 """
 MIT License
 
-Copyright (c) 2019 Chodera lab // Memorial Sloan Kettering Cancer Center
-and Authors
+Copyright (c) 2019 Chodera lab // Memorial Sloan Kettering Cancer Center,
+Weill Cornell Medical College, Nicea Research, and Authors
 
 Authors:
 Yuanqing Wang
@@ -24,6 +24,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
 """
 
 # =============================================================================
