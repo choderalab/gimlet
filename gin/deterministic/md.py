@@ -51,22 +51,29 @@ def topological_molecule_to_3d_conformation_distance_geometry(
 # =============================================================================
 # module classes
 # =============================================================================
-class MoleculeMDSystem(gin.molecule.Molecule):
+class SingleMoleculeMechanicsSystem(object):
     """
     A single molecule system that could be calculated in MD calculation.
     """
-    def __init__(self):
-        super(MoleculeMDSystem, self).__init__()
-
-    def get_3d_conformation(
+    def __init__(
             self,
-            forcefield=gin.forcefields.gaff,
-            n_conformations=1):
-        """ Generate 3D conformation of a small molecule based on
-        its topology.
+            mol
+            coordinates=None,
+            typing=gin.deterministic.typing.TypingGAFF,
+            forcefield=gin.deterministic.forcefields.gaff):
 
-        Parameters
-        ----------
+        self.mol = mol
+        self.atoms = mol[0]
+        self.adjacency_map = mol[1]
+        self.coordinates = coordinates
+        self.typing = typing
+        self.forcefield = forcefield
 
-        """
-        pass
+
+        if type(self.coordinates) == type(None):
+            self.coordinates = gin.conformer(
+                mol,
+                self.forcefield,
+                self.typing).get_conformers_from_distance_geometry(1)[0]
+
+        
