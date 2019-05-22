@@ -126,7 +126,7 @@ def obj_fn(point):
             f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
         optimizer = tf.train.AdamOptimizer(point['learning_rate'])
-        n_epoch = 100
+        n_epoch = 30
         batch_size = 32
         batch_idx = 0
         loss = 0
@@ -201,7 +201,7 @@ def obj_fn(point):
         f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
     optimizer = tf.train.AdamOptimizer(point['learning_rate'])
-    n_epoch = 100
+    n_epoch = 30
     batch_size = 32
     batch_idx = 0
     loss = 0
