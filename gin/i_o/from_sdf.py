@@ -31,4 +31,180 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution
+tf.enable_eager_execution()
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import multiprocessing
+N_CPUS = multiprocessing.cpu_count()
+
+# =============================================================================
+# imports
+# =============================================================================
+TRANSLATION = {
+    b'C': 0,
+    b'N': 1,
+    b'O': 2,
+    b'S': 3,
+    b'P': 4,
+    b'F': 5,
+    b'Cl': 6,
+    b'Br': 7,
+    b'I': 8,
+    b'H': 9
+}
+
+# =============================================================================
+# utility functions
+# =============================================================================
+def read_sdf(file_path):
+    """
+
+    Organic atoms:
+    [C, N, O, S, P, F, Cl, Br, I, H]
+
+    Corresponding indices:
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    """
+    # read the file
+    text = tf.io.read_file(
+        file_path)
+
+    lines = tf.string_split(tf.expand_dims(text, 0), '\n', False).values
+
+    # get the starts and the ends
+    starts = tf.strings.regex_full_match(
+        lines,
+        '.*V2000.*')
+
+    ends = tf.strings.regex_full_match(
+        lines,
+        '.*END.*')
+
+    starts_idxs = tf.boolean_mask(
+        tf.range(
+            tf.cast(
+                starts.shape[0],
+                tf.int64),
+            dtype=tf.int64),
+        starts)
+
+    ends_idxs = tf.boolean_mask(
+        tf.range(
+            tf.cast(
+                ends.shape[0],
+                tf.int64),
+            dtype=tf.int64),
+        ends) - tf.constant(1, dtype=tf.int64)
+
+    mol_chunks = tf.concat(
+        [
+            tf.expand_dims(
+                starts_idxs,
+                1),
+            tf.expand_dims(
+                ends_idxs,
+                1)
+        ],
+        axis=1)
+
+    def read_one_mol(idx):
+        mol_chunk = mol_chunks[idx]
+        start = mol_chunk[0]
+        end = mol_chunk[1]
+
+        # process the head line to get the number of the atoms and bonds
+        head = lines[start]
+        head = tf.strings.split(tf.expand_dims(head, 0), ' ').values
+        head = tf.boolean_mask(
+            head,
+            tf.logical_not(
+                tf.equal(
+                    head, '')))
+
+        n_atoms = tf.strings.to_number(
+            head[0],
+            tf.int64)
+
+        n_bonds = tf.strings.to_number(
+            head[1],
+            tf.int64)
+
+        # get the lines for atoms and bonds
+        atoms_lines = tf.slice(
+            lines,
+            tf.expand_dims(start+1, 0),
+            tf.expand_dims(n_atoms, 0))
+
+        bonds_lines = tf.slice(
+            lines,
+            tf.expand_dims(start+n_atoms+1, 0),
+            tf.expand_dims(n_bonds, 0))
+
+        # process atom lines
+        atoms_lines = tf.strings.split(atoms_lines, ' ').values
+        atoms_lines = tf.reshape(
+            tf.boolean_mask(
+                atoms_lines,
+                tf.logical_not(
+                    tf.equal(
+                        atoms_lines,
+                        ''))),
+            [n_atoms, -1])
+
+        coordinates = tf.strings.to_number(
+            atoms_lines[:, :3],
+            tf.float32)
+
+        atoms = tf.py_func(
+            lambda *x: tf.convert_to_tensor(
+                [TRANSLATION[x_] for x_ in x], dtype=tf.int64),
+            atoms_lines[:, 3],
+            [tf.int64])
+
+
+        # process bond lines
+        bonds_lines = tf.strings.split(bonds_lines, ' ').values
+        bonds_lines = tf.reshape(
+            tf.boolean_mask(
+                bonds_lines,
+                tf.logical_not(
+                    tf.equal(
+                        bonds_lines,
+                        ''))),
+            [n_bonds, -1])
+
+        bond_idxs = tf.strings.to_number(
+            bonds_lines[:, :2],
+            tf.int64) - 1
+
+        bond_orders = tf.strings.to_number(
+            bonds_lines[:, 2],
+            tf.float32)
+
+        adjacency_map = tf.Variable(
+            tf.zeros((n_atoms, n_atoms),
+            dtype=tf.float32))
+
+        adjacency_map = tf.scatter_nd_update(
+            adjacency_map,
+            bond_idxs,
+            bond_orders)
+
+        adjacency_map = adjacency_map.read_value()
+
+        return atoms, adjacency_map, coordinates
+
+    ds = tf.data.Dataset.from_tensor_slices(
+        tf.range(
+            tf.cast(
+                mol_chunks.shape[0],
+                tf.int64),
+            dtype=tf.int64))
+
+    ds = ds.map(lambda x: tf.contrib.eager.py_func(
+        read_one_mol,
+        [x],
+        [tf.int64, tf.float32, tf.float32]),
+    num_parallel_calls=4*N_CPUS)
+
+    return ds
