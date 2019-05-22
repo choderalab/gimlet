@@ -107,6 +107,9 @@ class ForceFieldBase(object):
         self.root = root
 
     def get_bond(self, atom1_type, atom2_type):
+        length = 0.
+        k = 0.
+
         # get the strings for atom0 and atom1
         atom1_str = self.typing_translation_dict[atom1_type]
         atom2_str = self.typing_translation_dict[atom2_type]
@@ -120,7 +123,8 @@ class ForceFieldBase(object):
                 atom2_str,
             ))
 
-        if type(bond_entry) == None:
+        if type(bond_entry) == type(None):
+
             bond_entry = self.root.find(
                 './/HarmonicBondForce/Bond'
                 '[@type1=\"%s\"][@type2=\"%s\"]'\
@@ -128,6 +132,7 @@ class ForceFieldBase(object):
                     atom2_str,
                     atom1_str,
                 ))
+
 
         # get length and k
         length = float(bond_entry.get('length'))

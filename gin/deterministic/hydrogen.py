@@ -64,7 +64,7 @@ def add_hydrogen(mol):
                         atom_types.is_carbon,
                         tf.logical_and(
                             atom_types.is_sp3,
-                            atom_types.is_connected_to_3_heavy),
+                            atom_types.is_connected_to_3_heavy)),
 
                     # sp2 carbon
                     tf.logical_and(
@@ -103,7 +103,8 @@ def add_hydrogen(mol):
                         tf.logical_or(
                             atom_types.is_oxygen,
                             atom_types.is_sulfur),
-                        atom_types.is_sp3),
+                        atom_types.is_sp3)
+
                 ],
                 axis=0),
             [None, tf.shape(atoms)[0]]),

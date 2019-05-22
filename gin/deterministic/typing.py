@@ -56,7 +56,7 @@ class TypingBase(object):
     """
     def __init__(self, mol):
         # get the adjacency_map
-        adjacency_map = mol.[1]
+        adjacency_map = mol[1]
 
         # use the full adjacency map for atom typing
         self.adjacency_map_full = adjacency_map \
@@ -64,7 +64,7 @@ class TypingBase(object):
 
         self.atoms = mol[0]
 
-        self.n_atoms = mol.atoms.numpy().shape[0]
+        self.n_atoms = self.atoms.numpy().shape[0]
 
     def _is_carbon(self):
         return tf.equal(
