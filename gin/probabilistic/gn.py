@@ -312,3 +312,9 @@ class GraphNet(tf.keras.Model):
 
     def call(self, molecules, repeat=3):
         return self._call(molecules, repeat=repeat)
+
+    def switch(self, to_test=True):
+        for fn in [self.rho_e_u, self.rho_e_v, self.rho_v_u]:
+            if hasattr(fn, 'switch'):
+                fn.switch()
+                
