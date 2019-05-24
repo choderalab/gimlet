@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 import gin
 import gin.deterministic.forcefield
 
@@ -76,4 +76,54 @@ class SingleMoleculeMechanicsSystem(object):
                 self.forcefield,
                 self.typing).get_conformers_from_distance_geometry(1)[0]
 
-        
+    def get_bonds(self):
+        """ Get the config of all the bonds in the system.
+
+        """
+        # find the positions at which there is a bond
+        is_bond = tf.greater(
+            self.adjacency_map,
+            tf.constant(0, dtype=tf.float32))
+
+        # dirty stuff to get the bond indices to update
+        all_idxs_x, all_idxs_y = tf.meshgrid(
+            tf.range(tf.cast(self.n_atoms, tf.int64), dtype=tf.int64),
+            tf.range(tf.cast(self.n_atoms, tf.int64), dtype=tf.int64))
+
+        all_idxs_stack = tf.stack(
+            [
+                all_idxs_y,
+                all_idxs_x
+            ],
+            axis=2)
+
+        # get the bond indices
+        bond_idxs = tf.boolean_mask(
+            all_idxs_stack,
+            is_bond)
+
+
+        # get the types
+        typing_assignment = self.typing(self.mol).get_assignment()
+
+        # get the specs of the bond
+        bond_specs = tf.py_func(
+            lambda *bonds: tf.convert_to_tensor(
+                [
+                    self.forcefield.get_bond(
+                        int(tf.gather(typing_assignment, bond[0]).numpy()),
+                        int(tf.gather(typing_assignment, bond[1]).numpy())) \
+                    for bond in bonds
+                ]),
+            bond_idxs,
+            [tf.float32])
+
+        self.bond_idxs = bond_idxs
+        self.bond_k = bond_specs[:, 0]
+        self.bond_length = bond_specs[:, 1]
+
+
+    def get_angle_params(self):
+        """ Get all the angles in the system.
+
+        """

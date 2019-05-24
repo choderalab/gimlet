@@ -37,7 +37,7 @@ SOFTWARE.
 # =============================================================================
 # dependencies
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import multiprocessing
@@ -146,7 +146,7 @@ dummy_list = []
 # =============================================================================
 # utility functions
 # =============================================================================
-# @tf.contrib.eager.defun
+# @tf.function
 def smiles_to_organic_topological_molecule(smiles):
     """ Decode a SMILES string to a molecule object.
 
@@ -666,7 +666,7 @@ def smiles_to_organic_topological_molecule(smiles):
 
         # count the number of connections
         n_connections = tf.shape(connection_idxs)[0]
-        n_connections_bonds = tf.div(
+        n_connections_bonds = tf.math.divide(
             n_connections * (n_connections - 1),
             2)
 
@@ -1156,7 +1156,7 @@ def smiles_to_organic_topological_molecule(smiles):
                     system_adjacency_map_flatten,
                     tf.constant(0, dtype=tf.float32))))
 
-        system_mean_bond_order = tf.div(
+        system_mean_bond_order = tf.math.divide(
             system_total_bond_order,
             system_total_bond_count)
 
@@ -1256,7 +1256,7 @@ def smiles_to_mols(
 
     ds_smiles = tf.data.Dataset.from_tensor_slices(smiles_array)
 
-    ds = ds_smiles.map(lambda x: tf.contrib.eager.py_func(
+    ds = ds_smiles.map(lambda x: tf.py_function(
         smiles_to_mol,
         [x],
         [tf.int64, tf.float32]),
@@ -1276,7 +1276,7 @@ def smiles_to_mols_with_attributes(
 
     ds = tf.data.Dataset.from_tensor_slices((smiles_array, attributes_array))
 
-    ds = ds.map(lambda x, y: tf.contrib.eager.py_func(
+    ds = ds.map(lambda x, y: tf.py_function(
         lambda x,y: (smiles_to_mol(x)[0], smiles_to_mol(x)[1], y),
         [x, y],
         [tf.int64, tf.float32, tf.float32]),

@@ -1,6 +1,6 @@
 import gin
 
-caffeine = gin.i_o.from_smiles.smiles_to_organic_topological_molecule('Cc1occc1C(=O)Nc2ccccc2')
+caffeine = gin.i_o.from_smiles.smiles_to_organic_topological_molecule('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
 caffeine_conformers = gin.deterministic.conformer.Conformers(
     caffeine,
     gin.deterministic.forcefields.gaff,

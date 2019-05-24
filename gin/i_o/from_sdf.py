@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import multiprocessing
