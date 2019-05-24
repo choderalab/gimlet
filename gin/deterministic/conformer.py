@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 # =============================================================================
 # constants
@@ -226,7 +226,6 @@ class Conformers(object):
         # get the types
         typing_assignment = self.typing(self.mol).get_assignment()
 
-
         # get the specs of the bond
         bond_specs = tf.py_func(
             lambda *bonds: tf.convert_to_tensor(
@@ -311,7 +310,6 @@ class Conformers(object):
         distance_matrices = tf.transpose(distance_matrices, perm=[0, 2, 1]) \
             + distance_matrices
 
-        print(distance_matrices)
         conformers = tf.map_fn(
             lambda x: embed(self.n_atoms, x),
             distance_matrices)

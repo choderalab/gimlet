@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution
+# tf.enable_eager_execution()
 
 import gin.molecule
 
@@ -127,7 +127,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    # @tf.contrib.eager.defun
+    @tf.function
     def _call(
             self,
             mol, # note that the molecules here could be featurized
@@ -219,6 +219,7 @@ class GraphNet(tf.keras.Model):
         # (...)
         h_u = self.f_u(atoms, adjacency_map)
 
+        # @tf.function
         def propagate_one_time(h_e, h_v, h_u, iter_idx):
             # update $ e'_k $
             # $$
@@ -317,4 +318,3 @@ class GraphNet(tf.keras.Model):
         for fn in [self.rho_e_u, self.rho_e_v, self.rho_v_u]:
             if hasattr(fn, 'switch'):
                 fn.switch()
-                

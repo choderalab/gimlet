@@ -33,7 +33,7 @@ SOFTWARE.
 # imports
 # ===========================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 # ===========================================================================
 # module classes
@@ -99,7 +99,7 @@ class Attention(tf.keras.Model):
         x = tf.transpose(x, [0, 2, 1, 3])
         return tf.reshape(x, [batch_size, length, self.hidden_size])
 
-    @tf.contrib.eager.defun
+    @tf.function
     def _call(self, x, y):
         q = self.d_q(x)
         k = self.d_k(y)

@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 import gin
 from gin.deterministic import typing
 

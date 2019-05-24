@@ -36,7 +36,7 @@ SOFTWARE.
 # imports
 # ===========================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 # ===========================================================================
 # module functions
@@ -166,7 +166,7 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
 
                 self.flow.append('A_%s' % idx)
 
-    # @tf.contrib.eager.defun
+    @tf.function
     def _call(self, *args):
         # NOTE: not sure why all the args were rendered as a tuple
         #       I think this is something with tensorflow.

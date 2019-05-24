@@ -34,7 +34,7 @@ SOFTWARE.
 # imports
 # ===========================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 # ===========================================================================
 # module classes
@@ -200,7 +200,7 @@ class OneDConvNet(tf.keras.Model):
             else:
                 raise ValueError(str(layer))
 
-    @tf.contrib.eager.defun
+    @tf.function
     def _call(self, x):
         for name in self.workflow:
             x = getattr(self, name)(x)

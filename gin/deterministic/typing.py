@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 # =============================================================================
 # utility functions
@@ -201,9 +201,9 @@ class TypingBase(object):
 
     def _is_sp1(self):
         return tf.reduce_any(
-            tf.greater_equal(
+            tf.greater(
                 self.adjacency_map_full,
-                tf.constant(3, dtype=tf.float32)),
+                tf.constant(2, dtype=tf.float32)),
             axis=0)
 
     @property
@@ -214,16 +214,20 @@ class TypingBase(object):
         return self.__is_sp1
 
     def _is_sp2(self):
-        return tf.reduce_any(
+        return tf.logical_or(
+            tf.reduce_any(
+                tf.logical_and(
+                    tf.greater(
+                        self.adjacency_map_full,
+                        tf.constant(1, dtype=tf.float32)),
+                    tf.less(
+                        self.adjacency_map_full,
+                        tf.constant(3, dtype=tf.float32)
+                    )),
+                axis=1),
             tf.logical_and(
-                tf.greater(
-                    self.adjacency_map_full,
-                    tf.constant(1, dtype=tf.float32)),
-                tf.less(
-                    self.adjacency_map_full,
-                    tf.constant(3, dtype=tf.float32)
-                )),
-            axis=1)
+                self.is_nitrogen,
+                self.is_connected_to_3_heavy))
 
     @property
     def is_sp2(self):
@@ -233,11 +237,17 @@ class TypingBase(object):
         return self.__is_sp2
 
     def _is_sp3(self):
-        return tf.reduce_all(
-            tf.less_equal(
-                self.adjacency_map_full,
-                tf.constant(1, dtype=tf.float32)),
-            axis=0)
+        return tf.logical_and(
+            tf.reduce_all(
+                tf.less_equal(
+                    self.adjacency_map_full,
+                    tf.constant(1, dtype=tf.float32)),
+                axis=0),
+            tf.logical_not(
+                tf.logical_and(
+                    self.is_nitrogen,
+                    self.is_connected_to_3_heavy)))
+
     @property
     def is_sp3(self):
         if not hasattr(self, '__is_sp3'):
@@ -471,7 +481,7 @@ class TypingBase(object):
 
         return self.__is_connected_to_4_heavy
 
-    @tf.contrib.eager.defun
+    @tf.function
     def _is_in_ring(self):
         """ Determine whether an atom in a molecule is in a ring or not.
         """
@@ -696,7 +706,7 @@ class TypingBase(object):
 
         return self.__is_in_ring
 
-    @tf.contrib.eager.defun
+    @tf.function
     def _is_in_conjugate_system(self):
         """ Determine whether an atom in a molecule is in a conjugated
         system or not.
@@ -991,7 +1001,7 @@ class TypingBase(object):
 
         return self.__is_in_conjugate_system
 
-    @tf.contrib.eager.defun
+    @tf.function
     def _is_aromatic(self):
         """ Determine whether the atoms are in an aromatic system.
 
