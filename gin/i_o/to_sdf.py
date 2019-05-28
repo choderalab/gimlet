@@ -89,18 +89,17 @@ def write_one_sdf(*mol):
 
     atom_chunk = tf.concat(
         [
-            tf.dtypes.as_string(
+            tf.strings.as_string(
                 coordinates,
                 precision=4,
                 scientific=False,
                 width=9,
                 fill=' '),
             tf.expand_dims(
-                tf.py_func(
-                    lambda *x: tf.convert_to_tensor(
-                        [TRANSLATION[x_] for x_ in x], dtype=tf.string),
+                tf.map_fn(
+                    lambda x: TRANSLATION[int(x.numpy())],
                     atoms,
-                    [tf.string]),
+                    tf.string),
                 1)
         ],
         axis=1)
@@ -127,6 +126,8 @@ def write_one_sdf(*mol):
         all_idxs_stack,
         is_bond)
 
+    # TODO: right now this is not correct, we cannot simply
+    # round up the bond orders
     bond_orders = tf.cast(
         tf.math.round(
             tf.gather_nd(
@@ -136,11 +137,11 @@ def write_one_sdf(*mol):
 
     bond_chunk = tf.concat(
         [
-            tf.dtypes.as_string(
+            tf.strings.as_string(
                 bond_idxs + 1,
                 width=3,
                 fill=' '),
-            tf.dtypes.as_string(
+            tf.strings.as_string(
                 tf.expand_dims(
                     bond_orders,
                     1),
@@ -170,7 +171,7 @@ def write_one_sdf(*mol):
                     axis=1),
                 axis=1,
                 separator=' ',
-                keep_dims=True),
+                keepdims=True),
 
             tf.strings.reduce_join(
                 tf.concat(
@@ -183,7 +184,7 @@ def write_one_sdf(*mol):
                     axis=1),
                 axis=1,
                 separator='',
-                keep_dims=True),
+                keepdims=True),
             [['M  END']],
             [['$$$$']]
         ],
@@ -203,7 +204,7 @@ def write_sdf(mols, file_path):
         ],
         axis=0)
 
-    tf.write_file(
+    tf.io.write_file(
         file_path,
         tf.reshape(
             tf.strings.reduce_join(

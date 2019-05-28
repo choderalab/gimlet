@@ -241,27 +241,31 @@ class ForceFieldBase(object):
                     atom2_str,
                     atom3_str,
                 ))
-
         try:
             periodicity1 = float(proper_entry.get('periodicity1'))
             phase1 = float(proper_entry.get('phase1'))
+            k1 = float(proper_entry.get('k1'))
         except:
             pass
 
         try:
             periodicity2 = float(proper_entry.get('periodicity2'))
             phase2 = float(proper_entry.get('phase2'))
+            k2 = float(proper_entry.get('k2'))
         except:
             pass
 
         try:
             periodicity3 = float(proper_entry.get('periodicity3'))
             phase3 = float(proper_entry.get('phase3'))
+            k3 = float(proper_entry.get('k3'))
         except:
             pass
 
         return (
-            periodicity1, phase1, periodicity2, phase2, periodicity3, phase3)
+            periodicity1, phase1, k1,
+            periodicity2, phase2, k2,
+            periodicity3, phase3, k3)
 
     def get_improper(
             self,
@@ -291,7 +295,7 @@ class ForceFieldBase(object):
 
         # get the entry of the proper torsion
         # first search for the entry
-        proper_entry = self.root.find(
+        improper_entry = self.root.find(
             './/PeriodicTorsionForce/Improper'
             '[@type1=\'%s\'][@type2=\'%s\'][@type3=\'%s\'][@type4=\'%s\']'\
             %(
@@ -301,8 +305,8 @@ class ForceFieldBase(object):
                 atom4_str,
             ))
 
-        if type(proper_entry) == type(None):
-            proper_entry = self.root.find(
+        if type(improper_entry) == type(None):
+            improper_entry = self.root.find(
                 './/PeriodicTorsionForce/Improper'
                 '[@type1=\'%s\'][@type2=\'%s\'][@type3=\'%s\'][@type4=\'%s\']'\
                 %(
@@ -312,9 +316,9 @@ class ForceFieldBase(object):
                     atom1_str,
                 ))
 
-        if type(proper_entry) == type(None):
+        if type(improper_entry) == type(None):
             # try only matching two atoms
-            proper_entry = self.root.find(
+            improper_entry = self.root.find(
                 './/PeriodicTorsionForce/Improper'
                 '[@type2=\'%s\'][@type3=\'%s\']'
                 %(
@@ -322,9 +326,9 @@ class ForceFieldBase(object):
                     atom3_str,
                 ))
 
-        if type(proper_entry) == type(None):
+        if type(improper_entry) == type(None):
             # try only matching two atoms
-            proper_entry = self.root.find(
+            improper_entry = self.root.find(
                 './/PeriodicTorsionForce/Improper'
                 '[@type3=\'%s\'][@type2=\'%s\']'
                 %(
@@ -333,25 +337,64 @@ class ForceFieldBase(object):
                 ))
 
         try:
-            periodicity1 = float(proper_entry.get('periodicity1'))
-            phase1 = float(proper_entry.get('phase1'))
+            periodicity1 = float(improper_entry.get('periodicity1'))
+            phase1 = float(improper_entry.get('phase1'))
+            k1 = float(improper_entry.get('k1'))
         except:
             pass
 
         try:
-            periodicity2 = float(proper_entry.get('periodicity2'))
-            phase2 = float(proper_entry.get('phase2'))
+            periodicity2 = float(improper_entry.get('periodicity2'))
+            phase2 = float(improper_entry.get('phase2'))
+            k2 = float(improper_entry.get('k2'))
         except:
             pass
 
         try:
-            periodicity3 = float(proper_entry.get('periodicity3'))
-            phase3 = float(proper_entry.get('phase3'))
+            periodicity3 = float(improper_entry.get('periodicity3'))
+            phase3 = float(improper_entry.get('phase3'))
+            k3 = float(improper_entry.get('k3'))
         except:
             pass
 
         return (
-            periodicity1, phase1, periodicity2, phase2, periodicity3, phase3)
+            periodicity1, phase1, k1,
+            periodicity2, phase2, k2,
+            periodicity3, phase3, k3)
+
+    def get_nonbonded(self, atom_type):
+        """ Get the nonbonded entry.
+        """
+        sigma = .0
+        epsilon = .0
+
+        atom_str = self.typing_translation_dict[atom_type]
+        nonbonded_entry = self.root.find(
+            './/NonbondedForce/Atom[@type=\'%s\']' % atom_str)
+
+        try:
+            sigma = float(nonbonded_entry.get('sigma'))
+            epsilon = float(nonbonded_entry.get('epsilon'))
+        except:
+            pass
+
+        return sigma, epsilon
+
+    def get_onefour_scaling(self):
+        """ Get the scaling constant for one-four interactions.
+
+        """
+        coulomb14scale = .0
+        lj14scale = .0
+
+        try:
+            nonbonded_entry = self.root.find('.//NonbondedForce')
+            coulomb14scale = float(nonbonded_entry.get('coulomb14scale'))
+            lj14scale = float(nonbonded_entry.get('lj14scale'))
+        except:
+            pass
+
+        return coulomb14scale, lj14scale
 
 class GAFF(ForceFieldBase):
     def __init__(self):
