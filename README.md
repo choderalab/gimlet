@@ -11,7 +11,7 @@ Minimal working example: https://github.com/choderalab/gin/blob/master/tonic/scr
 - yuanqing wang `<yuanqing.wang@choderalab.org>` (while at Chodera Lab at Memorial Sloan Kettering Cancer Center, Weill Cornell Medicine, and City University of New York -- City College of New York.)
 
 ## Manifest
-`gin/` the core (and fun) part of the package.
+`gin/` the core (and fun) part of the package.\\
     'i_o/' reading and writing popular molecule embedding/representing structures.
     'deterministic/' simple property predictions based on molecular mechanics.
     'probabilistic/' infrastructure for molecular machine learning, especially graph networks.
