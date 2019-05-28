@@ -411,7 +411,7 @@ class TypingBase(object):
 
     def _is_connected_to_1_heavy(self):
         return tf.equal(
-            tf.count_nonzero(
+            tf.math.count_nonzero(
                 tf.boolean_mask(
                     self.adjacency_map_full,
                     self.is_heavy,
@@ -429,7 +429,7 @@ class TypingBase(object):
 
     def _is_connected_to_2_heavy(self):
         return tf.equal(
-            tf.count_nonzero(
+            tf.math.count_nonzero(
                 tf.boolean_mask(
                     self.adjacency_map_full,
                     self.is_heavy,
@@ -447,7 +447,7 @@ class TypingBase(object):
 
     def _is_connected_to_3_heavy(self):
         return tf.equal(
-            tf.count_nonzero(
+            tf.math.count_nonzero(
                 tf.boolean_mask(
                     self.adjacency_map_full,
                     self.is_heavy,
@@ -465,7 +465,7 @@ class TypingBase(object):
 
     def _is_connected_to_4_heavy(self):
         return tf.equal(
-            tf.count_nonzero(
+            tf.math.count_nonzero(
                 tf.boolean_mask(
                     self.adjacency_map_full,
                     self.is_heavy,
@@ -1281,7 +1281,7 @@ class TypingBase(object):
 
     def _is_connected_to_aromatic(self):
         return tf.greater(
-            tf.count_nonzero(
+            tf.math.count_nonzero(
                 tf.boolean_mask(
                     self.adjacency_map_full,
                     self.is_aromatic,
@@ -1409,7 +1409,7 @@ class TypingGAFF(TypingBase):
         return tf.logical_and(
             self.is_nitrogen,
             tf.greater_equal(
-                tf.count_nonzero(
+                tf.math.count_nonzero(
                     tf.greater(
                         self.adjacency_map_full,
                         tf.constant(1, dtype=tf.float32)),

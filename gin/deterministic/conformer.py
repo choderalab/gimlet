@@ -41,8 +41,8 @@ BOND_ENERGY_THRS = 500
 # =============================================================================
 # utility functions
 # =============================================================================
-# @tf.contrib.eager.defun
-def floyd(n_atoms, upper, lower):
+@tf.function
+def floyd(upper, lower):
     """ Floyd algorithm, as was implemented here:
     doi: 10.1002/0470845015.cda018
 
@@ -59,6 +59,7 @@ def floyd(n_atoms, upper, lower):
     """
 
     # NOTE: here TensorFlow will optimize the graph
+    n_atoms = upper.shape[0]
 
     def inner_loop(upper, lower, k, i, j):
         upper[i, j].assign(
@@ -125,24 +126,25 @@ def floyd(n_atoms, upper, lower):
 
     return upper, lower
 
-# @tf.contrib.eager.defun
-def embed(n_atoms, distance_matrix):
+@tf.function
+def embed(distance_matrix):
     """ EMBED algorithm, as was implemented here:
     10.1002/0470845015.cda018
     """
+    n_atoms = distance_matrix.shape[0]
     # $$
     # d_{io}^2 = \frac{1}{N}\sum_{i=1}^{N}d_{ij}^2
     # - \frac{1}{N^2}\sum_{j=2}^N \sum_{k=2}{j-1}d_{jk}^2
     # $$
 
-    d_o_2 = tf.div(
+    d_o_2 = tf.math.divide(
         tf.reduce_sum(
             tf.pow(
                 distance_matrix,
                 2),
             axis=0),
         tf.cast(n_atoms, tf.float32)) \
-        - tf.div(
+        - tf.math.divide(
             tf.reduce_sum(
                 tf.pow(
                     tf.linalg.band_part(
@@ -156,7 +158,7 @@ def embed(n_atoms, distance_matrix):
     # g_ij = (d_{io}^2 + d_{jo}^2 - d_{ij}^2)
     # $$
 
-    g = tf.div(
+    g = tf.math.divide(
         tf.tile(
             tf.expand_dims(
                 d_o_2,
@@ -226,22 +228,19 @@ class Conformers(object):
         # get the types
         typing_assignment = self.typing(self.mol).get_assignment()
 
-        # get the specs of the bond
-        bond_specs = tf.py_func(
-            lambda *bonds: tf.convert_to_tensor(
-                [
+        bond_specs = tf.map_fn(
+            lambda bond: tf.convert_to_tensor(
                     self.forcefield.get_bond(
                         int(tf.gather(typing_assignment, bond[0]).numpy()),
-                        int(tf.gather(typing_assignment, bond[1]).numpy())) \
-                    for bond in bonds
-                ]),
+                        int(tf.gather(typing_assignment, bond[1]).numpy()))),
             bond_idxs,
-            [tf.float32])
+            dtype=tf.float32)
+
 
         # TODO:
         # figure out how to get the upper and lower boundary of the bonds
         delta_x = tf.math.sqrt(
-            tf.div(
+            tf.math.divide(
                 tf.constant(2 * BOND_ENERGY_THRS, tf.float32),
                 bond_specs[:, 1]))
 
@@ -253,28 +252,23 @@ class Conformers(object):
         upper_bound = tf.Variable(10 * tf.ones_like(self.mol[1]))
         lower_bound = tf.Variable(0.05 * tf.ones_like(self.mol[1]))
 
-        upper_bound = tf.scatter_nd_update(
-            upper_bound,
+        upper_bound.scatter_nd_update(
             bond_idxs,
             bonds_upper_bound)
 
-        lower_bound = tf.scatter_nd_update(
-            lower_bound,
+        lower_bound.scatter_nd_update(
             bond_idxs,
             bonds_lower_bound)
 
-        upper_bound = tf.scatter_nd_update(
-            upper_bound,
+        upper_bound.scatter_nd_update(
             tf.reverse(bond_idxs, axis=[1]),
             bonds_upper_bound)
 
-        lower_bound = tf.scatter_nd_update(
-            lower_bound,
+        lower_bound.scatter_nd_update(
             tf.reverse(bond_idxs, axis=[1]),
             bonds_lower_bound)
 
-        upper_bound = tf.scatter_nd_update(
-            upper_bound,
+        upper_bound.scatter_nd_update(
             tf.tile(
                 tf.expand_dims(
                     tf.range(
@@ -286,8 +280,7 @@ class Conformers(object):
                 [1, 2]),
             tf.zeros((self.n_atoms, ), dtype=tf.float32))
 
-        lower_bound = tf.scatter_nd_update(
-            lower_bound,
+        lower_bound.scatter_nd_update(
             tf.tile(
                 tf.expand_dims(
                     tf.range(
@@ -299,7 +292,7 @@ class Conformers(object):
                 [1, 2]),
             tf.zeros((self.n_atoms, ), dtype=tf.float32))
 
-        upper_bound, lower_bound = floyd(self.n_atoms, upper_bound, lower_bound)
+        upper_bound, lower_bound = floyd(upper_bound, lower_bound)
         # sample from a uniform distribution
         distance_matrix_distribution = tf.distributions.Uniform(
             low=lower_bound,
@@ -311,7 +304,7 @@ class Conformers(object):
             + distance_matrices
 
         conformers = tf.map_fn(
-            lambda x: embed(self.n_atoms, x),
+            embed,
             distance_matrices)
 
         return conformers
