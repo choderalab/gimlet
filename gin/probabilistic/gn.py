@@ -143,23 +143,15 @@ class GraphNet(tf.keras.Model):
         # get the attributes of the molecule
         adjacency_map = mol[1]
         atoms = mol[0]
-
-        n_atoms = tf.cast(tf.shape(atoms)[0], tf.int64)
-
         adjacency_map_full = adjacency_map \
             + tf.transpose(adjacency_map)
-
-        # dirty stuff to get the bond indices to update
-        all_idxs_x, all_idxs_y = tf.meshgrid(
-            tf.range(n_atoms, dtype=tf.int64),
-            tf.range(n_atoms, dtype=tf.int64))
+        n_atoms = tf.cast(tf.shape(atoms)[0], tf.int64)
 
         # (n_atoms, n_atoms, 2)
         all_idxs_stack = tf.stack(
-            [
-                all_idxs_y,
-                all_idxs_x
-            ],
+            tf.meshgrid(
+                tf.range(n_atoms, dtype=tf.int64),
+                tf.range(n_atoms, dtype=tf.int64)),
             axis=2)
 
         # (n_atoms, n_atoms, 2) # boolean
@@ -188,17 +180,17 @@ class GraphNet(tf.keras.Model):
                         1),
                     [1, n_atoms])),
 
-            tf.equal(
-                tf.tile(
-                    tf.expand_dims(
-                        tf.range(n_atoms),
-                        0),
-                    [n_bonds, 1]),
-                tf.tile(
-                    tf.expand_dims(
-                        bond_idxs[:,1],
-                        1),
-                    [1, n_atoms])))
+        tf.equal(
+            tf.tile(
+                tf.expand_dims(
+                    tf.range(n_atoms),
+                    0),
+                [n_bonds, 1]),
+            tf.tile(
+                tf.expand_dims(
+                    bond_idxs[:,1],
+                    1),
+                [1, n_atoms])))
 
         # (n_atoms, n_bonds)
         atom_is_connected_to_bonds = tf.transpose(
@@ -219,7 +211,6 @@ class GraphNet(tf.keras.Model):
         # (...)
         h_u = self.f_u(atoms, adjacency_map)
 
-        # @tf.function
         def propagate_one_time(h_e, h_v, h_u, iter_idx):
             # update $ e'_k $
             # $$
@@ -305,7 +296,8 @@ class GraphNet(tf.keras.Model):
                 h_e.get_shape(),
                 h_v.get_shape(),
                 h_u.get_shape(),
-                iter_idx.get_shape()])
+                iter_idx.get_shape()],
+            parallel_iterations=repeat)
 
         y_bar = self.f_r(h_e, h_v, h_u)
 

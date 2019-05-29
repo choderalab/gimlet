@@ -6,4 +6,13 @@ caffeine_conformers = gin.deterministic.conformer.Conformers(
     gin.deterministic.forcefields.gaff,
     gin.deterministic.typing.TypingGAFF)
 
-print(caffeine_conformers.get_conformers_from_distance_geometry(5))
+conformers = caffeine_conformers.get_conformers_from_distance_geometry(5)
+
+gin.i_o.to_sdf.write_sdf(
+    [
+        [caffeine[0], caffeine[1], conformers[0]],
+        # [caffeine[0], caffeine[1], conformers[1]],
+        # [caffeine[0], caffeine[1], conformers[2]],
+        # [caffeine[0], caffeine[1], conformers[3]],
+        # [caffeine[0], caffeine[1], conformers[4]],
+    ], 'caffeine_out.sdf')
