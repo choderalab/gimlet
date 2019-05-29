@@ -296,8 +296,7 @@ class GraphNet(tf.keras.Model):
                 h_e.get_shape(),
                 h_v.get_shape(),
                 h_u.get_shape(),
-                iter_idx.get_shape()],
-            parallel_iterations=repeat)
+                iter_idx.get_shape()])
 
         y_bar = self.f_r(h_e, h_v, h_u)
 
