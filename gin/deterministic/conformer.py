@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-# tf.enable_eager_execution()
+import tensorflow_probability as tfp
 
 # =============================================================================
 # constants
@@ -41,7 +41,7 @@ BOND_ENERGY_THRS = 500
 # =============================================================================
 # utility functions
 # =============================================================================
-@tf.function
+# @tf.function
 def floyd(upper, lower):
     """ Floyd algorithm, as was implemented here:
     doi: 10.1002/0470845015.cda018
@@ -97,7 +97,7 @@ def floyd(upper, lower):
 
     def middle_loop(upper, lower, k, i):
         j = i + 1
-        upper, lower, k, i, j = tf.while_loop(
+        tf.while_loop(
             lambda upper, lower, k, i, j: tf.less(j, n_atoms),
             inner_loop,
             [upper, lower, k, i, j])
@@ -105,7 +105,7 @@ def floyd(upper, lower):
 
     def outer_loop(upper, lower, k):
         i = 0
-        upper, lower, k, i = tf.while_loop(
+        tf.while_loop(
             lambda upper, lower, k, i: tf.less(i, n_atoms - 1),
             middle_loop,
             [upper, lower, k, i])
@@ -294,7 +294,7 @@ class Conformers(object):
 
         upper_bound, lower_bound = floyd(upper_bound, lower_bound)
         # sample from a uniform distribution
-        distance_matrix_distribution = tf.distributions.Uniform(
+        distance_matrix_distribution = tfp.distributions.Uniform(
             low=lower_bound,
             high=upper_bound)
 
@@ -303,7 +303,7 @@ class Conformers(object):
         distance_matrices = tf.transpose(distance_matrices, perm=[0, 2, 1]) \
             + distance_matrices
 
-        conformers = tf.map_fn(
+        conformers = 10 * tf.map_fn(
             embed,
             distance_matrices)
 

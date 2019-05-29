@@ -27,7 +27,6 @@ class f_v(tf.keras.Model):
     def call(self, x):
         return self.d(tf.one_hot(x, 8))
 
-
 gn = gin.probabilistic.gn.GraphNet(
     f_e=tf.keras.layers.Dense(128),
 

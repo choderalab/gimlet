@@ -163,6 +163,9 @@ def write_one_sdf(*mol):
             tf.strings.reduce_join(
                 tf.concat(
                     [
+                        tf.tile(
+                            [['']],
+                            [n_atoms, 1]),
                         atom_chunk,
                         tf.tile(
                             [['  0  0  0  0  0  0  0  0  0  0  0  0']],

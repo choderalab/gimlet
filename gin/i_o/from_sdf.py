@@ -155,12 +155,13 @@ def read_sdf(file_path):
             atoms_lines[:, :3],
             tf.float32)
 
-        atoms = tf.py_func(
-            lambda *x: tf.convert_to_tensor(
-                [TRANSLATION[x_] for x_ in x], dtype=tf.int64),
-            atoms_lines[:, 3],
-            [tf.int64])
 
+        atoms = tf.cast(
+            tf.map_fn(
+                lambda x: TRANSLATION[x.numpy()],
+                atoms_lines[:, 3],
+                tf.int32),
+            tf.int64)
 
         # process bond lines
         bonds_lines = tf.strings.split(bonds_lines, ' ').values
@@ -185,8 +186,7 @@ def read_sdf(file_path):
             tf.zeros((n_atoms, n_atoms),
             dtype=tf.float32))
 
-        adjacency_map = tf.scatter_nd_update(
-            adjacency_map,
+        adjacency_map = adjacency_map.scatter_nd_update(
             bond_idxs,
             bond_orders)
 
@@ -201,7 +201,7 @@ def read_sdf(file_path):
                 tf.int64),
             dtype=tf.int64))
 
-    ds = ds.map(lambda x: tf.contrib.eager.py_func(
+    ds = ds.map(lambda x: tf.py_function(
         read_one_mol,
         [x],
         [tf.int64, tf.float32, tf.float32]),
