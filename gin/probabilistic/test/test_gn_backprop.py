@@ -19,7 +19,7 @@ class f_r(tf.keras.Model):
         super(f_r, self).__init__()
         self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
-    @tf.function
+    # @tf.function
     def call(self, h_e, h_v, h_u):
         y = self.d(h_u)[0][0]
         return y

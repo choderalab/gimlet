@@ -79,7 +79,7 @@ class GraphNet(tf.keras.Model):
 
             # aggregate functions, default to be sum
             rho_e_v=(lambda h_e, atom_is_connected_to_bonds: tf.reduce_sum(
-                tf.where(
+                tf.where( # here we grab the edges connected to nodes
                     tf.tile(
                         tf.expand_dims(
                             atom_is_connected_to_bonds,
@@ -127,7 +127,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    @tf.function
+    # @tf.function
     def _call(
             self,
             mol, # note that the molecules here could be featurized
@@ -180,17 +180,18 @@ class GraphNet(tf.keras.Model):
                         1),
                     [1, n_atoms])),
 
-        tf.equal(
-            tf.tile(
-                tf.expand_dims(
-                    tf.range(n_atoms),
-                    0),
-                [n_bonds, 1]),
-            tf.tile(
-                tf.expand_dims(
-                    bond_idxs[:,1],
-                    1),
-                [1, n_atoms])))
+            tf.equal(
+                tf.tile(
+                    tf.expand_dims(
+                        tf.range(n_atoms),
+                        0),
+                    [n_bonds, 1]),
+                tf.tile(
+                    tf.expand_dims(
+                        bond_idxs[:,1],
+                        1),
+                    [1, n_atoms])))
+
 
         # (n_atoms, n_bonds)
         atom_is_connected_to_bonds = tf.transpose(
@@ -203,7 +204,7 @@ class GraphNet(tf.keras.Model):
 
         # initialize the hidden layers
         # (n_bonds, ...)
-        h_e = self.f_e(tf.transpose(tf.expand_dims(bond_orders, 0)))
+        h_e = self.f_e(tf.expand_dims(bond_orders, 1))
 
         # (n_atoms, ...)
         h_v = self.f_v(atoms)
@@ -217,17 +218,17 @@ class GraphNet(tf.keras.Model):
             # e'_k = \phi^e (e_k, v_{rk}, v_{sk}, u)
             # $$
 
-            # (n_bonds, ...)
+            # (n_bonds, d_v)
             h_left = tf.gather(
                 h_v,
                 bond_idxs[:, 0])
 
-            # (n_bonds, ...)
+            # (n_bonds, d_v)
             h_right = tf.gather(
                 h_v,
                 bond_idxs[:, 1])
 
-            # (n_bonds, ...)
+            # (n_bonds, d_e)
             h_e = self.phi_e(h_e, h_left, h_right,
                 tf.tile( # repeat global attribute to the number of bonds
                     h_u,
@@ -238,7 +239,7 @@ class GraphNet(tf.keras.Model):
             # \bar{e_i'} = \rho^{e \rightarrow v} (E'_i)
             # $$
 
-            # (n_atoms, ...)
+            # (n_atoms, d_e)
             h_e_bar_i = self.rho_e_v(h_e, atom_is_connected_to_bonds)
 
             # update $ v'_i $
@@ -246,7 +247,7 @@ class GraphNet(tf.keras.Model):
             # v'_i = phi^v (\bar{e_i}, v_i, u)
             # $$
 
-            # (n_atoms, ...)
+            # (n_atoms, d_v)
             h_v = self.phi_v(h_v, h_e_bar_i,
                 tf.tile(
                     h_u,
@@ -309,3 +310,4 @@ class GraphNet(tf.keras.Model):
         for fn in [self.rho_e_u, self.rho_e_v, self.rho_v_u]:
             if hasattr(fn, 'switch'):
                 fn.switch()
+        
