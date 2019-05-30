@@ -77,43 +77,44 @@ gn = gin.probabilistic.gn.GraphNet(
     repeat=3)
 
 
-optimizer = tf.keras.optimizers.Adam(1e-5)
-n_epoch = 50
-batch_size = 128
-batch_idx = 0
-loss = 0
-tape = tf.GradientTape()
-mols = []
+def train():
+    optimizer = tf.keras.optimizers.Adam(1e-5)
+    n_epoch = 50
+    batch_size = 4
+    batch_idx = 0
+    loss = 0
+    tape = tf.GradientTape()
+    mols = []
 
-for dummy_idx in range(n_epoch):
-    for atoms, adjacency_map, y in ds:
-        mol = [atoms, adjacency_map]
-        mols.append(mol)
-        batch_idx += 1
+    for dummy_idx in range(n_epoch):
+        for atoms, adjacency_map, y in ds:
+            mol = [atoms, adjacency_map]
+            mols.append(mol)
+            batch_idx += 1
 
-        if batch_idx == batch_size:
-            loss = 0
-            idx = 0
+            if batch_idx == batch_size:
+                loss = 0
+                idx = 0
 
-            def loop_body(idx, loss):
-                mol = mols[idx]
-                y_hat = gn(mol)
-                loss += tf.clip_by_norm(
-                    tf.pow(y - y_hat, 2),
-                    1e8)
-                return idx + 1, loss
+                def loop_body(idx, loss):
+                    mol = mols[idx]
+                    y_hat = gn(mol)
+                    loss += tf.clip_by_norm(
+                        tf.pow(y - y_hat, 2),
+                        1e8)
+                    return idx + 1, loss
 
-            with tf.GradientTape() as tape:
-                _, loss= tf.while_loop(
-                    lambda idx, loss: tf.less(idx, batch_size),
-                    loop_body,
-                    [idx, loss],
-                    parallel_iterations=batch_size)
-                print(loss)
+                with tf.GradientTape() as tape:
+                    _, loss= tf.while_loop(
+                        lambda idx, loss: tf.less(idx, batch_size),
+                        loop_body,
+                        [idx, loss],
+                        parallel_iterations=batch_size)
+                    print(loss)
 
-            variables = gn.variables
-            grad = tape.gradient(loss, variables)
-            optimizer.apply_gradients(
-                zip(grad, variables))
-            batch_idx = 0
-            mols = []
+                variables = gn.variables
+                grad = tape.gradient(loss, variables)
+                optimizer.apply_gradients(
+                    zip(grad, variables))
+                batch_idx = 0
+                mols = []

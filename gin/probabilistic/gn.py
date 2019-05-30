@@ -127,7 +127,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    # @tf.function
+    @tf.function
     def _call(
             self,
             mol, # note that the molecules here could be featurized
@@ -218,6 +218,7 @@ class GraphNet(tf.keras.Model):
             # e'_k = \phi^e (e_k, v_{rk}, v_{sk}, u)
             # $$
 
+            '''
             # (n_bonds, d_v)
             h_left = tf.gather(
                 h_v,
@@ -227,12 +228,24 @@ class GraphNet(tf.keras.Model):
             h_right = tf.gather(
                 h_v,
                 bond_idxs[:, 1])
+            '''
+
+            h_left_and_right = tf.boolean_mask(
+                tf.tile( # (n_bonds, n_atoms, d_v)
+                    tf.expand_dims(
+                        h_v,
+                        0),
+                    [n_bonds, 1, 1]),
+                bond_is_connected_to_atoms)
+
+            h_left, h_right = tf.split(h_left_and_right, 2)
 
             # (n_bonds, d_e)
             h_e = self.phi_e(h_e, h_left, h_right,
                 tf.tile( # repeat global attribute to the number of bonds
                     h_u,
                     [n_bonds, 1]))
+
 
             # aggregate $ \bar{e_i'} $
             # $$
@@ -310,4 +323,3 @@ class GraphNet(tf.keras.Model):
         for fn in [self.rho_e_u, self.rho_e_v, self.rho_v_u]:
             if hasattr(fn, 'switch'):
                 fn.switch()
-        
