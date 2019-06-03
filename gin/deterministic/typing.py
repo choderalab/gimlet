@@ -481,7 +481,7 @@ class TypingBase(object):
 
         return self.__is_connected_to_4_heavy
 
-    @tf.function
+    # @tf.function
     def _is_in_ring(self):
         """ Determine whether an atom in a molecule is in a ring or not.
         """
@@ -706,10 +706,11 @@ class TypingBase(object):
 
         return self.__is_in_ring
 
-    @tf.function
+    # @tf.function
     def _is_in_conjugate_system(self):
         """ Determine whether an atom in a molecule is in a conjugated
         system or not.
+
         """
         # TODO: when compiling this into a graph, it throws error
         sp2_idxs = tf.boolean_mask(
@@ -718,38 +719,7 @@ class TypingBase(object):
                     tf.shape(self.adjacency_map_full)[0],
                     tf.int64),
                 dtype=tf.int64),
-            tf.reduce_any(
-                tf.greater(
-                    self.adjacency_map_full,
-                    tf.constant(1.0, dtype=tf.float32)),
-                axis=1))
-
-        # NOTE:
-        # right now,
-        # we only allow carbon, nitrogen, or oxygen
-        # as part of our conjugate system
-        sp2_idxs = tf.boolean_mask(
-            sp2_idxs,
-            tf.logical_or(
-
-                tf.equal( # carbon
-                    tf.gather(self.atoms, sp2_idxs),
-                    tf.constant(
-                        0,
-                        dtype=tf.int64)),
-
-                tf.logical_or(
-                    tf.equal( # nitrogen
-                        tf.gather(self.atoms, sp2_idxs),
-                        tf.constant(
-                            1,
-                            dtype=tf.int64)),
-
-                    tf.equal( # oxygen
-                        tf.gather(self.atoms, sp2_idxs),
-                        tf.constant(
-                            2,
-                            dtype=tf.int64)))))
+            self.is_sp2)
 
         # gather only sp2 atoms
         sp2_adjacency_map = tf.gather(
@@ -957,6 +927,7 @@ class TypingBase(object):
                 tf.TensorShape([None, sp2_idxs.shape[0]]),
                 tf.TensorShape((visited.get_shape()))])
 
+
         # get all the indices
         idxs_in_conjugate_systems = tf.cast(
             tf.unique(
@@ -965,13 +936,16 @@ class TypingBase(object):
                     [-1]))[0],
             tf.int64)
 
-
         idxs_in_conjugate_systems = tf.boolean_mask(
             idxs_in_conjugate_systems,
             tf.logical_not(
                 tf.equal(
                     idxs_in_conjugate_systems,
                     tf.constant(-1, dtype=tf.int64))),)
+
+        idxs_in_conjugate_systems = tf.gather(
+            sp2_idxs,
+            idxs_in_conjugate_systems)
 
         # get the flags of whether an atom is in conjugate system
         is_in_conjugate_system_ = tf.reduce_any(
@@ -1001,7 +975,7 @@ class TypingBase(object):
 
         return self.__is_in_conjugate_system
 
-    @tf.function
+    # @tf.function
     def _is_aromatic(self):
         """ Determine whether the atoms are in an aromatic system.
 
@@ -1012,6 +986,12 @@ class TypingBase(object):
 
         # get the flags of whether atoms are in conjugate systems
         is_in_conjugate_system_ = self.is_in_conjugate_system
+
+        conjugate_system_idxs = tf.boolean_mask(
+            tf.range(
+                tf.shape(is_in_conjugate_system_, tf.int64)[0],
+                dtype=tf.int64),
+            is_in_conjugate_system_)
 
         # get the adjacency map for the conjugate system only
         adjacency_map_conjugate_system = tf.boolean_mask(
@@ -1250,6 +1230,11 @@ class TypingBase(object):
                         tf.int64),
                     dtype=tf.int64),
                 is_in_ring_))
+
+        # switch back to the full indexing of the atoms
+        aromatic_idxs = tf.gather(
+            conjugate_system_idxs,
+            aromatic_idxs)
 
         # turn the indices
         is_aromatic_ = tf.reduce_any(

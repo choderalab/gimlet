@@ -33,12 +33,12 @@ SOFTWARE.
 import tensorflow as tf
 # tf.enable_eager_execution()
 import gin
-import gin.deterministic.forcefield
+# import gin.deterministic.forcefields
 
 # =============================================================================
 # utility functions
 # =============================================================================
-@tf.function
+# @tf.function
 def get_distance_matrix(coordinates):
     """ Calculate the distance matrix from coordinates.
 
@@ -63,7 +63,7 @@ def get_distance_matrix(coordinates):
         ord='euclidean',
         axis=2)
 
-@tf.function
+# @tf.function
 def get_angles(coordinates, angle_idxs):
     """ Calculate the angles from coordinates and angle indices.
 
@@ -114,7 +114,7 @@ def get_dihedrals(coordinates, torsion_idxs):
     # (n_torsions, 3)
     normal_right = tf.linalg.cross(
         torsion_idxs[:, 2] - torsion_idxs[:, 3],
-        torsion_idxs[:, 2] - torsion_idxs[:, 4])
+        torsion_idxs[:, 2] - torsion_idxs[:, 1])
 
     # (n_torsions, )
     dihedrals = tf.math.acos(
@@ -129,37 +129,49 @@ def get_dihedrals(coordinates, torsion_idxs):
 # =============================================================================
 # module classes
 # =============================================================================
-class SingleMoleculeMechanicsSystem(object):
+class SingleMoleculeMechanicsSystem:
     """
     A single molecule system that could be calculated in MD calculation.
 
     """
     def __init__(
             self,
-            mol
-            coordinates=None,
-            typing=gin.deterministic.typing.TypingGAFF,
-            forcefield=gin.deterministic.forcefields.gaff):
+            mol,
+            typing=None,
+            forcefield=None):
 
         self.mol = mol
         self.atoms = mol[0]
+        self.n_atoms = tf.shape(self.atoms, tf.int64)[0]
         self.adjacency_map = mol[1]
-        self.coordinates = coordinates
         self.typing = typing
         self.forcefield = forcefield
 
-        if type(self.coordinates) == type(None):
-            self.coordinates = gin.conformer(
+        if self.typing == None:
+            self.typing = gin.deterministic.typing.TypingGAFF
+
+        if self.forcefield == None:
+            self.forcefield = gin.deterministic.forcefields.gaff
+
+        if len(mol) == 3:
+            self.coordinates = mol[2]
+
+        else:
+            self.coordinates = gin.deterministic.conformer.Conformers(
                 mol,
                 self.forcefield,
                 self.typing).get_conformers_from_distance_geometry(1)[0]
+
+
+        # get the types
+        self.typing_assignment = self.typing(self.mol).get_assignment()
 
         self.get_bond_params()
         self.get_angle_params()
         self.get_torsion_params()
         self.get_nonbonded_params()
 
-    def energy(self, coordinates):
+    def energy(self, coordinates=None):
         """ Compute the total energy of a small molecule.
 
         $$
@@ -167,6 +179,9 @@ class SingleMoleculeMechanicsSystem(object):
             + E_\mathtt{torsions}
         $$
         """
+        if type(coordinates) == type(None):
+            coordinates = self.coordinates
+
         # get all the vars needed
         distance_matrix = get_distance_matrix(coordinates)
         angles = get_angles(coordinates, self.angle_idxs)
@@ -177,10 +192,16 @@ class SingleMoleculeMechanicsSystem(object):
         # E_\mathtt{bonded}
         # = \frac{1}{2} k (x - x_0) ^ 2
         # $$
+        # NOTE: it's impossible for bonds to return NaN
         bond_energy = 0.5 * self.bond_k \
             * tf.pow(
-                bond_distances - self.bond_length,
+                tf.gather_nd(
+                    distance_matrix,
+                    self.bond_idxs) \
+                    - self.bond_length,
                 2)
+
+        bond_energy = tf.reduce_sum(bond_energy)
 
         # angle energy
         # $$
@@ -192,39 +213,61 @@ class SingleMoleculeMechanicsSystem(object):
                 angles - self.angle_angle,
                 2)
 
+        angle_energy = tf.where(
+            tf.math.is_nan(angle_energy),
+            tf.zeros_like(angle_energy),
+            angle_energy)
+
+        angle_energy = tf.reduce_sum(angle_energy)
+
         # torsion energy
         # $$
         # E_\texttt{torsion}
         # = k (1 + cos(n\theta - theta_0))
         # $$
         proper_torsion_energy = \
-            + self.torsion_proper_k1 * (
+            self.torsion_proper_k1 * (
                 1 + tf.math.cos(
                     self.torsion_proper_periodicity1 * torsions \
-                        - self.torsion_proper_phase1))
+                        - self.torsion_proper_phase1)) \
             + self.torsion_proper_k2 * (
                 1 + tf.math.cos(
                     self.torsion_proper_periodicity2 * torsions \
-                        - self.torsion_proper_phase2))
+                        - self.torsion_proper_phase2)) \
             + self.torsion_proper_k3 * (
                 1 + tf.math.cos(
                     self.torsion_proper_periodicity3 * torsions \
                         - self.torsion_proper_phase3))
 
+        # get rid of nan
+        proper_torsion_energy = tf.where(
+            tf.math.is_nan(proper_torsion_energy),
+            tf.zeros_like(proper_torsion_energy),
+            proper_torsion_energy)
+
+        proper_torsion_energy = tf.reduce_sum(proper_torsion_energy)
+
         improper_torsion_energy = \
-            + self.torsion_improper_k1 * (
+            self.torsion_improper_k1 * (
                 1 + tf.math.cos(
                     self.torsion_improper_periodicity1 * torsions \
-                        - self.torsion_improper_phase1))
+                        - self.torsion_improper_phase1)) \
             + self.torsion_improper_k2 * (
                 1 + tf.math.cos(
                     self.torsion_improper_periodicity2 * torsions \
-                        - self.torsion_improper_phase2))
+                        - self.torsion_improper_phase2)) \
             + self.torsion_improper_k3 * (
                 1 + tf.math.cos(
                     self.torsion_improper_periodicity3 * torsions \
                         - self.torsion_improper_phase3))
 
+        # get rid of nan
+        improper_torsion_energy = tf.where(
+            tf.math.is_nan(improper_torsion_energy),
+            tf.zeros_like(improper_torsion_energy),
+            improper_torsion_energy)
+
+        improper_torsion_energy = tf.reduce_sum(improper_torsion_energy)
 
         # lenard-jones
         # $$
@@ -255,6 +298,40 @@ class SingleMoleculeMechanicsSystem(object):
 
         return energy_tot
 
+    def minimize(
+            self,
+            method='adam',
+            coordinates=None,
+            max_iter=1000,
+            **kwargs):
+        """ Minimize the energy.
+        """
+
+        if type(coordinates) == type(None):
+            coordinates = self.coordinates
+
+        if method == 'adam':
+            # put coordinates into a variable
+            coordinates = tf.Variable(coordinates)
+
+            # get the Adam optimizer
+            optimizer = tf.keras.optimizers.Adam(1e-10)
+
+            # init
+            iter_idx = 0
+
+            while iter_idx < max_iter:
+                with tf.GradientTape(
+                    watch_accessed_variables=False) as tape:
+                    tape.watch(coordinates)
+                    energy = self.energy(coordinates)
+                grad = tape.gradient(energy, [coordinates])
+                optimizer.apply_gradients(zip(grad, [coordinates]))
+                iter_idx += 1
+                print(energy)
+
+
+
     def get_bond_params(self):
         """ Get the config of all the bonds in the system.
 
@@ -283,26 +360,26 @@ class SingleMoleculeMechanicsSystem(object):
             all_idxs_stack,
             is_bond)
 
-
-        # get the types
-        typing_assignment = self.typing(self.mol).get_assignment()
-
         # get the specs of the bond
         bond_specs = tf.map_fn(
             lambda bond: tf.convert_to_tensor(
                     self.forcefield.get_bond(
-                        int(tf.gather(typing_assignment, bond[0]).numpy()),
-                        int(tf.gather(typing_assignment, bond[1]).numpy()))),
+                        int(
+                            tf.gather(
+                                self.typing_assignment, bond[0]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment, bond[1]).numpy()))),
             bond_idxs,
             dtype=tf.float32)
 
-        # [n_bonds, 2]
+        # (n_bonds, 2)
         self.bond_idxs = bond_idxs
 
-        # [n_bonds, ]
+        # (n_bonds, )
         self.bond_k = bond_specs[:, 0]
 
-        # [n_bonds, ]
+        # (n_bonds, )
         self.bond_length = bond_specs[:, 1]
 
     def get_angle_params(self):
@@ -314,18 +391,20 @@ class SingleMoleculeMechanicsSystem(object):
             + self.adjacency_map
 
         # init the angles idxs to be all negative ones
-        angle_idxs = tf.constant([-1, -1, -1], dtype=tf.int64)
+        angle_idxs = tf.constant([[-1, -1, -1]], dtype=tf.int64)
 
-        def process_one_atom(idx, angle_idxs,
+        @tf.function
+        def process_one_atom_if_there_is_angle(idx, angle_idxs,
                 full_adjacency_map=full_adjacency_map):
+
             # get all the connection indices
             connection_idxs = tf.where(
                 tf.greater(
-                    full_adjacency_map[idx, ],
+                    full_adjacency_map[idx, :],
                     tf.constant(0, dtype=tf.float32)))
 
             # get the number of connections
-            n_connections = tf.shape(connection_idxs)
+            n_connections = tf.shape(connection_idxs)[0]
 
             # get the combinations from these connection indices
             connection_combinations = tf.gather_nd(
@@ -338,10 +417,20 @@ class SingleMoleculeMechanicsSystem(object):
                     tf.greater(
                         tf.linalg.band_part(
                             tf.ones(
-                                (connection_idxs, connection_idxs),
+                                (
+                                    n_connections,
+                                    n_connections
+                                ),
                                 dtype=tf.int64),
                             0, -1),
                         tf.constant(0, dtype=tf.int64))))
+
+            connection_combinations = tf.boolean_mask(
+                connection_combinations,
+                tf.greater(
+                    connection_combinations[:, 0] \
+                     - connection_combinations[:, 1],
+                    tf.constant(0, dtype=tf.int64)))
 
             angle_idxs = tf.concat(
                 [
@@ -352,37 +441,44 @@ class SingleMoleculeMechanicsSystem(object):
                                 connection_combinations[:, 0],
                                 1),
                             tf.expand_dims(
-                                idx * tf.ones((n_connections, ), dtype=int64),
+                                idx * tf.ones(
+                                    (tf.shape(connection_combinations)[0], ),
+                                    dtype=tf.int64),
                                 1),
                             tf.expand_dims(
                                 connection_combinations[:, 1],
                                 1)
-                        ])
+                        ],
+                        axis=1)
                 ],
                 axis=0)
 
             return idx + 1, angle_idxs
 
-        idx = tf.constant(0, dtype=tf.int64)
+        @tf.function
+        def process_one_atom(idx, angle_idxs,
+                full_adjacency_map=full_adjacency_map):
 
+            if tf.less(
+                tf.math.count_nonzero(full_adjacency_map[idx, :]),
+                tf.constant(1, dtype=tf.int64)):
+                return idx+1, angle_idxs
+
+            else:
+                return process_one_atom_if_there_is_angle(idx, angle_idxs)
+
+
+        idx = tf.constant(0, dtype=tf.int64)
         # use while loop to update the indices forming the angles
         idx, angle_idxs = tf.while_loop(
             # condition
-            tf.less(idx, self.n_atoms),
+            lambda idx, angle_idxs: tf.less(idx, self.n_atoms),
 
-            lambda idx, angle_idxs: tf.cond(
-                tf.greater(
-                    tf.math.count_nonzero(
-                        full_adjacency_map[idx, :]),
-                    tf.constant(1, dtype=tf.int64)),
-
-                loop_body,
-
-                lambda idx, angle_idxs: idx + 1, angle_idxs),
+            process_one_atom,
 
             [idx, angle_idxs],
 
-            shape_invariant=[
+            shape_invariants=[
                 idx.get_shape(),
                 tf.TensorShape((None, 3))])
 
@@ -393,10 +489,16 @@ class SingleMoleculeMechanicsSystem(object):
         angle_specs = tf.map_fn(
             lambda angle: tf.convert_to_tensor(
                     self.forcefield.get_angle(
-                        int(tf.gather(typing_assignment, angle[0]).numpy()),
-                        int(tf.gather(typing_assignment, angle[1]).numpy()),
-                        int(tf.gather(typing_assignment, angle[2]).numpy()))),
-            bond_idxs,
+                        int(
+                            tf.gather(
+                                self.typing_assignment, angle[0]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment, angle[1]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment, angle[2]).numpy()))),
+            angle_idxs,
             dtype=tf.float32)
 
         # put everything into the attributes of the object
@@ -419,10 +521,10 @@ class SingleMoleculeMechanicsSystem(object):
             + self.adjacency_map
 
         # init the torsion idxs to be all negative ones
-        torsion_idxs = tf.constant([-1, -1, -1, -1], dtype=tf.int64)
+        torsion_idxs = tf.constant([[-1, -1, -1, -1]], dtype=tf.int64)
 
         # for each bond, there is at least one torsion terms associated
-        def process_one_bond(idx, torsion_idxs):
+        def process_one_bond_if_there_is_torsion(idx, torsion_idxs):
             bond = self.bond_idxs[idx]
             left_atom_connections = tf.where(
                 tf.greater(
@@ -441,21 +543,25 @@ class SingleMoleculeMechanicsSystem(object):
                         left_atom_connections,
                         right_atom_connections),
                     axis=2),
-                [None, 2])
+                [-1, 2])
 
             torsion_idxs = tf.concat(
                 [
                     torsion_idxs,
                     tf.concat(
                         [
-                            connection_combinations[:, 0],
+                            tf.expand_dims(
+                                connection_combinations[:, 0],
+                                1),
                             bond[0] * tf.ones(
-                                (tf.shape(connection_combinations), 1),
+                                (tf.shape(connection_combinations)[0], 1),
                                 dtype=tf.int64),
                             bond[1] * tf.ones(
-                                (tf.shape(connection_combinations), 1),
+                                (tf.shape(connection_combinations)[0], 1),
                                 dtype=tf.int64),
-                            connection_combinations[:, 1]
+                            tf.expand_dims(
+                                connection_combinations[:, 1],
+                                1)
                         ],
                         axis=1)
                 ],
@@ -463,45 +569,74 @@ class SingleMoleculeMechanicsSystem(object):
 
             return idx + 1, torsion_idxs
 
-        idx = tf.constant(0, dtype=tf.int64)
-        idx, torsion_idxs = tf.while_loop(
-            # condition
-            tf.less(idx, tf.shape(bond_idxs)[0]),
-
-            # body
-            lambda idx, torsion_idxs: tf.cond(
+        def process_one_bond(idx, torsion_idxs):
+            if tf.logical_not(
                 tf.logical_and(
                     tf.greater(
                         tf.math.count_nonzero(
-                            full_adjacency_map[bond[0]]),
-                        tf.constant(0, dtype=tf.int64)),
+                            full_adjacency_map[self.bond_idxs[idx][0]]),
+                        tf.constant(1, dtype=tf.int64)),
                     tf.greater(
                         tf.math.count_nonzero(
-                            full_adjacency_map[bond[1]]),
-                        tf.constant(0, dtype=tf.int64))),
+                            full_adjacency_map[self.bond_idxs[idx][1]]),
+                        tf.constant(1, dtype=tf.int64)))):
+                return idx + 1, torsion_idxs
 
-                # if there is torsion
-                process_one_bond,
+            else:
+                return process_one_bond_if_there_is_torsion(
+                    idx, torsion_idxs)
 
-                # else
-                lambda idx, torsion_idxs: idx+1, torsion_idxs),
+
+        idx = tf.constant(0, dtype=tf.int64)
+        idx, torsion_idxs = tf.while_loop(
+            # condition
+            lambda idx, _: tf.less(idx, tf.shape(self.bond_idxs, tf.int64)[0]),
+
+            # body
+            process_one_bond,
 
             # vars
             [idx, torsion_idxs],
 
-            shape_invariant=[idx.get_shape(), [4, None]])
+            shape_invariants=[idx.get_shape(), [4, None]])
 
         # get rid of the first one
         torsion_idxs = torsion_idxs[1:, ]
+
+        torsion_idxs = tf.boolean_mask(
+            torsion_idxs,
+            tf.logical_and(
+                tf.logical_not(
+                    tf.equal(
+                        torsion_idxs[:, 0] - torsion_idxs[:, 2],
+                        tf.constant(0, dtype=tf.int64))),
+                tf.logical_not(
+                    tf.equal(
+                        torsion_idxs[:, 1] - torsion_idxs[:, 3],
+                        tf.constant(0, dtype=tf.int64)))))
+
+        self.torsion_idxs = torsion_idxs
 
         # get the specs of the torsion
         torsion_proper_specs = tf.map_fn(
             lambda torsion: tf.convert_to_tensor(
                     self.forcefield.get_proper(
-                        int(tf.gather(typing_assignment, torsion[0]).numpy()),
-                        int(tf.gather(typing_assignment, torsion[1]).numpy()),
-                        int(tf.gather(typing_assignment, torsion[2]).numpy()),
-                        int(tf.gather(typing_assignment, torsion[3]).numpy()))),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[0]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[1]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[2]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[3]).numpy()))),
             torsion_idxs,
             dtype=tf.float32)
 
@@ -509,10 +644,22 @@ class SingleMoleculeMechanicsSystem(object):
         torsion_improper_specs = tf.map_fn(
             lambda torsion: tf.convert_to_tensor(
                     self.forcefield.get_improper(
-                        int(tf.gather(typing_assignment, torsion[0]).numpy()),
-                        int(tf.gather(typing_assignment, torsion[1]).numpy()),
-                        int(tf.gather(typing_assignment, torsion[2]).numpy()),
-                        int(tf.gather(typing_assignment, torsion[3]).numpy()))),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[0]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[1]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[2]).numpy()),
+                        int(
+                            tf.gather(
+                                self.typing_assignment,
+                                torsion[3]).numpy()))),
             torsion_idxs,
             dtype=tf.float32)
 
@@ -590,7 +737,7 @@ class SingleMoleculeMechanicsSystem(object):
         nonbonded_specs = tf.map_fn(
             lambda atom: tf.convert_to_tensor(
                     self.forcefield.get_nonbonded(
-                        int(tf.gather(typing_assignment, atom).numpy()))),
+                        int(tf.gather(self.typing_assignment, atom).numpy()))),
             self.atoms,
             dtype=tf.float32)
 
@@ -605,12 +752,12 @@ class SingleMoleculeMechanicsSystem(object):
                     tf.expand_dims(
                         nonbonded_specs[:, 0],
                         0),
-                    [n_atoms, 1]),
+                    [self.n_atoms, 1]),
                 tf.tile(
                     tf.expand_dims(
                         nonbonded_specs[:, 0],
-                        0),
-                    [1, n_atoms])),
+                        1),
+                    [1, self.n_atoms])),
             2)
 
         self.nonbonded_epsilon = tf.math.sqrt(
@@ -619,9 +766,9 @@ class SingleMoleculeMechanicsSystem(object):
                     tf.expand_dims(
                         nonbonded_specs[:, 1],
                         0),
-                    [n_atoms, 1]),
+                    [self.n_atoms, 1]),
                 tf.tile(
                     tf.expand_dims(
                         nonbonded_specs[:, 1],
-                        0),
-                    [1, n_atoms])))
+                        1),
+                    [1, self.n_atoms])))

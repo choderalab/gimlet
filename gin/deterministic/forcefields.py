@@ -143,33 +143,43 @@ class ForceFieldBase(object):
     def get_angle(self, atom1_type, atom2_type, atom3_type):
         # get the string representation of atom0, 1, and 2
         # NOTE: atom1 is the atom in the center
-        atom1_str = self.typing_translation_dict[atom1_type]
-        atom2_str = self.typing_translation_dict[atom2_type]
-        atom3_str = self.typing_translation_dict[atom3_type]
+        angle = .0
+        k = .0
 
-        # get the entry for the bond
-        bond_entry = self.root.find(
-            './/HarmonicAngleForce/Angle'
-            '[@type1=\'%s\'][@type2=\'%s\'][@type3=\'%s\']'\
-            % (
-                atom1_str,
-                atom2_str,
-                atom3_str,
-            ))
+        # TODO: solve the inconsistency between atom types
+        #       to get rid of try-except
 
-        if type(bond_entry) == type(None):
+        try:
+            atom1_str = self.typing_translation_dict[atom1_type]
+            atom2_str = self.typing_translation_dict[atom2_type]
+            atom3_str = self.typing_translation_dict[atom3_type]
+
+            # get the entry for the bond
             bond_entry = self.root.find(
                 './/HarmonicAngleForce/Angle'
                 '[@type1=\'%s\'][@type2=\'%s\'][@type3=\'%s\']'\
                 % (
-                    atom3_str,
-                    atom2_str,
                     atom1_str,
+                    atom2_str,
+                    atom3_str,
                 ))
 
-        # get length and k
-        angle = float(bond_entry.get('angle'))
-        k = float(bond_entry.get('k'))
+            if type(bond_entry) == type(None):
+                bond_entry = self.root.find(
+                    './/HarmonicAngleForce/Angle'
+                    '[@type1=\'%s\'][@type2=\'%s\'][@type3=\'%s\']'\
+                    % (
+                        atom3_str,
+                        atom2_str,
+                        atom1_str,
+                    ))
+
+            # get length and k
+            angle = float(bond_entry.get('angle'))
+            k = float(bond_entry.get('k'))
+
+        except:
+            pass
 
         return angle, k
 
