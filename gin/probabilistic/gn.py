@@ -207,12 +207,15 @@ class GraphNet(tf.keras.Model):
         # initialize the hidden layers
         # (n_bonds, ...)
         h_e = self.f_e(tf.expand_dims(bond_orders, 1))
+        h_e_0 = h_e
 
         # (n_atoms, ...)
         h_v = self.f_v(atoms)
+        h_v_0 = h_v
 
         # (...)
         h_u = self.f_u(atoms, adjacency_map)
+        h_u_0 = h_u
 
         def propagate_one_time(h_e, h_v, h_u, iter_idx):
             # update $ e'_k $
@@ -243,7 +246,7 @@ class GraphNet(tf.keras.Model):
             h_left, h_right = tf.split(h_left_and_right, 2)
 
             # (n_bonds, d_e)
-            h_e = self.phi_e(h_e, h_left, h_right,
+            h_e = self.phi_e(h_e, h_e_0, h_left, h_right,
                 tf.tile( # repeat global attribute to the number of bonds
                     h_u,
                     [n_bonds, 1]))
@@ -263,7 +266,7 @@ class GraphNet(tf.keras.Model):
             # $$
 
             # (n_atoms, d_v)
-            h_v = self.phi_v(h_v, h_e_bar_i,
+            h_v = self.phi_v(h_v, h_v_0, h_e_bar_i,
                 tf.tile(
                     h_u,
                     [n_atoms, 1]))
@@ -290,7 +293,7 @@ class GraphNet(tf.keras.Model):
             # $$
 
             # (...)
-            h_u = self.phi_u(h_u, h_e_bar, h_v_bar)
+            h_u = self.phi_u(h_u, h_u_0, h_e_bar, h_v_bar)
 
             return h_e, h_v, h_u, iter_idx + 1
 

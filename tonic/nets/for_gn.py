@@ -166,10 +166,11 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
 
                 self.flow.append('A_%s' % idx)
 
-    @tf.function
+    # @tf.function
     def _call(self, *args):
         # NOTE: not sure why all the args were rendered as a tuple
         #       I think this is something with tensorflow.
+
         args = args[0]
 
         x = tf.concat(
