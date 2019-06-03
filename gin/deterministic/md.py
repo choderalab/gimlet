@@ -310,6 +310,7 @@ class SingleMoleculeMechanicsSystem:
         if type(coordinates) == type(None):
             coordinates = self.coordinates
 
+
         if method == 'adam':
             # put coordinates into a variable
             coordinates = tf.Variable(coordinates)
@@ -325,7 +326,8 @@ class SingleMoleculeMechanicsSystem:
                     watch_accessed_variables=False) as tape:
                     tape.watch(coordinates)
                     energy = self.energy(coordinates)
-                grad = tape.gradient(energy, [coordinates])
+                grad = tape.gradient(energy, coordinates)
+                print(grad)
                 optimizer.apply_gradients(zip(grad, [coordinates]))
                 iter_idx += 1
                 print(energy)

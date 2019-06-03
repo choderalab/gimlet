@@ -31,7 +31,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-import tensorflow_probability as tfp
+# import tensorflow_probability as tfp
 
 # =============================================================================
 # constants
@@ -293,12 +293,33 @@ class Conformers(object):
             tf.zeros((self.n_atoms, ), dtype=tf.float32))
 
         upper_bound, lower_bound = floyd(upper_bound, lower_bound)
-        # sample from a uniform distribution
-        distance_matrix_distribution = tfp.distributions.Uniform(
-            low=lower_bound,
-            high=upper_bound)
 
-        distance_matrices = distance_matrix_distribution.sample(n_samples)
+
+        # NOTE: the following code is commented out because
+        # because we don't want to use tfp for now
+        # sample from a uniform distribution
+        # distance_matrix_distribution = tfp.distributions.Uniform(
+        #     low=lower_bound,
+        #     high=upper_bound)
+
+        # distance_matrices = distance_matrix_distribution.sample(n_samples)
+
+        distance_matrices = tf.tile(
+            tf.expand_dims(
+                lower_bound,
+                0),
+            [n_samples, 1, 1]) \
+            + tf.random.uniform(
+                shape=(n_samples, self.n_atoms, self.n_atoms),
+                minval=0.,
+                maxval=1.,
+                dtype=tf.float32) \
+            * tf.tile(
+                tf.expand_dims(
+                    upper_bound - lower_bound,
+                    0),
+                [n_samples, 1, 1])
+
         distance_matrices = tf.linalg.band_part(distance_matrices, 0, -1)
         distance_matrices = tf.transpose(distance_matrices, perm=[0, 2, 1]) \
             + distance_matrices
