@@ -198,9 +198,11 @@ class GraphNet(tf.keras.Model):
             bond_is_connected_to_atoms)
 
         # (n_bonds, )
-        bond_orders = tf.gather_nd(
+        # NOTE: here we use the same boolean mask as before, so they
+        #       should be following the same order
+        bond_orders = tf.boolean_mask(
             adjacency_map,
-            bond_idxs)
+            is_bond)
 
         # initialize the hidden layers
         # (n_bonds, ...)
