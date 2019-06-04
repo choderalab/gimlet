@@ -209,16 +209,19 @@ class GraphNet(tf.keras.Model):
         h_e = self.f_e(tf.expand_dims(bond_orders, 1))
         h_e_0 = h_e
         h_e_history = tf.expand_dims(h_e_0, 1)
+        d_e = tf.shape(h_e, tf.int64)[1]
 
         # (n_atoms, ...)
         h_v = self.f_v(atoms)
         h_v_0 = h_v
         h_v_history = tf.expand_dims(h_v_0, 1)
+        d_v = tf.shape(h_v, tf.int64)[1]
 
         # (...)
         h_u = self.f_u(atoms, adjacency_map)
         h_u_0 = h_u
         h_u_history = tf.expand_dims(h_u_0, 1)
+        d_u = tf.shape(h_u, tf.int64)[1]
 
         def propagate_one_time(
             iter_idx,
@@ -354,13 +357,13 @@ class GraphNet(tf.keras.Model):
 
             # shape_invariants
             shape_invariants = [
-                iter_idx,
+                iter_idx.get_shape(),
                 h_e.get_shape(),
                 h_v.get_shape(),
                 h_u.get_shape(),
-                tf.TensorShape((None, h_e.shape[0], h_e.shape[1])),
-                tf.TensorShape((None, h_v.shape[0], h_v.shape[1])),
-                tf.TensorShape((None, h_u.shape[0], h_u.shape[1])),
+                tf.TensorShape((h_e.shape[0], None, h_e.shape[1])),
+                tf.TensorShape((h_v.shape[0], None, h_v.shape[1])),
+                tf.TensorShape((h_u.shape[0], None, h_u.shape[1]))
                 ])
 
         y_bar = self.f_r(
