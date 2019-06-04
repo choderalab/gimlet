@@ -183,7 +183,26 @@ class SingleMoleculeMechanicsSystem:
             coordinates = self.coordinates
 
         # get all the vars needed
-        distance_matrix = get_distance_matrix(coordinates)
+        # distance_matrix = get_distance_matrix(coordinates)
+
+        distance_matrix = tf.norm(
+            tf.math.subtract(
+                # (n_atoms, n_atoms, 3)
+                tf.tile(
+                    tf.expand_dims(
+                        coordinates,
+                        0),
+                    [coordinates.shape[0], 1, 1]),
+                tf.tile(
+                    tf.expand_dims(
+                        coordinates,
+                        1),
+                    [1, coordinates.shape[0], 1])),
+            ord='euclidean',
+            axis=2)
+
+        print(distance_matrix)
+
         angles = get_angles(coordinates, self.angle_idxs)
         torsions = get_dihedrals(coordinates, self.torsion_idxs)
 
@@ -275,28 +294,51 @@ class SingleMoleculeMechanicsSystem:
         # $$
 
         # (n_atoms, n_atoms)
-        sigma_over_r = tf.math.divide(self.nonbonded_sigma, distance_matrix)
+        sigma_over_r = tf.math.divide_no_nan(
+            self.nonbonded_sigma,
+            distance_matrix)
 
         # (n_atoms, n_atoms)
-        lj_energy_matrix = 4 * self.nonbonded_epsilon \
+        lj_energy_matrix = tf.stop_gradient(4 * self.nonbonded_epsilon) \
             * (tf.pow(sigma_over_r, 12) - tf.pow(sigma_over_r, 6))
 
-        lj_energy = tf.reduce_sum(
-            tf.boolean_mask(
-                lj_energy_matrix,
-                self.is_nonbonded)) \
-            + tf.reduce_sum(
-                tf.boolean_mask(
-                    lj_energy_matrix,
-                    self.is_onefour))
+        nonbonded_mask = tf.stop_gradient(
+            tf.where(
+                self.is_nonbonded,
+                tf.ones_like(lj_energy_matrix),
+                tf.zeros_like(lj_energy_matrix)))
 
+        onefour_mask = tf.stop_gradient(
+            tf.where(
+                self.is_onefour,
+                tf.ones_like(lj_energy_matrix),
+                tf.zeros_like(lj_energy_matrix)))
+
+        lj_energy = tf.reduce_sum(
+            nonbonded_mask * lj_energy_matrix \
+                + onefour_mask * lj_energy_matrix)
+
+
+        '''
         energy_tot = bond_energy \
             + angle_energy \
             + proper_torsion_energy \
             + improper_torsion_energy \
             + lj_energy
 
+        '''
+
+        energy_tot = distance_matrix
+
         return energy_tot
+
+    def d_energy(self, coordinates=None):
+        """ Explicitly calculate the gradient of the energy w.r.t.
+        the coordinates.
+
+        """
+
+        pass
 
     def minimize(
             self,
@@ -310,7 +352,6 @@ class SingleMoleculeMechanicsSystem:
         if type(coordinates) == type(None):
             coordinates = self.coordinates
 
-
         if method == 'adam':
             # put coordinates into a variable
             coordinates = tf.Variable(coordinates)
@@ -322,11 +363,23 @@ class SingleMoleculeMechanicsSystem:
             iter_idx = 0
 
             while iter_idx < max_iter:
-                with tf.GradientTape(
-                    watch_accessed_variables=False) as tape:
-                    tape.watch(coordinates)
-                    energy = self.energy(coordinates)
-                grad = tape.gradient(energy, coordinates)
+                with tf.GradientTape() as tape:
+                    distance_matrix = tf.norm(
+                        tf.math.subtract(
+                            # (n_atoms, n_atoms, 3)
+                            tf.tile(
+                                tf.expand_dims(
+                                    coordinates,
+                                    0),
+                                [coordinates.shape[0], 1, 1]),
+                            tf.tile(
+                                tf.expand_dims(
+                                    coordinates,
+                                    1),
+                                [1, coordinates.shape[0], 1])),
+                        ord='euclidean',
+                        axis=2)
+                grad = tape.gradient(distance_matrix, coordinates)
                 print(grad)
                 optimizer.apply_gradients(zip(grad, [coordinates]))
                 iter_idx += 1
