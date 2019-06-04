@@ -127,7 +127,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    # @tf.function
+    @tf.function
     def _call(
             self,
             mol, # note that the molecules here could be featurized
@@ -208,17 +208,17 @@ class GraphNet(tf.keras.Model):
         # (n_bonds, ...)
         h_e = self.f_e(tf.expand_dims(bond_orders, 1))
         h_e_0 = h_e
-        h_e_history = tf.expand_dims(h_e_0, 0)
+        h_e_history = tf.expand_dims(h_e_0, 1)
 
         # (n_atoms, ...)
         h_v = self.f_v(atoms)
         h_v_0 = h_v
-        h_v_history = tf.expand_dims(h_v_0, 0)
+        h_v_history = tf.expand_dims(h_v_0, 1)
 
         # (...)
         h_u = self.f_u(atoms, adjacency_map)
         h_u_0 = h_u
-        h_u_history = tf.expand_dims(h_u_0, 0)
+        h_u_history = tf.expand_dims(h_u_0, 1)
 
         def propagate_one_time(
             iter_idx,
@@ -257,6 +257,14 @@ class GraphNet(tf.keras.Model):
                     h_u,
                     [n_bonds, 1]))
 
+            h_e_history = tf.concat(
+                [
+                    h_e_history,
+                    tf.expand_dims(
+                        h_e,
+                        1)
+                ],
+                axis=1)
 
             # aggregate $ \bar{e_i'} $
             # $$
@@ -276,6 +284,15 @@ class GraphNet(tf.keras.Model):
                 tf.tile(
                     h_u,
                     [n_atoms, 1]))
+
+            h_v_history = tf.concat(
+                [
+                    h_v_history,
+                    tf.expand_dims(
+                        h_v,
+                        1)
+                ],
+                axis=1)
 
             # aggregate $ \bar{e'} $
             # $$
@@ -300,6 +317,15 @@ class GraphNet(tf.keras.Model):
 
             # (...)
             h_u = self.phi_u(h_u, h_u_0, h_e_bar, h_v_bar)
+
+            h_u_history = tf.concat(
+                [
+                    h_u_history,
+                    tf.expand_dims(
+                        h_u,
+                        1)
+                ],
+                axis=1)
 
             return (
                 iter_idx + 1,
