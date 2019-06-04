@@ -127,7 +127,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    @tf.function
+    # @tf.function
     def _call(
             self,
             mol, # note that the molecules here could be featurized
@@ -208,16 +208,22 @@ class GraphNet(tf.keras.Model):
         # (n_bonds, ...)
         h_e = self.f_e(tf.expand_dims(bond_orders, 1))
         h_e_0 = h_e
+        h_e_history = tf.expand_dims(h_e_0, 0)
 
         # (n_atoms, ...)
         h_v = self.f_v(atoms)
         h_v_0 = h_v
+        h_v_history = tf.expand_dims(h_v_0, 0)
 
         # (...)
         h_u = self.f_u(atoms, adjacency_map)
         h_u_0 = h_u
+        h_u_history = tf.expand_dims(h_u_0, 0)
 
-        def propagate_one_time(h_e, h_v, h_u, iter_idx):
+        def propagate_one_time(
+            iter_idx,
+            h_e, h_v, h_u,
+            h_e_history, h_v_history, h_u_history):
             # update $ e'_k $
             # $$
             # e'_k = \phi^e (e_k, v_{rk}, v_{sk}, u)
@@ -295,29 +301,45 @@ class GraphNet(tf.keras.Model):
             # (...)
             h_u = self.phi_u(h_u, h_u_0, h_e_bar, h_v_bar)
 
-            return h_e, h_v, h_u, iter_idx + 1
+            return (
+                iter_idx + 1,
+                h_e, h_v, h_u,
+                h_e_history, h_v_history, h_u_history)
 
         # use while loop to execute the graph multiple times
         iter_idx = tf.constant(0, dtype=tf.int64)
 
-        h_e, h_v, h_u, iter_idx = tf.while_loop(
+        iter_idx, h_e, h_v, h_u, h_e_history, h_v_history, h_u_history \
+            = tf.while_loop(
             # condition
-            lambda h_e, h_v, h_u, iter_idx: tf.less(iter_idx, self.repeat),
+            lambda \
+                iter_idx, h_e, h_v, h_u, h_e_history, h_v_history, h_u_history:\
+                    tf.less(iter_idx, self.repeat),
 
             # loop body
             propagate_one_time,
 
             # loop vars
-            [h_e, h_v, h_u, iter_idx],
+            [
+                iter_idx,
+                h_e, h_v, h_u,
+                h_e_history, h_v_history, h_u_history
+            ],
 
             # shape_invariants
             shape_invariants = [
+                iter_idx,
                 h_e.get_shape(),
                 h_v.get_shape(),
                 h_u.get_shape(),
-                iter_idx.get_shape()])
+                tf.TensorShape((None, h_e.shape[0], h_e.shape[1])),
+                tf.TensorShape((None, h_v.shape[0], h_v.shape[1])),
+                tf.TensorShape((None, h_u.shape[0], h_u.shape[1])),
+                ])
 
-        y_bar = self.f_r(h_e, h_v, h_u)
+        y_bar = self.f_r(
+            h_e, h_v, h_u,
+            h_e_history, h_v_history, h_u_history)
 
         return y_bar
 
