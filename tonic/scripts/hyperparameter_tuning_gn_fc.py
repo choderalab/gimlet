@@ -28,7 +28,6 @@ SOFTWARE.
 """
 
 import tensorflow as tf
-tf.enable_eager_execution()
 import gin
 import tonic
 import time
@@ -95,7 +94,10 @@ def obj_fn(point):
                 self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
             @tf.function
-            def call(self, h_e, h_v, h_u):
+            def call(self, h_e, h_v, h_u,
+                    h_e_history,
+                    h_v_history,
+                    h_u_history):
                 y = self.d(h_u)[0][0]
                 return y
 
@@ -111,7 +113,7 @@ def obj_fn(point):
         gn = gin.probabilistic.gn.GraphNet(
             f_e=tf.keras.layers.Dense(point['f_e_0']),
 
-            f_v=f_v(point['f_v_0'])
+            f_v=f_v(point['f_v_0']),
 
             f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
 
@@ -134,7 +136,7 @@ def obj_fn(point):
                  point['phi_u_a_1'])),
             f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
-        optimizer = tf.train.AdamOptimizer(point['learning_rate'])
+        optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
         n_epoch = 30
         batch_size = 32
         batch_idx = 0
@@ -142,6 +144,8 @@ def obj_fn(point):
         tape = tf.GradientTape()
 
         for dummy_idx in range(n_epoch):
+            print('=========================')
+            print('epoch %s' % dummy_idx)
             for atoms, adjacency_map, y in ds_tr:
                 mol = [atoms, adjacency_map]
 
@@ -151,11 +155,11 @@ def obj_fn(point):
                     batch_idx += 1
 
                 if batch_idx == batch_size:
+                    print(loss.numpy())
                     variables = gn.variables
                     grad = tape.gradient(loss, variables)
                     optimizer.apply_gradients(
-                        zip(grad, variables),
-                        tf.train.get_or_create_global_step())
+                        zip(grad, variables))
                     loss = 0
                     batch_idx = 0
                     tape = tf.GradientTape()
@@ -177,7 +181,10 @@ def obj_fn(point):
                 self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
             @tf.function
-            def call(self, h_e, h_v, h_u):
+            def call(self, h_e, h_v, h_u,
+                    h_e_history,
+                    h_v_history,
+                    h_u_history):
                 y = self.d(h_u)[0][0]
                 return y
 
@@ -193,7 +200,7 @@ def obj_fn(point):
         gn = gin.probabilistic.gn.GraphNet(
             f_e=tf.keras.layers.Dense(point['f_e_0']),
 
-            f_v=f_v(point['f_v_0'])
+            f_v=f_v(point['f_v_0']),
 
             f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
 
@@ -216,7 +223,7 @@ def obj_fn(point):
                  point['phi_u_a_1'])),
             f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
-    optimizer = tf.train.AdamOptimizer(point['learning_rate'])
+    optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
     n_epoch = 30
     batch_size = 32
     batch_idx = 0
@@ -239,8 +246,7 @@ def obj_fn(point):
                 variables = gn.variables
                 grad = tape.gradient(loss, variables)
                 optimizer.apply_gradients(
-                    zip(grad, variables),
-                    tf.train.get_or_create_global_step())
+                    zip(grad, variables))
                 loss = 0
                 batch_idx = 0
                 tape = tf.GradientTape()
