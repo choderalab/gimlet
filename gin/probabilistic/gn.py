@@ -232,18 +232,6 @@ class GraphNet(tf.keras.Model):
             # e'_k = \phi^e (e_k, v_{rk}, v_{sk}, u)
             # $$
 
-            '''
-            # (n_bonds, d_v)
-            h_left = tf.gather(
-                h_v,
-                bond_idxs[:, 0])
-
-            # (n_bonds, d_v)
-            h_right = tf.gather(
-                h_v,
-                bond_idxs[:, 1])
-            '''
-
             h_left_and_right = tf.boolean_mask(
                 tf.tile( # (n_bonds, n_atoms, d_v)
                     tf.expand_dims(

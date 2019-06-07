@@ -106,6 +106,7 @@ ORGANIC_ATOMS = [
     'F',
     'R', # Br
     'L', # Cl
+    'I'
 ]
 
 N_ORGANIC_ATOMS = len(ORGANIC_ATOMS)
@@ -465,8 +466,7 @@ def smiles_to_organic_topological_molecule(smiles):
         return idx, bracket_queue, bracket_pairs
 
     def if_right(idx, bracket_queue, bracket_pairs,
-            topology_idxs=topology_idxs,
-            ):
+            topology_idxs=topology_idxs):
         # if at a certain position
         # it is a right bracket
         # we need to do the following things
@@ -557,6 +557,53 @@ def smiles_to_organic_topological_molecule(smiles):
 
     left_bracket_idxs = left_bracket_idxs[:right_bracket_idxs.shape[0]]
 
+    # handle the overlap between left and right brackets
+    # as in
+    # CCC(C)(C)CC
+    left_right_overlaps = tf.where(
+        tf.equal(
+            tf.subtract(
+                tf.tile(
+                    tf.expand_dims(
+                        left_bracket_idxs,
+                        0),
+                    [right_bracket_idxs.shape[0], 1]),
+                tf.tile(
+                    tf.expand_dims(
+                        right_bracket_idxs,
+                        1),
+                    [1, right_bracket_idxs.shape[0]])),
+            tf.constant(0, dtype=tf.int64)))
+
+
+    def process_right_left_overlap(
+            idx,
+            left_bracket_idxs,
+            right_bracket_idxs=right_bracket_idxs,
+            left_right_overlaps=left_right_overlaps):
+
+        left_right_overlap = left_right_overlaps[idx, :]
+
+        left_bracket_idxs = tf.where(
+            tf.equal(
+                tf.range(
+                    tf.shape(right_bracket_idxs, tf.int64)[0]),
+                left_right_overlap[1]),
+            tf.ones_like(left_bracket_idxs) \
+                * left_bracket_idxs[left_right_overlap[0]],
+            left_bracket_idxs)
+
+        return idx + 1, left_bracket_idxs
+
+    idx = tf.constant(0, dtype=tf.int64)
+
+
+    _, left_bracket_idxs = tf.while_loop(
+        lambda idx, _: tf.less(idx, tf.shape(left_right_overlaps, tf.int64)[0]),
+        process_right_left_overlap,
+        [idx, left_bracket_idxs])
+
+
     current_bond_idxs = tf.transpose(
         tf.concat(
             [
@@ -590,8 +637,7 @@ def smiles_to_organic_topological_molecule(smiles):
     # drop the connection between right bracket and the atom right to it
     adjacency_map.scatter_nd_update(
         current_bond_idxs,
-        tf.zeros_like(current_bond_order)
-    )
+        tf.zeros_like(current_bond_order))
 
     # connect the atom right of the right bracket to the atom left of
     # the left bracket
@@ -749,6 +795,7 @@ def smiles_to_organic_topological_molecule(smiles):
     # discard the first row
     bond_idxs_to_update = bond_idxs_to_update[1:, ]
     bond_orders_to_update = bond_orders_to_update[1:, ]
+
 
     adjacency_map.scatter_nd_update(
         bond_idxs_to_update,

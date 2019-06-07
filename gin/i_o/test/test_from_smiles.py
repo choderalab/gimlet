@@ -132,7 +132,7 @@ def test_caffeine():
             decimal=2)
 
 def test_naphthalene():
-    atoms, adjacency_map =smiles_to_organic_topological_molecule(
+    atoms, adjacency_map = smiles_to_organic_topological_molecule(
         'C1=CC=C2C=CC=CC2=C1')
 
     npt.assert_almost_equal(
@@ -153,3 +153,25 @@ def test_naphthalene():
              [0, 0, 0, 0, 0, 0, 0, 0, 0, 16/11],
              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]),
         decimal=2)
+
+def test_3_3_dimethylpentane():
+    atoms, adjacency_map = smiles_to_organic_topological_molecule(
+        'CCC(C)(C)CC')
+
+    npt.assert_almost_equal(
+        atoms.numpy(),
+        np.array([0, 0, 0, 0, 0, 0, 0]))
+
+    npt.assert_almost_equal(
+        adjacency_map.numpy(),
+        np.array(
+            [[0, 1, 0, 0, 0, 0, 0],
+             [0, 0, 1, 0, 0, 0, 0],
+             [0, 0, 0, 1, 1, 1, 0],
+             [0, 0, 0, 0, 0, 0, 0],
+             [0, 0, 0, 0, 0, 0, 0],
+             [0, 0, 0, 0, 0, 0, 1],
+             [0, 0, 0, 0, 0, 0, 0]]))
+
+
+print(smiles_to_organic_topological_molecule('Clc1ccc(I)cc1'))

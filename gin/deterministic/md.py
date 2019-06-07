@@ -201,8 +201,6 @@ class SingleMoleculeMechanicsSystem:
             ord='euclidean',
             axis=2)
 
-        print(distance_matrix)
-
         angles = get_angles(coordinates, self.angle_idxs)
         torsions = get_dihedrals(coordinates, self.torsion_idxs)
 
@@ -318,21 +316,17 @@ class SingleMoleculeMechanicsSystem:
             nonbonded_mask * lj_energy_matrix \
                 + onefour_mask * lj_energy_matrix)
 
-
         '''
         energy_tot = bond_energy \
             + angle_energy \
             + proper_torsion_energy \
             + improper_torsion_energy \
             + lj_energy
-
         '''
-
-        energy_tot = distance_matrix
-
+        energy_tot = angle_energy + proper_torsion_energy + improper_torsion_energy
         return energy_tot
 
-    def d_energy(self, coordinates=None):
+    def force(self, coordinates=None):
         """ Explicitly calculate the gradient of the energy w.r.t.
         the coordinates.
 
@@ -364,24 +358,19 @@ class SingleMoleculeMechanicsSystem:
 
             while iter_idx < max_iter:
                 with tf.GradientTape() as tape:
-                    distance_matrix = tf.norm(
-                        tf.math.subtract(
-                            # (n_atoms, n_atoms, 3)
-                            tf.tile(
-                                tf.expand_dims(
-                                    coordinates,
-                                    0),
-                                [coordinates.shape[0], 1, 1]),
-                            tf.tile(
-                                tf.expand_dims(
-                                    coordinates,
-                                    1),
-                                [1, coordinates.shape[0], 1])),
-                        ord='euclidean',
-                        axis=2)
-                grad = tape.gradient(distance_matrix, coordinates)
+                    energy = self.energy(coordinates)
+
+                grad = tape.gradient(energy, coordinates)
                 print(grad)
-                optimizer.apply_gradients(zip(grad, [coordinates]))
+                grad = tf.sparse.to_dense(
+                    grad.indices,
+                    grad.dense_shape,
+                    grad.values)
+
+                print(grad)
+
+                raise NotImplementedError
+                optimizer.apply_gradients(zip([grad], [coordinates]))
                 iter_idx += 1
                 print(energy)
 
