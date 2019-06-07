@@ -94,15 +94,24 @@ def obj_fn(point):
                 super(f_r, self).__init__()
                 self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
+            @tf.function
             def call(self, h_e, h_v, h_u):
                 y = self.d(h_u)[0][0]
                 return y
 
+        class f_v(tf.keras.Model):
+            def __init__(self, units):
+                super(f_v, self).__init__()
+                self.d = tf.keras.layers.Dense(units)
+
+            @tf.function
+            def call(self, x):
+                return self.d(tf.one_hot(x, 8))
+
         gn = gin.probabilistic.gn.GraphNet(
             f_e=tf.keras.layers.Dense(point['f_e_0']),
 
-            f_v=tf.keras.layers.Lambda(
-                lambda x: tf.keras.layers.Dense(point['f_v_0'])(tf.one_hot(x, 8))),
+            f_v=f_v(point['f_v_0'])
 
             f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
 
@@ -138,9 +147,7 @@ def obj_fn(point):
 
                 with tape:
                     y_hat = gn(mol)
-                    loss += tf.clip_by_norm(
-                        tf.losses.mean_squared_error(y, y_hat),
-                        1e8)
+                    loss += tf.pow(y - y_hat, 2)
                     batch_idx += 1
 
                 if batch_idx == batch_size:
@@ -163,42 +170,51 @@ def obj_fn(point):
             [(gn([atoms, adjacency_map]) - y) \
                 for atoms, adjacency_map, y in ds_tr]))
 
-    # train on global train data
-    class f_r(tf.keras.Model):
-        def __init__(self, config):
-            super(f_r, self).__init__()
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
-        def call(self, h_e, h_v, h_u):
-            y = self.d(h_u)[0][0]
-            return y
+        class f_r(tf.keras.Model):
+            def __init__(self, config):
+                super(f_r, self).__init__()
+                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
-    gn = gin.probabilistic.gn.GraphNet(
-        f_e=tf.keras.layers.Dense(point['f_e_0']),
+            @tf.function
+            def call(self, h_e, h_v, h_u):
+                y = self.d(h_u)[0][0]
+                return y
 
-        f_v=tf.keras.layers.Lambda(
-            lambda x: tf.keras.layers.Dense(point['f_v_0'])(tf.one_hot(x, 8))),
+        class f_v(tf.keras.Model):
+            def __init__(self, units):
+                super(f_v, self).__init__()
+                self.d = tf.keras.layers.Dense(units)
 
-        f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
+            @tf.function
+            def call(self, x):
+                return self.d(tf.one_hot(x, 8))
 
-        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_e_0'],
-             point['phi_e_a_0'],
-             point['f_e_0'],
-             point['phi_e_a_1'])),
+        gn = gin.probabilistic.gn.GraphNet(
+            f_e=tf.keras.layers.Dense(point['f_e_0']),
 
-        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_v_0'],
-             point['phi_v_a_0'],
-             point['f_v_0'],
-             point['phi_v_a_1'])),
+            f_v=f_v(point['f_v_0'])
 
-        phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_u_0'],
-             point['phi_u_a_0'],
-             point['f_u_0'],
-             point['phi_u_a_1'])),
-        f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
+            f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
+
+            phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+                (point['phi_e_0'],
+                 point['phi_e_a_0'],
+                 point['f_e_0'],
+                 point['phi_e_a_1'])),
+
+            phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+                (point['phi_v_0'],
+                 point['phi_v_a_0'],
+                 point['f_v_0'],
+                 point['phi_v_a_1'])),
+
+            phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+                (point['phi_u_0'],
+                 point['phi_u_a_0'],
+                 point['f_u_0'],
+                 point['phi_u_a_1'])),
+            f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
     optimizer = tf.train.AdamOptimizer(point['learning_rate'])
     n_epoch = 30
