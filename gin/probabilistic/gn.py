@@ -84,20 +84,20 @@ class GraphNet(tf.keras.Model):
                         tf.expand_dims(
                             atom_is_connected_to_bonds,
                             2),
-                        [1, 1, h_e.shape[1]]),
+                        [1, 1, tf.shape(h_e)[1]]),
                     tf.tile(
                         tf.expand_dims(
                             h_e,
                             0),
                         [
-                            atom_is_connected_to_bonds.shape[0], # n_atoms
+                            tf.shape(atom_is_connected_to_bonds)[0], # n_atoms
                             1,
                             1
                         ]),
                     tf.zeros((
-                        atom_is_connected_to_bonds.shape[0],
-                        h_e.shape[0],
-                        h_e.shape[1]))),
+                        tf.shape(atom_is_connected_to_bonds)[0],
+                        tf.shape(h_e)[0],
+                        tf.shape(h_e)[1]))),
                 axis=1)),
 
             rho_e_u=(lambda x: tf.expand_dims(tf.reduce_sum(x, axis=0), 0)),
