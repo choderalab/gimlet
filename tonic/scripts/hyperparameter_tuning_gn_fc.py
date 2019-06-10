@@ -237,9 +237,7 @@ def obj_fn(point):
 
             with tape:
                 y_hat = gn(mol)
-                loss += tf.clip_by_norm(
-                    tf.losses.mean_squared_error(y, y_hat),
-                    1e8)
+                loss += tf.pow(y-y_hat, 2)
                 batch_idx += 1
 
             if batch_idx == batch_size:
