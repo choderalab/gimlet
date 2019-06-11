@@ -168,11 +168,11 @@ def obj_fn(point):
 
         # test on train data
         mse_train.append(tf.reduce_mean(
-            [(gn([atoms, adjacency_map]) - y) \
+            [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
                 for atoms, adjacency_map, y in ds_tr]))
-        mse_train.append(tf.reduce_mean(
-            [(gn([atoms, adjacency_map]) - y) \
-                for atoms, adjacency_map, y in ds_tr]))
+        mse_test.append(tf.reduce_mean(
+            [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
+                for atoms, adjacency_map, y in ds_te]))
 
 
         class f_r(tf.keras.Model):
@@ -251,7 +251,7 @@ def obj_fn(point):
     time1 = time.time()
 
     mse_global_test = tf.reduce_mean(
-        [(gn([atoms, adjacency_map]) - y) \
+        [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
             for atoms, adjacency_map, y in ds_global_te])
 
     mse_train = tf.reduce_mean(mse_train)
