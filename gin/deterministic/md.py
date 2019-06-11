@@ -42,26 +42,24 @@ import gin
 def get_distance_matrix(coordinates):
     """ Calculate the distance matrix from coordinates.
 
+    $$
+    D_{ij} = <X_i, X_i> - 2<X_i, X_j> + <X_j, X_j>
+
     Parameters
     ----------
     coordinates: tf.Tensor, shape=(n_atoms, 3)
 
     """
-    return tf.norm(
-        tf.math.subtract(
-            # (n_atoms, n_atoms, 3)
-            tf.tile(
-                tf.expand_dims(
-                    coordinates,
-                    0),
-                [coordinates.shape[0], 1, 1]),
-            tf.tile(
-                tf.expand_dims(
-                    coordinates,
-                    1),
-                [1, coordinates.shape[0], 1])),
-        ord='euclidean',
-        axis=2)
+
+    X_2 = tf.reshape(
+        tf.reduce_sum(
+            coordinates * coordinates,
+            1),
+        [-1, 1])
+
+    return X_2 - 2 * tf.matmul(coordinates, tf.transpose(coordinates)) \
+        + tf.transpose(X_2)
+
 
 # @tf.function
 def get_angles(coordinates, angle_idxs):
@@ -72,6 +70,7 @@ def get_angles(coordinates, angle_idxs):
     coordinates: tf.Tensor, shape=(n_atoms, 3)
 
     """
+
     # get the coordinates of the atoms forming the angle
     # (n_angles, 3, 3)
     angle_coordinates = tf.gather(coordinates, angle_idxs)
@@ -183,23 +182,7 @@ class SingleMoleculeMechanicsSystem:
             coordinates = self.coordinates
 
         # get all the vars needed
-        # distance_matrix = get_distance_matrix(coordinates)
-
-        distance_matrix = tf.norm(
-            tf.math.subtract(
-                # (n_atoms, n_atoms, 3)
-                tf.tile(
-                    tf.expand_dims(
-                        coordinates,
-                        0),
-                    [coordinates.shape[0], 1, 1]),
-                tf.tile(
-                    tf.expand_dims(
-                        coordinates,
-                        1),
-                    [1, coordinates.shape[0], 1])),
-            ord='euclidean',
-            axis=2)
+        distance_matrix = get_distance_matrix(coordinates)
 
         angles = get_angles(coordinates, self.angle_idxs)
         torsions = get_dihedrals(coordinates, self.torsion_idxs)
@@ -229,11 +212,6 @@ class SingleMoleculeMechanicsSystem:
             * tf.pow(
                 angles - self.angle_angle,
                 2)
-
-        angle_energy = tf.where(
-            tf.math.is_nan(angle_energy),
-            tf.zeros_like(angle_energy),
-            angle_energy)
 
         angle_energy = tf.reduce_sum(angle_energy)
 
@@ -292,29 +270,25 @@ class SingleMoleculeMechanicsSystem:
         # $$
 
         # (n_atoms, n_atoms)
-        sigma_over_r = tf.math.divide_no_nan(
-            self.nonbonded_sigma,
-            distance_matrix)
+        sigma_over_r = tf.clip_by_value(
+            tf.math.divide_no_nan(
+                self.nonbonded_sigma,
+                distance_matrix),
+            -1e10, 1e10)
 
         # (n_atoms, n_atoms)
         lj_energy_matrix = tf.stop_gradient(4 * self.nonbonded_epsilon) \
             * (tf.pow(sigma_over_r, 12) - tf.pow(sigma_over_r, 6))
 
-        nonbonded_mask = tf.stop_gradient(
-            tf.where(
-                self.is_nonbonded,
-                tf.ones_like(lj_energy_matrix),
-                tf.zeros_like(lj_energy_matrix)))
-
-        onefour_mask = tf.stop_gradient(
-            tf.where(
-                self.is_onefour,
-                tf.ones_like(lj_energy_matrix),
-                tf.zeros_like(lj_energy_matrix)))
-
-        lj_energy = tf.reduce_sum(
-            nonbonded_mask * lj_energy_matrix \
-                + onefour_mask * lj_energy_matrix)
+        lj_energy = tf.math.add(
+            tf.reduce_sum(
+                tf.boolean_mask(
+                    lj_energy_matrix,
+                    self.is_nonbonded)),
+            tf.reduce_sum(
+                tf.boolean_mask(
+                    lj_energy_matrix,
+                    self.is_onefour)))
 
         '''
         energy_tot = bond_energy \
@@ -322,8 +296,12 @@ class SingleMoleculeMechanicsSystem:
             + proper_torsion_energy \
             + improper_torsion_energy \
             + lj_energy
+
         '''
-        energy_tot = angle_energy + proper_torsion_energy + improper_torsion_energy
+
+        energy_tot = bond_energy + proper_torsion_energy + improper_torsion_energy + lj_energy
+
+
         return energy_tot
 
     def force(self, coordinates=None):
@@ -338,10 +316,12 @@ class SingleMoleculeMechanicsSystem:
             self,
             method='adam',
             coordinates=None,
-            max_iter=1000,
+            max_iter=10000,
             **kwargs):
         """ Minimize the energy.
         """
+
+        max_iter = tf.constant(max_iter, dtype=tf.int64)
 
         if type(coordinates) == type(None):
             coordinates = self.coordinates
@@ -350,29 +330,52 @@ class SingleMoleculeMechanicsSystem:
             # put coordinates into a variable
             coordinates = tf.Variable(coordinates)
 
+            # keep a history
+            recent_hundred = tf.zeros((100, ), dtype=tf.float32)
+
             # get the Adam optimizer
-            optimizer = tf.keras.optimizers.Adam(1e-10)
+            optimizer = tf.keras.optimizers.Adam(1000)
 
             # init
-            iter_idx = 0
+            iter_idx = tf.constant(0, dtype=tf.int64)
 
-            while iter_idx < max_iter:
+            while tf.less(iter_idx, max_iter):
                 with tf.GradientTape() as tape:
                     energy = self.energy(coordinates)
 
-                grad = tape.gradient(energy, coordinates)
-                print(grad)
-                grad = tf.sparse.to_dense(
-                    grad.indices,
-                    grad.dense_shape,
-                    grad.values)
-
-                print(grad)
-
-                raise NotImplementedError
-                optimizer.apply_gradients(zip([grad], [coordinates]))
-                iter_idx += 1
                 print(energy)
+                recent_hundred = tf.concat(
+                    [
+                        recent_hundred[1:],
+                        tf.expand_dims(energy, 0)
+                    ],
+                    axis=0)
+
+                grad = tape.gradient(energy, coordinates)
+
+                grad = tf.where(
+                    tf.math.is_nan(grad),
+                    tf.zeros_like(grad),
+                    grad)
+
+                optimizer.apply_gradients(zip([grad], [coordinates]))
+
+                if tf.logical_and(
+                    tf.greater(iter_idx, 100),
+                    tf.less(
+                        tf.math.reduce_std(recent_hundred),
+                        1e-5)):
+                    break
+
+                iter_idx += 1
+
+            gin.i_o.to_sdf.write_sdf(
+                [[
+                    self.atoms,
+                    self.adjacency_map,
+                    coordinates - tf.reduce_mean(coordinates, 0)
+                ]],
+                'caffeine_out.sdf')
 
 
 

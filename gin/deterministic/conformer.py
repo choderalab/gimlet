@@ -42,7 +42,7 @@ BOND_ENERGY_THRS = 500
 # utility functions
 # =============================================================================
 # @tf.function
-def floyd(upper, lower):
+def set_12_bounds(upper, lower):
     """ Floyd algorithm, as was implemented here:
     doi: 10.1002/0470845015.cda018
 
@@ -126,7 +126,129 @@ def floyd(upper, lower):
 
     return upper, lower
 
-@tf.function
+
+def set_13_bounds(upper, lower, adjacency_map):
+    """ Calculate the 1-3 bounds based on cosine relationships.
+
+    """
+    # NOTE: unfinished
+    n_atoms = upper.shape[0]
+    # get the full adjacency_map
+    full_adjacency_map = tf.transpose(adjacency_map) + adjacency_map
+
+    # init the angles idxs to be all negative ones
+    angle_idxs = tf.constant([[-1, -1, -1]], dtype=tf.int64)
+
+    def process_one_atom_if_there_is_angle(idx, angle_idxs,
+            full_adjacency_map=full_adjacency_map):
+
+        # get all the connection indices
+        connection_idxs = tf.where(
+            tf.greater(
+                full_adjacency_map[idx, :],
+                tf.constant(0, dtype=tf.float32)))
+
+        # get the number of connections
+        n_connections = tf.shape(connection_idxs)[0]
+
+        # get the combinations from these connection indices
+        connection_combinations = tf.gather_nd(
+            tf.stack(
+                tf.meshgrid(
+                    connection_idxs,
+                    connection_idxs),
+                axis=2),
+            tf.where(
+                tf.greater(
+                    tf.linalg.band_part(
+                        tf.ones(
+                            (
+                                n_connections,
+                                n_connections
+                            ),
+                            dtype=tf.int64),
+                        0, -1),
+                    tf.constant(0, dtype=tf.int64))))
+
+        connection_combinations = tf.boolean_mask(
+            connection_combinations,
+            tf.greater(
+                connection_combinations[:, 0] \
+                 - connection_combinations[:, 1],
+                tf.constant(0, dtype=tf.int64)))
+
+        angle_idxs = tf.concat(
+            [
+                angle_idxs,
+                tf.concat(
+                    [
+                        tf.expand_dims(
+                            connection_combinations[:, 0],
+                            1),
+                        tf.expand_dims(
+                            idx * tf.ones(
+                                (tf.shape(connection_combinations)[0], ),
+                                dtype=tf.int64),
+                            1),
+                        tf.expand_dims(
+                            connection_combinations[:, 1],
+                            1)
+                    ],
+                    axis=1)
+            ],
+            axis=0)
+
+        return idx + 1, angle_idxs
+
+    def process_one_atom(idx, angle_idxs,
+            full_adjacency_map=full_adjacency_map):
+
+        if tf.less(
+            tf.math.count_nonzero(full_adjacency_map[idx, :]),
+            tf.constant(1, dtype=tf.int64)):
+            return idx+1, angle_idxs
+
+        else:
+            return process_one_atom_if_there_is_angle(idx, angle_idxs)
+
+
+    idx = tf.constant(0, dtype=tf.int64)
+    # use while loop to update the indices forming the angles
+    idx, angle_idxs = tf.while_loop(
+        # condition
+        lambda idx, angle_idxs: tf.less(idx, n_atoms),
+
+        process_one_atom,
+
+        [idx, angle_idxs],
+
+        shape_invariants=[
+            idx.get_shape(),
+            tf.TensorShape((None, 3))])
+
+    # discard the first row
+    angle_idxs = angle_idxs[1:, ]
+
+    # discard the angles where there is a bond between atom1 and atom3
+    # (n_angles, ) Boolean
+    is_bond_13 = tf.greater(
+        tf.gather_nd(
+            adjacency_map_full,
+            tf.concat(
+                [
+                    tf.expand_dims(angle_idxs[0], 1),
+                    tf.expand_dims(angle_idxs[1], 1)
+                ],
+                axis=1)),
+        tf.constant(0, dtype=tf.float32))
+
+    angle_idxs = tf.boolean_mask(
+        angle_idxs,
+        is_bond_13)
+
+    raise NotImplementedError
+
+# @tf.function
 def embed(distance_matrix):
     """ EMBED algorithm, as was implemented here:
     10.1002/0470845015.cda018
@@ -292,7 +414,7 @@ class Conformers(object):
                 [1, 2]),
             tf.zeros((self.n_atoms, ), dtype=tf.float32))
 
-        upper_bound, lower_bound = floyd(upper_bound, lower_bound)
+        upper_bound, lower_bound = set_12_bounds(upper_bound, lower_bound)
 
 
         # NOTE: the following code is commented out because
