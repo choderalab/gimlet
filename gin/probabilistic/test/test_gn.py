@@ -71,7 +71,7 @@ def test_forward_rho_e_v_cyclobutane():
         f_e=lambda *x: 10 * tf.ones((4, 16), dtype=tf.float32),
         f_v=lambda *x: tf.ones((4, 16), dtype=tf.float32),
         f_u=lambda *x: tf.zeros((1, 16)),
-        phi_v=lambda *x: x[1],
+        phi_v=lambda *x: x[2],
         f_r=lambda *x: x[1],
         repeat=1)
 

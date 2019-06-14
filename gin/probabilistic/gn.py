@@ -35,6 +35,7 @@ import tensorflow as tf
 
 import gin.molecule
 
+
 # =============================================================================
 # module classes
 # =============================================================================
@@ -101,26 +102,46 @@ class GraphNet(tf.keras.Model):
                 axis=1)),
 
             rho_e_u=(lambda h_e, bond_in_mol: tf.reduce_sum(
-                tf.boolean_mask(
+                tf.multiply(
                     tf.tile(
                         tf.expand_dims(
-                            h_e,
+                            tf.where( # (n_bonds, n_mols)
+                                bond_in_mol,
+                                tf.ones_like(
+                                    bond_in_mol,
+                                    dtype=tf.float32),
+                                tf.zeros_like(
+                                    bond_in_mol,
+                                    dtype=tf.float32)),
+                            2),
+                        [1, 1, h_e.shape[1]]),
+                    tf.tile( # (n_bonds, n_mols, d_e)
+                        tf.expand_dims(
+                            h_e, # (n_bonds, d_e)
                             1),
-                        [1, bond_in_mol.shape[1], 1]),
-                    bond_in_mol),
-                0,
-                keepdims=True)),
+                        [1, bond_in_mol.shape[1], 1])),
+                axis=0)),
 
             rho_v_u=(lambda h_v, atom_in_mol: tf.reduce_sum(
-                tf.boolean_mask(
+                tf.multiply(
                     tf.tile(
                         tf.expand_dims(
-                            h_v,
+                            tf.where( # (n_bonds, n_mols)
+                                atom_in_mol,
+                                tf.ones_like(
+                                    atom_in_mol,
+                                    dtype=tf.float32),
+                                tf.zeros_like(
+                                    atom_in_mol,
+                                    dtype=tf.float32)),
+                            2),
+                        [1, 1, h_v.shape[1]]),
+                    tf.tile( # (n_bonds, n_mols, d_e)
+                        tf.expand_dims(
+                            h_v, # (n_bonds, d_e)
                             1),
-                        [1, atom_in_mol.shape[1], 1]),
-                    atom_in_mol),
-                0,
-                keepdims=True)),
+                        [1, atom_in_mol.shape[1], 1])),
+                axis=0)),
 
             # readout phase
             f_r=lambda *x:x[0],
@@ -145,12 +166,12 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    @tf.function
+    # @tf.function
     def _call(
             self,
             mol, # NOTE: here there could be more than one mol
-            atom_in_mol=None, # (n_atoms, )
-            bond_in_mol=None, # (n_bonds, )
+            atom_in_mol=False, # (n_atoms, )
+            bond_in_mol=False, # (n_bonds, )
             repeat=3):
         """ More general __call__ method.
 
@@ -182,11 +203,16 @@ class GraphNet(tf.keras.Model):
 
         n_bonds = tf.cast(tf.shape(bond_idxs)[0], tf.int64)
 
-        if type(atom_in_mol) == type(None):
-            atom_in_mol = tf.constant(True, shape=[tf.shape(atoms)[0], 1])
+        if tf.logical_not(tf.reduce_all(atom_in_mol)):
+            atom_in_mol = tf.tile(
+                [[True]],
+                [n_atoms, 1])
 
-        if type(bond_in_mol) == type(None):
-            bond_in_mol = tf.constant(True, shape=[tf.shape(bond_idxs)[0], 1])
+
+        if tf.logical_not(tf.reduce_all(bond_in_mol)):
+            bond_in_mol = tf.tile(
+                [[True]],
+                [n_bonds, 1])
 
         # (n_bonds, n_atoms)
         bond_is_connected_to_atoms = tf.logical_or(
@@ -213,7 +239,6 @@ class GraphNet(tf.keras.Model):
                         bond_idxs[:,1],
                         1),
                     [1, n_atoms])))
-
 
         # (n_atoms, n_bonds)
         atom_is_connected_to_bonds = tf.transpose(
@@ -245,6 +270,8 @@ class GraphNet(tf.keras.Model):
         h_u_0 = h_u
         h_u_history = tf.expand_dims(h_u_0, 1)
         d_u = tf.shape(h_u, tf.int64)[1]
+
+        n_mols = tf.shape(h_u, tf.int64)[0]
 
         def propagate_one_time(
             iter_idx,
@@ -305,7 +332,6 @@ class GraphNet(tf.keras.Model):
             # $$
             # v'_i = phi^v (\bar{e_i}, v_i, u)
             # $$
-
             # (n_atoms, d_v)
             h_v = self.phi_v(h_v, h_v_0, h_e_bar_i,
                 tf.reduce_sum(
@@ -333,6 +359,7 @@ class GraphNet(tf.keras.Model):
             # \bar{e'} = \rhp^{e \rightarrow u} (E')
             # $$
 
+
             # (n_mols, d_e)
             h_e_bar = self.rho_e_u(h_e, bond_in_mol)
 
@@ -341,7 +368,7 @@ class GraphNet(tf.keras.Model):
             # \bar{v'} = \rho^{v \rightarrow u} (V')
             # $$
 
-            # (n_atoms, d_v)
+            # (n_mols, d_v)
             h_v_bar = self.rho_v_u(h_v, atom_in_mol)
 
             # update $ u' $
@@ -377,7 +404,9 @@ class GraphNet(tf.keras.Model):
             = tf.while_loop(
             # condition
             lambda \
-                iter_idx, h_e, h_v, h_u, h_e_history, h_v_history, h_u_history:\
+                iter_idx, \
+                h_e, h_v, h_u, h_e_history, \
+                h_v_history, h_u_history:\
                     tf.less(iter_idx, self.repeat),
 
             # loop body
@@ -403,7 +432,8 @@ class GraphNet(tf.keras.Model):
 
         y_bar = self.f_r(
             h_e, h_v, h_u,
-            h_e_history, h_v_history, h_u_history)
+            h_e_history, h_v_history, h_u_history,
+            atom_in_mol, bond_in_mol)
 
         return y_bar
 
@@ -437,205 +467,243 @@ class GraphNet(tf.keras.Model):
 
         """
 
-        # init the sum of batch size
-        atom_idx = tf.convert_to_tensor(0, dtype=tf.int64)
-        bond_idx = tf.constant(0, dtype=tf.int64)
-        mol_idx = tf.constant(0, dtype=tf.int64)
+        # @tf.function # decorators not available in Alpha stage of tf 2.0
+        def _batch(
+            mols_with_attributes=mols_with_attributes,
+            inner_batch_size=inner_batch_size,
+            outer_batch_size=outer_batch_size):
 
-        batched_atoms_cache = tf.constant(
-            -1,
-            shape=[inner_batch_size,],
-            dtype=tf.int64)
+            # init the sum of batch size
+            atom_idx = tf.convert_to_tensor(0, dtype=tf.int64)
+            bond_idx = tf.constant(0, dtype=tf.int64)
+            mol_idx = tf.constant(0, dtype=tf.int64)
 
-        batched_adjacency_map_cache = tf.constant(
-            -1,
-            shape=[inner_batch_size, inner_batch_size],
-            dtype=tf.float32)
+            batched_atoms_cache = tf.constant(
+                -1,
+                shape=[inner_batch_size,],
+                dtype=tf.int64)
 
-        batched_atom_in_mol_cache = tf.constant(
-            False,
-            shape=[inner_batch_size, inner_batch_size])
+            batched_adjacency_map_cache = tf.constant(
+                -1,
+                shape=[inner_batch_size, inner_batch_size],
+                dtype=tf.float32)
 
-        batched_bond_in_mol_cache = tf.constant(
-            False,
-            shape=[4 * inner_batch_size, inner_batch_size]) # safe choice
+            batched_atom_in_mol_cache = tf.constant(
+                False,
+                shape=[inner_batch_size, inner_batch_size])
 
-        inner_ds = tf.data.Dataset.from_tensor_slices((
-                tf.expand_dims(batched_atoms_cache, 0),
-                tf.expand_dims(batched_adjacency_map_cache, 0),
-                tf.expand_dims(batched_atom_in_mol_cache, 0),
-                tf.expand_dims(batched_bond_in_mol_cache, 0)))
+            batched_bond_in_mol_cache = tf.constant(
+                False,
+                shape=[4 * inner_batch_size, inner_batch_size]) # safe choice
 
-        # loop through
-        for atoms, adjacency_map, attr in mols_with_attributes:
-            n_atoms = tf.shape(atoms, tf.int64)[0]
-            n_bonds = tf.math.count_nonzero(adjacency_map)
+            batched_atoms = tf.expand_dims(
+                batched_atoms_cache, 0)
+            batched_adjacency_map = tf.expand_dims(
+                batched_adjacency_map_cache, 0)
+            batched_atom_in_mol = tf.expand_dims(
+                batched_atom_in_mol_cache, 0)
+            batched_bond_in_mol= tf.expand_dims(
+                batched_bond_in_mol_cache, 0)
 
-            if tf.greater(
-                atom_idx + n_atoms,
-                inner_batch_size):
+            # loop through
+            for atoms, adjacency_map, attr in mols_with_attributes:
+                n_atoms = tf.shape(atoms, tf.int64)[0]
+                n_bonds = tf.math.count_nonzero(adjacency_map)
 
-                inner_ds = inner_ds.concatenate(
-                    tf.data.Dataset.from_tensor_slices((
-                            tf.expand_dims(batched_atoms_cache, 0),
-                            tf.expand_dims(batched_adjacency_map_cache, 0),
-                            tf.expand_dims(batched_atom_in_mol_cache, 0),
-                            tf.expand_dims(batched_bond_in_mol_cache, 0))))
-                # use this one extra molecule to initiate the next batch
-                batched_atoms_cache = tf.concat(
-                    [
-                        atoms,
-                        tf.tile(
-                            tf.constant(
-                                -1,
-                                shape=(1,),
-                                dtype=tf.int64),
-                            [inner_batch_size - n_atoms])
-                    ],
-                    axis=0)
+                if tf.greater(
+                    atom_idx + n_atoms,
+                    inner_batch_size):
 
-                batched_adjacency_map_cache = tf.pad(
-                    adjacency_map,
-                    [
-                        [0, inner_batch_size - n_atoms],
-                        [0, inner_batch_size - n_atoms]
-                    ])
-
-
-                batched_atom_in_mol_cache = tf.pad(
-                    tf.tile(
-                        [[True]],
-                        [n_atoms, 1]),
-                    [
-                        [0, inner_batch_size - n_atoms],
-                        [0, inner_batch_size - 1]
-                    ],
-                    constant_values=False)
-
-                batched_bond_in_mol_cache = tf.pad(
-                    tf.tile(
-                        [[True]],
-                        [n_bonds, 1]),
-                    [
-                        [0, 4 * inner_batch_size - n_bonds],
-                        [0, inner_batch_size - 1]
-                    ],
-                    constant_values=False)
-
-                # re-init counter
-                atom_idx = tf.constant(0, dtype=tf.int64)
-                bond_idx = tf.constant(0, dtype=tf.int64)
-                mol_idx = tf.constant(0, dtype=tf.int64)
-
-            else:
-                # get the mask to update atoms and bonds
-                one_d_atom_mask = tf.logical_and(
-                    tf.greater_equal(
-                        tf.range(
-                            inner_batch_size,
-                            dtype=tf.int64),
-                        atom_idx),
-                    tf.less(
-                        tf.range(
-                            inner_batch_size,
-                            dtype=tf.int64),
-                        atom_idx + n_atoms))
-
-                two_d_atom_mask = tf.logical_and(
-                    tf.tile(
-                        tf.expand_dims(
-                            one_d_atom_mask,
-                            0),
-                        [inner_batch_size, 1]),
-                    tf.tile(
-                        tf.expand_dims(
-                            one_d_atom_mask,
-                            1),
-                        [1, inner_batch_size]))
-
-                batched_atoms_cache = tf.where(
-                    # cond
-                    one_d_atom_mask,
-
-                    # where True
-                    tf.concat(
+                    # put cache into variables
+                    batched_atoms = tf.concat(
                         [
-                            tf.tile(
-                                [tf.constant(-1, dtype=tf.int64)],
-                                [atom_idx]),
+                            batched_atoms,
+                            tf.expand_dims(batched_atoms_cache, 0)
+                        ],
+                        axis=0)
+
+                    batched_adjacency_map = tf.concat(
+                        [
+                            batched_adjacency_map,
+                            tf.expand_dims(batched_adjacency_map_cache, 0)
+                        ],
+                        axis=0)
+
+                    batched_atom_in_mol = tf.concat(
+                        [
+                            batched_atom_in_mol,
+                            tf.expand_dims(batched_atom_in_mol_cache, 0)
+                        ],
+                        axis=0)
+
+                    batched_bond_in_mol = tf.concat(
+                        [
+                            batched_bond_in_mol,
+                            tf.expand_dims(batched_bond_in_mol_cache, 0)
+                        ],
+                        axis=0)
+
+                    # use this one extra molecule to initiate the next batch
+                    batched_atoms_cache = tf.concat(
+                        [
                             atoms,
                             tf.tile(
-                                [tf.constant(-1, dtype=tf.int64)],
-                                [inner_batch_size - atom_idx - n_atoms])
+                                tf.constant(
+                                    -1,
+                                    shape=(1,),
+                                    dtype=tf.int64),
+                                [inner_batch_size - n_atoms])
                         ],
-                        axis=0),
+                        axis=0)
 
-                    # where False
-                    batched_atoms_cache)
-
-                batched_adjacency_map_cache = tf.where(
-                    # cond
-                    two_d_atom_mask,
-
-                    # where True
-                    tf.pad(
+                    batched_adjacency_map_cache = tf.pad(
                         adjacency_map,
                         [
-                            [
-                                atom_idx,
-                                inner_batch_size - atom_idx - n_atoms
-                            ],
-                            [
-                                atom_idx,
-                                inner_batch_size - atom_idx - n_atoms
-                            ]
-                        ],
-                        constant_values=0),
+                            [0, inner_batch_size - n_atoms],
+                            [0, inner_batch_size - n_atoms]
+                        ])
 
-                    # where False
-                    batched_adjacency_map_cache)
 
-                batched_atom_in_mol_cache = tf.logical_or(
-                    tf.pad(
+                    batched_atom_in_mol_cache = tf.pad(
                         tf.tile(
                             [[True]],
                             [n_atoms, 1]),
                         [
-                            [
-                                atom_idx,
-                                inner_batch_size - atom_idx - n_atoms
-                            ],
-                            [
-                                mol_idx,
-                                inner_batch_size - mol_idx - 1
-                            ]
+                            [0, inner_batch_size - n_atoms],
+                            [0, inner_batch_size - 1]
                         ],
-                        constant_values=False),
-                    batched_atom_in_mol_cache)
+                        constant_values=False)
 
-                batched_bond_in_mol_cache = tf.logical_or(
-                    tf.pad(
+                    batched_bond_in_mol_cache = tf.pad(
                         tf.tile(
                             [[True]],
                             [n_bonds, 1]),
                         [
-                            [
-                                bond_idx,
-                                4 * inner_batch_size - bond_idx - n_bonds
-                            ],
-                            [
-                                mol_idx,
-                                inner_batch_size - mol_idx - 1
-                            ]
+                            [0, 4 * inner_batch_size - n_bonds],
+                            [0, inner_batch_size - 1]
                         ],
-                        constant_values=False),
-                    batched_bond_in_mol_cache)
+                        constant_values=False)
 
-                atom_idx = atom_idx + n_atoms
-                bond_idx = bond_idx + n_bonds
-                mol_idx = mol_idx + 1
+                    # re-init counter
+                    atom_idx = tf.constant(0, dtype=tf.int64)
+                    bond_idx = tf.constant(0, dtype=tf.int64)
+                    mol_idx = tf.constant(0, dtype=tf.int64)
 
-        inner_ds = inner_ds.skip(1) # get rid of the first entry
+                else:
+                    # get the mask to update atoms and bonds
+                    one_d_atom_mask = tf.logical_and(
+                        tf.greater_equal(
+                            tf.range(
+                                inner_batch_size,
+                                dtype=tf.int64),
+                            atom_idx),
+                        tf.less(
+                            tf.range(
+                                inner_batch_size,
+                                dtype=tf.int64),
+                            atom_idx + n_atoms))
+
+                    two_d_atom_mask = tf.logical_and(
+                        tf.tile(
+                            tf.expand_dims(
+                                one_d_atom_mask,
+                                0),
+                            [inner_batch_size, 1]),
+                        tf.tile(
+                            tf.expand_dims(
+                                one_d_atom_mask,
+                                1),
+                            [1, inner_batch_size]))
+
+                    batched_atoms_cache = tf.where(
+                        # cond
+                        one_d_atom_mask,
+
+                        # where True
+                        tf.concat(
+                            [
+                                tf.tile(
+                                    [tf.constant(-1, dtype=tf.int64)],
+                                    [atom_idx]),
+                                atoms,
+                                tf.tile(
+                                    [tf.constant(-1, dtype=tf.int64)],
+                                    [inner_batch_size - atom_idx - n_atoms])
+                            ],
+                            axis=0),
+
+                        # where False
+                        batched_atoms_cache)
+
+                    batched_adjacency_map_cache = tf.where(
+                        # cond
+                        two_d_atom_mask,
+
+                        # where True
+                        tf.pad(
+                            adjacency_map,
+                            [
+                                [
+                                    atom_idx,
+                                    inner_batch_size - atom_idx - n_atoms
+                                ],
+                                [
+                                    atom_idx,
+                                    inner_batch_size - atom_idx - n_atoms
+                                ]
+                            ],
+                            constant_values=0),
+
+                        # where False
+                        batched_adjacency_map_cache)
+
+                    batched_atom_in_mol_cache = tf.logical_or(
+                        tf.pad(
+                            tf.tile(
+                                [[True]],
+                                [n_atoms, 1]),
+                            [
+                                [
+                                    atom_idx,
+                                    inner_batch_size - atom_idx - n_atoms
+                                ],
+                                [
+                                    mol_idx,
+                                    inner_batch_size - mol_idx - 1
+                                ]
+                            ],
+                            constant_values=False),
+                        batched_atom_in_mol_cache)
+
+                    batched_bond_in_mol_cache = tf.logical_or(
+                        tf.pad(
+                            tf.tile(
+                                [[True]],
+                                [n_bonds, 1]),
+                            [
+                                [
+                                    bond_idx,
+                                    4 * inner_batch_size - bond_idx - n_bonds
+                                ],
+                                [
+                                    mol_idx,
+                                    inner_batch_size - mol_idx - 1
+                                ]
+                            ],
+                            constant_values=False),
+                        batched_bond_in_mol_cache)
+
+                    atom_idx = atom_idx + n_atoms
+                    bond_idx = bond_idx + n_bonds
+                    mol_idx = mol_idx + 1
+
+            return (
+                batched_atoms,
+                batched_adjacency_map,
+                batched_atom_in_mol,
+                batched_bond_in_mol)
+
+        inner_ds = tf.data.Dataset.from_tensor_slices(_batch())
 
         if type(outer_batch_size) == type(None):
             return inner_ds
@@ -644,7 +712,11 @@ class GraphNet(tf.keras.Model):
             outer_ds = inner_ds.batch(outer_batch_size, True)
             return outer_ds
 
-    def call(self, molecule, repeat=3):
+    def call(
+            self,
+            molecule,
+            repeat=3):
+
         return self._call(molecule, repeat=repeat)
 
     def switch(self, to_test=True):
