@@ -41,32 +41,6 @@ gn = gin.probabilistic.gn.GraphNet(
 
     phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
-    rho_e_v= lambda h_e, atom_is_connected_to_bonds: tf.reduce_sum(
-            tf.where(
-                tf.tile(
-                    tf.expand_dims(
-                        atom_is_connected_to_bonds,
-                        2),
-                    [1, 1, tf.shape(h_e)[1]]),
-                tf.tile(
-                    tf.expand_dims(
-                        h_e,
-                        0),
-                    [
-                        tf.shape(atom_is_connected_to_bonds)[0], # n_atoms
-                        1,
-                        1
-                    ]),
-                tf.zeros((
-                    tf.shape(atom_is_connected_to_bonds)[0],
-                    tf.shape(h_e)[0],
-                    tf.shape(h_e)[1]))),
-            axis=1),
-
-    rho_e_u=(lambda x: tf.expand_dims(tf.reduce_sum(x, axis=0), 0)),
-
-    rho_v_u=(lambda x: tf.expand_dims(tf.reduce_sum(x, axis=0), 0)),
-
     f_r=f_r((128, 'tanh', 128, 1)),
 
     repeat=3)
