@@ -6,8 +6,6 @@ import pandas as pd
 
 caffeine = gin.i_o.from_smiles.smiles_to_mol('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
 
-
-
 class f_r(tf.keras.Model):
     def __init__(self, config):
         super(f_r, self).__init__()
@@ -15,7 +13,8 @@ class f_r(tf.keras.Model):
 
     @tf.function
     def call(self, h_e, h_v, h_u,
-            h_e_history, h_v_history, h_u_history):
+            h_e_history, h_v_history, h_u_history,
+            atom_in_mol, bond_in_mol):
         y = self.d(h_u)[0][0]
         return y
 

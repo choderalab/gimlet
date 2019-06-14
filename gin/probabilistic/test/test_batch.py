@@ -15,6 +15,3 @@ y_array = (y_array - np.mean(y_array) / np.std(y_array))
 ds = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 
 ds = gin.probabilistic.gn.GraphNet.batch(ds, 256)
-
-for x in ds:
-    print(x)
