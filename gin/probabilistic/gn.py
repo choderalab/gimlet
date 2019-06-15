@@ -169,17 +169,19 @@ class GraphNet(tf.keras.Model):
     # @tf.function
     def _call(
             self,
-            mol, # NOTE: here there could be more than one mol
+            atoms, # NOTE: here there could be more than one mol
+            adjacency_map,
             atom_in_mol=False, # (n_atoms, )
             bond_in_mol=False, # (n_bonds, )
+            batched_attr_mask=False,
             repeat=3):
         """ More general __call__ method.
 
         """
 
         # get the attributes of the molecule
-        adjacency_map = mol[1]
-        atoms = mol[0]
+        # adjacency_map = mol[1]
+        # atoms = mol[0]
         adjacency_map_full = adjacency_map \
             + tf.transpose(adjacency_map)
         n_atoms = tf.cast(tf.shape(atoms)[0], tf.int64)
@@ -213,6 +215,9 @@ class GraphNet(tf.keras.Model):
             bond_in_mol = tf.tile(
                 [[True]],
                 [n_bonds, 1])
+
+        if tf.logical_not(tf.reduce_all(batched_attr_mask)):
+            batched_attr_mask = tf.constant([[True]])
 
         # (n_bonds, n_atoms)
         bond_is_connected_to_atoms = tf.logical_or(
@@ -496,16 +501,37 @@ class GraphNet(tf.keras.Model):
                 False,
                 shape=[4 * inner_batch_size, inner_batch_size]) # safe choice
 
+            batched_attr_cache = tf.tile(
+                tf.expand_dims(
+                    tf.constant(-1, dtype=tf.float32),
+                    0),
+                [inner_batch_size])
+
+            batched_attr_mask_cache = tf.tile(
+                tf.expand_dims(
+                    tf.constant(True),
+                    0),
+                [inner_batch_size])
+
             batched_atoms = tf.expand_dims(
                 batched_atoms_cache, 0)
+
             batched_adjacency_map = tf.expand_dims(
                 batched_adjacency_map_cache, 0)
+
             batched_atom_in_mol = tf.expand_dims(
                 batched_atom_in_mol_cache, 0)
+
             batched_bond_in_mol= tf.expand_dims(
                 batched_bond_in_mol_cache, 0)
 
-            # loop through
+            batched_attr = tf.expand_dims(
+                batched_attr_cache, 0)
+
+            batched_attr_mask = tf.expand_dims(
+                batched_attr_mask_cache, 0)
+
+            # loop through mols
             for atoms, adjacency_map, attr in mols_with_attributes:
                 n_atoms = tf.shape(atoms, tf.int64)[0]
                 n_bonds = tf.math.count_nonzero(adjacency_map)
@@ -540,6 +566,20 @@ class GraphNet(tf.keras.Model):
                         [
                             batched_bond_in_mol,
                             tf.expand_dims(batched_bond_in_mol_cache, 0)
+                        ],
+                        axis=0)
+
+                    batched_attr = tf.concat(
+                        [
+                            batched_attr,
+                            tf.expand_dims(batched_attr_cache, 0)
+                        ],
+                        axis=0)
+
+                    batched_attr_mask = tf.concat(
+                        [
+                            batched_attr_mask,
+                            tf.expand_dims(batched_attr_mask_cache, 0)
                         ],
                         axis=0)
 
@@ -583,6 +623,29 @@ class GraphNet(tf.keras.Model):
                             [0, inner_batch_size - 1]
                         ],
                         constant_values=False)
+
+                    batched_attr_cache = tf.concat(
+                        [
+                            [attr],
+                            tf.tile(
+                                tf.constant(
+                                    -1,
+                                    shape=(1,),
+                                    dtype=tf.float32),
+                                [inner_batch_size - 1])
+                        ],
+                        axis=0)
+
+                    batched_attr_mask_cache = tf.concat(
+                        [
+                            [True],
+                            tf.tile(
+                                tf.constant(
+                                    False,
+                                    shape=(1,)),
+                            [inner_batch_size -1])
+                        ],
+                        axis=0)
 
                     # re-init counter
                     atom_idx = tf.constant(0, dtype=tf.int64)
@@ -693,6 +756,25 @@ class GraphNet(tf.keras.Model):
                             constant_values=False),
                         batched_bond_in_mol_cache)
 
+                    batched_attr_cache = tf.where(
+                        tf.equal(
+                            tf.range(
+                                inner_batch_size,
+                                dtype=tf.int64),
+                            mol_idx),
+                        tf.ones(
+                            (inner_batch_size,),
+                            dtype=tf.float32),
+                        batched_attr_cache)
+
+                    batched_attr_mask_cache = tf.logical_or(
+                        batched_attr_mask_cache,
+                        tf.equal(
+                            tf.range(
+                                inner_batch_size,
+                                dtype=tf.int64),
+                            mol_idx))
+
                     atom_idx = atom_idx + n_atoms
                     bond_idx = bond_idx + n_bonds
                     mol_idx = mol_idx + 1
@@ -701,7 +783,9 @@ class GraphNet(tf.keras.Model):
                 batched_atoms,
                 batched_adjacency_map,
                 batched_atom_in_mol,
-                batched_bond_in_mol)
+                batched_bond_in_mol,
+                batched_attr,
+                batched_attr_mask)
 
         inner_ds = tf.data.Dataset.from_tensor_slices(_batch())
 
@@ -714,10 +798,10 @@ class GraphNet(tf.keras.Model):
 
     def call(
             self,
-            molecule,
-            repeat=3):
+            *args,
+            **kwargs):
 
-        return self._call(molecule, repeat=repeat)
+        return self._call(*args, **kwargs)
 
     def switch(self, to_test=True):
         for fn in [self.rho_e_u, self.rho_e_v, self.rho_v_u]:
