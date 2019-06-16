@@ -13,10 +13,10 @@ Minimal working example: https://github.com/choderalab/gin/blob/master/tonic/scr
 ## Manifest
 * `gin/` the core (and fun) part of the package.
     * `i_o/` reading and writing popular molecule embedding/representing structures.
-    * `deterministic/` simple property predictions based on molecular mechanics.
-    * `probabilistic/` infrastructure for molecular machine learning, especially graph networks.
+    * `deterministic/` property predictions, conformer and charge generations. 
+    * `probabilistic/` molecular machine learning through graph networks.
 * `tonic/` auxiliary scripts.
-    * `for_biologists/` ready-to-use modules and scripts that does not require knowledge, experience, or intelligence of any sort.
+    * `for_biologists/` ready-to-use modules and scripts.
     * `architectures/` off-the-shelf model architectures developed elsewhere.
     * `scripts/` fun scripts we used to generate data and hypothesis.
     * `trained_models/` _Nomen est omen_.
