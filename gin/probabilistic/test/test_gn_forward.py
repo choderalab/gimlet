@@ -44,4 +44,4 @@ gn = gin.probabilistic.gn.GraphNet(
 
     repeat=3)
 
-print(gn(caffeine))
+print(gn(caffeine[0], caffeine[1], atom_in_mol=False, bond_in_mol=False))

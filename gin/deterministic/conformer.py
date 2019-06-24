@@ -1,4 +1,11 @@
 """
+conformer.py
+
+Generate conformers for MD calculation using distance geometry.
+Code adopted from:
+https://github.com/openbabel/openbabel/blob/master/src/distgeom.cpp
+
+
 MIT License
 
 Copyright (c) 2019 Chodera lab // Memorial Sloan Kettering Cancer Center,
@@ -37,6 +44,10 @@ import tensorflow as tf
 # constants
 # =============================================================================
 BOND_ENERGY_THRS = 500
+DIST12_TOL = tf.constant(0.01, dtype=tf.float32)
+DIST13_TOL = tf.constant(0.03, dtype=tf.float32)
+DIST14_TOL = tf.constant(0.05, dtype=tf.float32)
+DIST15_TOL = tf.constant(0.07, dtype=tf.float32)
 
 # =============================================================================
 # utility functions
@@ -68,7 +79,7 @@ def set_12_bounds(upper, lower):
                     upper[i, j],
                     upper[i, k] + upper[k, j]),
 
-                lambda: (upper[i, k] + upper[k, j]),
+                lambda: (upper[i, k] + upper[k, j] + DIST12_TOL),
 
                 lambda: upper[i, j]))
 
@@ -78,7 +89,7 @@ def set_12_bounds(upper, lower):
                     lower[i, j],
                     lower[i, k] - upper[k, j]),
 
-                lambda: lower[i, k] - upper[k, j],
+                lambda: lower[i, k] - upper[k, j] - DIST12_TOL,
 
                 lambda: lower[i, j]))
 
@@ -88,7 +99,7 @@ def set_12_bounds(upper, lower):
                     lower[i, j],
                     lower[j, k] - upper[k, i]),
 
-                lambda: lower[j, k] - upper[k, i],
+                lambda: lower[j, k] - upper[k, i] - DIST12_TOL,
 
                 lambda: lower[i, j]))
 
@@ -127,7 +138,7 @@ def set_12_bounds(upper, lower):
     return upper, lower
 
 
-def set_13_bounds(upper, lower, adjacency_map):
+def set_13_bounds(upper, lower, adjacency_map, typing_assignment):
     """ Calculate the 1-3 bounds based on cosine relationships.
 
     """
@@ -231,7 +242,7 @@ def set_13_bounds(upper, lower, adjacency_map):
 
     # discard the angles where there is a bond between atom1 and atom3
     # (n_angles, ) Boolean
-    is_bond_13 = tf.greater(
+    is_bond_13 = tf.less_equal(
         tf.gather_nd(
             adjacency_map_full,
             tf.concat(
@@ -245,6 +256,9 @@ def set_13_bounds(upper, lower, adjacency_map):
     angle_idxs = tf.boolean_mask(
         angle_idxs,
         is_bond_13)
+
+    
+
 
     raise NotImplementedError
 
