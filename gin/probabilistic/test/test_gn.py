@@ -25,7 +25,7 @@ def test_forward_update_bonds_cyclobutane():
         repeat=5)
 
     npt.assert_almost_equal(
-        gn(cyclobutane).numpy(),
+        gn(cyclobutane[0], cyclobutane[1]).numpy(),
         2 ** 5 * 10 * np.ones((4, 8)))
 
 def test_forward_update_atoms_cyclobutane():
@@ -42,7 +42,7 @@ def test_forward_update_atoms_cyclobutane():
         repeat=5)
 
     npt.assert_almost_equal(
-        gn(cyclobutane).numpy(),
+        gn(cyclobutane[0], cyclobutane[1]).numpy(),
         4 ** 5 * np.ones((4, 16)))
 
 def test_forward_update_global_cyclobutane():
@@ -60,7 +60,7 @@ def test_forward_update_global_cyclobutane():
         repeat=5)
 
     npt.assert_almost_equal(
-        gn(cyclobutane).numpy(),
+        gn(cyclobutane[0], cyclobutane[1]).numpy(),
         3 ** 5 * 5 * np.ones((1, 32)))
 
 def test_forward_rho_e_v_cyclobutane():
@@ -76,5 +76,5 @@ def test_forward_rho_e_v_cyclobutane():
         repeat=1)
 
     npt.assert_almost_equal(
-        gn(cyclobutane).numpy(),
+        gn(cyclobutane[0], cyclobutane[1]).numpy(),
         20 * np.ones((4, 16)))
