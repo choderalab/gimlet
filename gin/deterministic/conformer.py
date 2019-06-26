@@ -141,7 +141,7 @@ def set_13_bounds(upper, lower, adjacency_map,
     """ Calculate the 1-3 bounds based on cosine relationships.
 
     """
-    # NOTE: unfinished
+
     n_atoms = tf.shape(upper, tf.int64)[0]
 
     # get the full adjacency_map
