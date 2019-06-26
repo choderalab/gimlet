@@ -18,8 +18,7 @@ print('putting into ds')
 ds = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 
 print('batching')
-ds = gin.probabilistic.gn.GraphNet.batch(ds, 1024)
-
+ds = gin.probabilistic.gn.GraphNet.batch(ds, 256)
 
 class f_r(tf.keras.Model):
     def __init__(self, config):

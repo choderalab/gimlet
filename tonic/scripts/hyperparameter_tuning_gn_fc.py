@@ -47,7 +47,6 @@ n_global_te = int(0.2 * n_samples)
 ds = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
 
-
 config_space = {
     'f_e_0': [32, 64, 128, 256],
     'f_v_0': [32, 64, 128, 256],
@@ -78,15 +77,20 @@ def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
     n_te = int(0.2 * 0.8 * n_samples)
     ds = ds_all.shuffle(n_samples)
+    print('batching global training')
+    ds_batched = gin.probabilistic.gn.GraphNet.batch(ds, 256)
 
     mse_train = []
     mse_test = []
 
     for idx in range(5):
-
         ds_tr = ds.take(idx * n_te).concatenate(
             ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
+
         ds_te = ds.skip(idx * n_te).take((idx + 1) * n_te)
+
+        print('batching local training')
+        ds_tr_batched = gin.probabilistic.gn.GraphNet.batch(ds_tr, 256)
 
         class f_r(tf.keras.Model):
             def __init__(self, config):
@@ -95,10 +99,9 @@ def obj_fn(point):
 
             @tf.function
             def call(self, h_e, h_v, h_u,
-                    h_e_history,
-                    h_v_history,
-                    h_u_history):
-                y = self.d(h_u)[0][0]
+                    h_e_history, h_v_history, h_u_history,
+                    atom_in_mol, bond_in_mol):
+                y = self.d(h_u)[0]
                 return y
 
         class f_v(tf.keras.Model):
@@ -109,6 +112,15 @@ def obj_fn(point):
             @tf.function
             def call(self, x):
                 return self.d(tf.one_hot(x, 8))
+
+        class phi_u(tf.keras.Model):
+            def __init__(self, config):
+                super(phi_u, self).__init__()
+                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+
+            @tf.function
+            def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
+                return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
 
         gn = gin.probabilistic.gn.GraphNet(
             f_e=tf.keras.layers.Dense(point['f_e_0']),
@@ -134,6 +146,7 @@ def obj_fn(point):
                  point['phi_u_a_0'],
                  point['f_u_0'],
                  point['phi_u_a_1'])),
+
             f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
         optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
@@ -146,23 +159,20 @@ def obj_fn(point):
         for dummy_idx in range(n_epoch):
             print('=========================')
             print('epoch %s' % dummy_idx)
-            for atoms, adjacency_map, y in ds_tr:
-                mol = [atoms, adjacency_map]
-
-                with tape:
-                    y_hat = gn(mol)
-                    loss += tf.pow(y - y_hat, 2)
-                    batch_idx += 1
-
-                if batch_idx == batch_size:
-                    print(loss.numpy())
-                    variables = gn.variables
-                    grad = tape.gradient(loss, variables)
-                    optimizer.apply_gradients(
-                        zip(grad, variables))
-                    loss = 0
-                    batch_idx = 0
-                    tape = tf.GradientTape()
+            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+                in ds_tr_batched:
+                with tf.GradientTape() as tape:
+                    y_bar = gn.call(
+                        atoms,
+                        adjacency_map,
+                        atom_in_mol=atom_in_mol,
+                        bond_in_mol=bond_in_mol)
+                    loss = tf.losses.mean_squared_error(y, y_bar)
+                print(loss)
+                variables = gn.variables
+                grad = tape.gradient(loss, variables)
+                optimizer.apply_gradients(
+                    zip(grad, variables))
 
         gn.switch(True)
 
@@ -174,7 +184,6 @@ def obj_fn(point):
             [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
                 for atoms, adjacency_map, y in ds_te]))
 
-
         class f_r(tf.keras.Model):
             def __init__(self, config):
                 super(f_r, self).__init__()
@@ -182,10 +191,9 @@ def obj_fn(point):
 
             @tf.function
             def call(self, h_e, h_v, h_u,
-                    h_e_history,
-                    h_v_history,
-                    h_u_history):
-                y = self.d(h_u)[0][0]
+                    h_e_history, h_v_history, h_u_history,
+                    atom_in_mol, bond_in_mol):
+                y = self.d(h_u)[0]
                 return y
 
         class f_v(tf.keras.Model):
@@ -196,6 +204,15 @@ def obj_fn(point):
             @tf.function
             def call(self, x):
                 return self.d(tf.one_hot(x, 8))
+
+        class phi_u(tf.keras.Model):
+            def __init__(self, config):
+                super(phi_u, self).__init__()
+                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+
+            @tf.function
+            def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
+                return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
 
         gn = gin.probabilistic.gn.GraphNet(
             f_e=tf.keras.layers.Dense(point['f_e_0']),
@@ -221,7 +238,9 @@ def obj_fn(point):
                  point['phi_u_a_0'],
                  point['f_u_0'],
                  point['phi_u_a_1'])),
+
             f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
+
 
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
     n_epoch = 30
@@ -232,22 +251,24 @@ def obj_fn(point):
 
     time0 = time.time()
     for dummy_idx in range(n_epoch):
-        for atoms, adjacency_map, y in ds:
-            mol = [atoms, adjacency_map]
-
-            with tape:
-                y_hat = gn(mol)
-                loss += tf.pow(y-y_hat, 2)
-                batch_idx += 1
-
-            if batch_idx == batch_size:
+        for dummy_idx in range(n_epoch):
+            print('=========================')
+            print('epoch %s' % dummy_idx)
+            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+                in ds_batched:
+                with tf.GradientTape() as tape:
+                    y_bar = gn.call(
+                        atoms,
+                        adjacency_map,
+                        atom_in_mol=atom_in_mol,
+                        bond_in_mol=bond_in_mol)
+                    loss = tf.losses.mean_squared_error(y, y_bar)
+                print(loss)
                 variables = gn.variables
                 grad = tape.gradient(loss, variables)
                 optimizer.apply_gradients(
                     zip(grad, variables))
-                loss = 0
-                batch_idx = 0
-                tape = tf.GradientTape()
+
     time1 = time.time()
 
     mse_global_test = tf.reduce_mean(
