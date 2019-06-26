@@ -34,22 +34,9 @@ import time
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv('data/Lipophilicity.csv')
-df = df[~df['smiles'].str.contains('B')]
-df = df[~df['smiles'].str.contains('\%')]
-df = df[~df['smiles'].str.contains('\.')]
-df = df[~df['smiles'].str.contains('Se')]
-df = df[~df['smiles'].str.contains('Si')]
-df = df[~df['smiles'].str.contains('S@@')]
-df = df[~df['smiles'].str.contains('6')]
-df = df[~df['smiles'].str.contains('7')]
-df = df[~df['smiles'].str.contains('8')]
-df = df[~df['smiles'].str.contains('9')]
-df = df[~df['smiles'].str.contains('\+')]
-df = df[~df['smiles'].str.contains('\-')]
-
+df = pd.read_csv('data/delaney-processed.csv')
 x_array = df[['smiles']].values.flatten()
-y_array = df[['exp']].values.flatten()
+y_array = df[['measured log solubility in mols per litre']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 n_samples = y_array.shape[0]
 
