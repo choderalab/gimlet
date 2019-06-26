@@ -181,7 +181,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    # @tf.function
+    @tf.function
     def _call(
             self,
             atoms, # NOTE: here there could be more than one mol
