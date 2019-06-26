@@ -35,8 +35,9 @@ import pandas as pd
 import numpy as np
 
 df = pd.read_csv('data/SAMPL.csv')
-df = df[('B' not in df['smiles']) and ('+' not in df['smiles']) \
-    and ('-' not in df['smiles'])]
+df = df[~df['smiles'].str.contains('B')]
+df = df[~df['smiles'].str.contains('\+')]
+df = df[~df['smiles'].str.contains('\-')]
 
 x_array = df[['smiles']].values.flatten()
 y_array = df[['expt']].values.flatten()
