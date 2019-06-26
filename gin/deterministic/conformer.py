@@ -435,7 +435,7 @@ def embed(distance_matrix):
             2),
         2)
 
-    # x = tf.linalg.sqrtm(g)
+
     e, v = tf.linalg.eigh(g)
     e = tf.math.sqrt(tf.tile(tf.expand_dims(e[-3:], 0), [n_atoms, 1]))
     v = v[:, -3:]

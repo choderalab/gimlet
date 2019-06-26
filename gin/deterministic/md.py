@@ -298,7 +298,7 @@ class SingleMoleculeMechanicsSystem:
 
         '''
 
-        energy_tot = bond_energy + angle_energy
+        energy_tot = bond_energy
 
         return energy_tot
 
@@ -332,7 +332,7 @@ class SingleMoleculeMechanicsSystem:
             recent_hundred = tf.zeros((100, ), dtype=tf.float32)
 
             # get the Adam optimizer
-            optimizer = tf.keras.optimizers.Adam(1000)
+            optimizer = tf.keras.optimizers.Adam(10000)
 
             # init
             iter_idx = tf.constant(0, dtype=tf.int64)
@@ -362,7 +362,7 @@ class SingleMoleculeMechanicsSystem:
                     tf.greater(iter_idx, 100),
                     tf.less(
                         tf.math.reduce_std(recent_hundred),
-                        1e-5)):
+                        1e-3)):
                     break
 
                 iter_idx += 1

@@ -127,7 +127,7 @@ def obj_fn(point):
 
             f_v=f_v(point['f_v_0']),
 
-            f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
+            f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
 
             phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
                 (point['phi_e_0'],
@@ -219,7 +219,7 @@ def obj_fn(point):
 
             f_v=f_v(point['f_v_0']),
 
-            f_u=(lambda x, y: tf.zeros((1, point['f_u_0']), dtype=tf.float32)),
+            f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
 
             phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
                 (point['phi_e_0'],
