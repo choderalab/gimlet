@@ -48,7 +48,10 @@ def get_eigenvalues_from_adjacency_map(adjacency_map):
     return eigen_values
 
 
-df = pd.read_csv('data/delaney-processed.csv')
+df = pd.read_csv('data/SAMPL.csv')
+df = df[~df['smiles'].str.contains('B')]
+df = df[~df['smiles'].str.contains('\+')]
+df = df[~df['smiles'].str.contains('\-')]
 smiles_array = df[['smiles']].values.flatten()
 
 '''
