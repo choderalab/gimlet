@@ -298,7 +298,7 @@ class SingleMoleculeMechanicsSystem:
 
         '''
 
-        energy_tot = bond_energy + proper_torsion_energy + improper_torsion_energy + lj_energy
+        energy_tot = bond_energy + angle_energy
 
         return energy_tot
 
