@@ -150,9 +150,7 @@ def obj_fn(point):
             f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
         optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
-        n_epoch = 30
-        batch_size = 32
-        batch_idx = 0
+        n_epoch = 10
         loss = 0
         tape = tf.GradientTape()
 
@@ -178,10 +176,10 @@ def obj_fn(point):
 
         # test on train data
         mse_train.append(tf.reduce_mean(
-            [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
+            [tf.pow(gn(atoms, adjacency_map) - y, 2) \
                 for atoms, adjacency_map, y in ds_tr]))
         mse_test.append(tf.reduce_mean(
-            [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
+            [tf.pow(gn(atoms, adjacency_map) - y, 2) \
                 for atoms, adjacency_map, y in ds_te]))
 
         class f_r(tf.keras.Model):
@@ -243,9 +241,7 @@ def obj_fn(point):
 
 
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
-    n_epoch = 30
-    batch_size = 32
-    batch_idx = 0
+    n_epoch = 10
     loss = 0
     tape = tf.GradientTape()
 
@@ -272,7 +268,7 @@ def obj_fn(point):
     time1 = time.time()
 
     mse_global_test = tf.reduce_mean(
-        [tf.pow(gn([atoms, adjacency_map]) - y, 2) \
+        [tf.pow(gn(atoms, adjacency_map) - y, 2) \
             for atoms, adjacency_map, y in ds_global_te])
 
     mse_train = tf.reduce_mean(mse_train)
