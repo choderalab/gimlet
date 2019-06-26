@@ -45,13 +45,15 @@ def add_hydrogen(mol):
     ----------
     mol : gin.molecule.Molecule object
     """
+
+    atoms = mol[0]
+    adjacency_map = mol[1]
     # get the current atoms and adjacency map
-    atoms = mol.atoms
-    adjacency_map = mol.adjacency_map
     adjacency_map_full = tf.transpose(adjacency_map) + adjacency_map
+    n_atoms = tf.shape(atoms, tf.int64)[0]
 
     # type the atoms
-    atom_types = typing.Typing(mol)
+    atom_types = typing.TypingGAFF(mol)
 
     # calculate the number of hydrogens added to heavy atoms
     # the heavy atoms with one hydrogen
@@ -107,12 +109,12 @@ def add_hydrogen(mol):
 
                 ],
                 axis=0),
-            [None, tf.shape(atoms)[0]]),
+            [-1, tf.shape(atoms, tf.int64)[0]]),
         axis=0)
 
     one_idxs = tf.boolean_mask(
         tf.range(
-            tf.shape(atoms[0]),
+            tf.shape(atoms, tf.int64)[0],
             dtype=tf.int64),
         has_one)
 
@@ -144,13 +146,14 @@ def add_hydrogen(mol):
                             atom_types.is_sp3,
                             atom_types.is_connected_to_1_heavy))
 
-                ]),
-            [None, tf.shape(atoms)[0]]),
+                ],
+                axis=0),
+            [-1, tf.shape(atoms)[0]]),
         axis=0)
 
     two_idxs = tf.boolean_mask(
         tf.range(
-            tf.shape(atoms[0]),
+            tf.shape(atoms, tf.int64)[0],
             dtype=tf.int64),
         has_two)
 
@@ -163,39 +166,41 @@ def add_hydrogen(mol):
 
     three_idxs = tf.boolean_mask(
         tf.range(
-            tf.shape(atoms[0]),
-            dtype=tf.int64))
+            tf.shape(atoms, tf.int64)[0],
+            dtype=tf.int64),
+        has_three)
 
     # build the adjacency map blocks to be appended to the map
     # TODO: figure out a way to do this more efficiently
 
     # init
-    hydrogen_block = tf.transpose(
-        tf.expand_dims(
-            (tf.ones((tf.shape(atoms)[0], ),
-                dtype=tf.float32)))) \
-        * tf.constant(-1, dypte=tf.float32)
+    hydrogen_block = tf.tile(
+        tf.constant(
+            -1,
+            shape=[1, 1,],
+            dtype=tf.float32),
+        [tf.shape(atoms)[0], 1])
 
     def one_body(idx, hydrogen_block):
         # grab idx to update
         one_idx = one_idxs[idx]
 
         # get the new line to append
-        new_line = tf.transpose(
-            tf.expand_dims(
-                tf.where(
-                    tf.equal(
-                        tf.range(
-                            tf.shape(atoms[0]),
-                            dtype=tf.float32),
-                        one_idx),
+        new_line = tf.expand_dims(
+            tf.where(
+                tf.equal(
+                    tf.range(
+                        tf.shape(atoms, tf.int64)[0],
+                        dtype=tf.int64),
+                    one_idx),
 
-                    # if is one_idx
-                    tf.constant(1, dtype=tf.float32),
+                # if is one_idx
+                tf.ones_like(atoms, dtype=tf.float32),
 
-                    # else:
-                    tf.constant(0, dtype=tf.float32)),
-                axis=0))
+                # else:
+                tf.zeros_like(atoms, dtype=tf.float32)),
+
+            axis=1)
 
         # append it to the matrix
         hydrogen_block = tf.concat(
@@ -212,27 +217,27 @@ def add_hydrogen(mol):
         two_idx = two_idxs[idx]
 
         # get the new line to append
-        new_line = tf.transpose(
-            tf.expand_dims(
-                tf.where(
-                    tf.equal(
-                        tf.range(
-                            tf.shape(atoms[0]),
-                            dtype=tf.float32),
-                        one_idx),
+        new_line = tf.expand_dims(
+            tf.where(
+                tf.equal(
+                    tf.range(
+                        tf.shape(atoms, tf.int64)[0],
+                        dtype=tf.int64),
+                    two_idx),
 
-                    # if is one_idx
-                    tf.constant(1, dtype=tf.float32),
+                # if is one_idx
+                tf.ones_like(atoms, dtype=tf.float32),
 
-                    # else:
-                    tf.constant(0, dtype=tf.float32)),
-                axis=0))
+                # else:
+                tf.zeros_like(atoms, dtype=tf.float32)),
+
+            axis=1)
 
         # append it to the matrix
         hydrogen_block = tf.concat(
             [
                 hydrogen_block,
-                new_line, # do this two times
+                new_line, # do this twice
                 new_line
             ],
             axis=1)
@@ -241,24 +246,24 @@ def add_hydrogen(mol):
 
     def three_body(idx, hydrogen_block):
         # grab idx to update
-        two_idx = two_idxs[idx]
+        three_idx = three_idxs[idx]
 
         # get the new line to append
-        new_line = tf.transpose(
-            tf.expand_dims(
-                tf.where(
-                    tf.equal(
-                        tf.range(
-                            tf.shape(atoms[0]),
-                            dtype=tf.float32),
-                        one_idx),
+        new_line = tf.expand_dims(
+            tf.where(
+                tf.equal(
+                    tf.range(
+                        tf.shape(atoms, tf.int64)[0],
+                        dtype=tf.int64),
+                    three_idx),
 
-                    # if is one_idx
-                    tf.constant(1, dtype=tf.float32),
+                # if is one_idx
+                tf.ones_like(atoms, dtype=tf.float32),
 
-                    # else:
-                    tf.constant(0, dtype=tf.float32)),
-                axis=0))
+                # else:
+                tf.zeros_like(atoms, dtype=tf.float32)),
+
+            axis=1)
 
         # append it to the matrix
         hydrogen_block = tf.concat(
@@ -279,7 +284,7 @@ def add_hydrogen(mol):
         # condition
         lambda idx, _: tf.less(
             idx,
-            tf.count_nonzero(has_one)),
+            tf.math.count_nonzero(has_one)),
 
         # body
         one_body,
@@ -291,7 +296,7 @@ def add_hydrogen(mol):
         shape_invariants=[
             idx.get_shape(),
             tf.TensorShape([
-                tf.shape(atoms[0]),
+                atoms.shape[0],
                 None])])
 
     # execute all the functions
@@ -301,10 +306,10 @@ def add_hydrogen(mol):
         # condition
         lambda idx, _: tf.less(
             idx,
-            tf.count_nonzero(has_one)),
+            tf.math.count_nonzero(has_two)),
 
         # body
-        one_body,
+        two_body,
 
         # var
         [idx, hydrogen_block],
@@ -313,7 +318,7 @@ def add_hydrogen(mol):
         shape_invariants=[
             idx.get_shape(),
             tf.TensorShape([
-                tf.shape(atoms[0]),
+                atoms.shape[0],
                 None])])
 
     # execute all the functions
@@ -322,10 +327,10 @@ def add_hydrogen(mol):
         # condition
         lambda idx, _: tf.less(
             idx,
-            tf.count_nonzero(has_one)),
+            tf.math.count_nonzero(has_three)),
 
         # body
-        one_body,
+        three_body,
 
         # var
         [idx, hydrogen_block],
@@ -334,20 +339,20 @@ def add_hydrogen(mol):
         shape_invariants=[
             idx.get_shape(),
             tf.TensorShape([
-                tf.shape(atoms[0]),
+                atoms.shape[0],
                 None])])
 
     # get rid of the first block
-    hydrogen_block = hydrogen_block[:, :1]
+    hydrogen_block = hydrogen_block[:, 1:]
 
     # get the total number of hydrogen
-    n_hydrogen = tf.shape(hydrogen_block)[1]
+    n_hydrogens = tf.shape(hydrogen_block, tf.int64)[1]
 
     # modify the attributes of molecules
     atoms = tf.concat(
         [
-            atom,
-            8 * tf.ones((n_hydrogen, ), dtype=tf.int64)
+            atoms,
+            8 * tf.ones((n_hydrogens, ), dtype=tf.int64)
         ],
         axis=0)
 
@@ -356,8 +361,15 @@ def add_hydrogen(mol):
             adjacency_map,
             hydrogen_block
         ],
+        axis=1)
+
+    adjacency_map = tf.concat(
+        [
+            adjacency_map,
+            tf.zeros(
+                (n_hydrogens, n_atoms + n_hydrogens),
+                tf.float32)
+        ],
         axis=0)
 
-    return gin.molecule.Molecule(
-        atoms,
-        adjacency_map)
+    return [atoms, adjacency_map]

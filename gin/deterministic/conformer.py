@@ -38,12 +38,13 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
+import math
 # import tensorflow_probability as tfp
 
 # =============================================================================
 # constants
 # =============================================================================
-BOND_ENERGY_THRS = 500
+BOND_ENERGY_THRS = 0.5
 DIST12_TOL = tf.constant(0.01, dtype=tf.float32)
 DIST13_TOL = tf.constant(0.03, dtype=tf.float32)
 DIST14_TOL = tf.constant(0.05, dtype=tf.float32)
@@ -83,6 +84,8 @@ def set_12_bounds(upper, lower):
 
                 lambda: upper[i, j]))
 
+        upper[j, i].assign(upper[i, j])
+
         lower[i, j].assign(
             tf.cond(
                 tf.less(
@@ -92,6 +95,8 @@ def set_12_bounds(upper, lower):
                 lambda: lower[i, k] - upper[k, j] - DIST12_TOL,
 
                 lambda: lower[i, j]))
+
+        lower[j, i].assign(lower[i, j])
 
         lower[i, j].assign(
             tf.cond(
@@ -103,6 +108,7 @@ def set_12_bounds(upper, lower):
 
                 lambda: lower[i, j]))
 
+        lower[j, i].assign(lower[i, j])
 
         return upper, lower, k, i, j+1
 
@@ -128,35 +134,29 @@ def set_12_bounds(upper, lower):
         outer_loop,
         [upper, lower, k])
 
-    # only keep the upper part
-    upper = tf.linalg.band_part(upper, 0, -1)
-    lower = tf.linalg.band_part(lower, 0, -1)
-
-    upper = tf.transpose(upper) + upper
-    lower = tf.transpose(lower) + lower
-
     return upper, lower
 
-
-def set_13_bounds(upper, lower, adjacency_map, typing_assignment):
+def set_13_bounds(upper, lower, adjacency_map,
+        typing_assignment, forcefield):
     """ Calculate the 1-3 bounds based on cosine relationships.
 
     """
     # NOTE: unfinished
-    n_atoms = upper.shape[0]
+    n_atoms = tf.shape(upper, tf.int64)[0]
+
     # get the full adjacency_map
-    full_adjacency_map = tf.transpose(adjacency_map) + adjacency_map
+    adjacency_map_full = tf.transpose(adjacency_map) + adjacency_map
 
     # init the angles idxs to be all negative ones
     angle_idxs = tf.constant([[-1, -1, -1]], dtype=tf.int64)
 
     def process_one_atom_if_there_is_angle(idx, angle_idxs,
-            full_adjacency_map=full_adjacency_map):
+            adjacency_map_full=adjacency_map_full):
 
         # get all the connection indices
         connection_idxs = tf.where(
             tf.greater(
-                full_adjacency_map[idx, :],
+                adjacency_map_full[idx, :],
                 tf.constant(0, dtype=tf.float32)))
 
         # get the number of connections
@@ -212,16 +212,15 @@ def set_13_bounds(upper, lower, adjacency_map, typing_assignment):
         return idx + 1, angle_idxs
 
     def process_one_atom(idx, angle_idxs,
-            full_adjacency_map=full_adjacency_map):
+            adjacency_map_full=adjacency_map_full):
 
         if tf.less(
-            tf.math.count_nonzero(full_adjacency_map[idx, :]),
+            tf.math.count_nonzero(adjacency_map_full[idx, :]),
             tf.constant(1, dtype=tf.int64)):
             return idx+1, angle_idxs
 
         else:
             return process_one_atom_if_there_is_angle(idx, angle_idxs)
-
 
     idx = tf.constant(0, dtype=tf.int64)
     # use while loop to update the indices forming the angles
@@ -242,53 +241,179 @@ def set_13_bounds(upper, lower, adjacency_map, typing_assignment):
 
     # discard the angles where there is a bond between atom1 and atom3
     # (n_angles, ) Boolean
-    is_bond_13 = tf.less_equal(
+    is_not_bond_13 = tf.equal(
         tf.gather_nd(
             adjacency_map_full,
             tf.concat(
                 [
-                    tf.expand_dims(angle_idxs[0], 1),
-                    tf.expand_dims(angle_idxs[1], 1)
+                    tf.expand_dims(angle_idxs[:, 0], 1),
+                    tf.expand_dims(angle_idxs[:, 2], 1)
                 ],
                 axis=1)),
         tf.constant(0, dtype=tf.float32))
 
     angle_idxs = tf.boolean_mask(
         angle_idxs,
-        is_bond_13)
+        is_not_bond_13)
 
-    
+    # get the optimal angles from the forcefield
+    angle_specs = tf.map_fn(
+        lambda angle: tf.convert_to_tensor(
+                forcefield.get_angle(
+                    int(
+                        tf.gather(
+                            typing_assignment, angle[0]).numpy()),
+                    int(
+                        tf.gather(
+                            typing_assignment, angle[1]).numpy()),
+                    int(
+                        tf.gather(
+                            typing_assignment, angle[2]).numpy()))),
+        angle_idxs,
+        dtype=tf.float32)
 
+    optimal_angles = angle_specs[:, 0]
 
-    raise NotImplementedError
+    # $$
+    # BC = \sqrt{AB ^ 2 + AC ^ 2 - 2 * AB * BC * cos(A)}
+    # $$
+    upper = tf.tensor_scatter_nd_update(
+        upper,
+        tf.concat(
+            [
+                tf.expand_dims(angle_idxs[:, 0], 1),
+                tf.expand_dims(angle_idxs[:, 2], 1)
+            ],
+            axis=1),
+        tf.sqrt(
+            tf.math.reduce_sum(
+                [
+                    tf.pow(
+                        tf.gather_nd(
+                            upper,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 0], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) - DIST12_TOL,
+                        2),
+
+                    tf.pow(
+                        tf.gather_nd(
+                            upper,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 2], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) - DIST12_TOL,
+                        2),
+
+                    tf.constant(-2, dtype=tf.float32) \
+                        * (tf.gather_nd(
+                            upper,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 0], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) - DIST12_TOL) \
+                        * (tf.gather_nd(
+                            upper,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 2], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) - DIST12_TOL) \
+                        * tf.math.cos(optimal_angles)
+                ],
+                axis=0
+            )) + DIST12_TOL)
+
+    lower = tf.tensor_scatter_nd_update(
+        lower,
+        tf.concat(
+            [
+                tf.expand_dims(angle_idxs[:, 0], 1),
+                tf.expand_dims(angle_idxs[:, 2], 1)
+            ],
+            axis=1),
+        tf.sqrt(
+            tf.math.reduce_sum(
+                [
+                    tf.pow(
+                        tf.gather_nd(
+                            lower,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 0], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) + DIST12_TOL,
+                        2),
+
+                    tf.pow(
+                        tf.gather_nd(
+                            lower,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 2], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) + DIST12_TOL,
+                        2),
+
+                    tf.constant(-2, dtype=tf.float32) \
+                        * (tf.gather_nd(
+                            lower,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 0], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) + DIST12_TOL) \
+                        * (tf.gather_nd(
+                            lower,
+                            tf.concat(
+                                [
+                                    tf.expand_dims(angle_idxs[:, 2], 1),
+                                    tf.expand_dims(angle_idxs[:, 1], 1)
+                                ],
+                                axis=1)) + DIST12_TOL) \
+                        * tf.math.cos(optimal_angles)
+                ],
+                axis=0
+            )) - DIST12_TOL)
+
+    return upper, lower
 
 # @tf.function
 def embed(distance_matrix):
     """ EMBED algorithm, as was implemented here:
     10.1002/0470845015.cda018
     """
-    n_atoms = distance_matrix.shape[0]
+    n_atoms = tf.shape(distance_matrix, tf.int64)[0]
+
     # $$
     # d_{io}^2 = \frac{1}{N}\sum_{i=1}^{N}d_{ij}^2
     # - \frac{1}{N^2}\sum_{j=2}^N \sum_{k=2}{j-1}d_{jk}^2
     # $$
 
-    d_o_2 = tf.math.divide(
-        tf.reduce_sum(
-            tf.pow(
-                distance_matrix,
-                2),
-            axis=0),
-        tf.cast(n_atoms, tf.float32)) \
+    d_o_2 = tf.reduce_mean(
+        tf.pow(
+            distance_matrix,
+            2),
+        axis=0) \
         - tf.math.divide(
             tf.reduce_sum(
                 tf.pow(
-                    tf.linalg.band_part(
-                        distance_matrix,
-                        0, -1),
+                    distance_matrix,
                     2)),
-            tf.pow(
-                tf.cast(n_atoms, tf.float32), 2))
+            2 * tf.pow(
+                tf.cast(n_atoms, tf.float32),
+                2))
 
     # $$
     # g_ij = (d_{io}^2 + d_{jo}^2 - d_{ij}^2)
@@ -300,20 +425,20 @@ def embed(distance_matrix):
                 d_o_2,
                 0),
             [n_atoms, 1]) \
-            + tf.tile(
-                tf.expand_dims(
-                    d_o_2,
-                    1),
-                [1, n_atoms])
-            - tf.pow(
-                distance_matrix,
-                2),
+        + tf.tile(
+            tf.expand_dims(
+                d_o_2,
+                1),
+            [1, n_atoms]) \
+        - tf.pow(
+            distance_matrix,
+            2),
         2)
 
     # x = tf.linalg.sqrtm(g)
     e, v = tf.linalg.eigh(g)
-    e = tf.tile(tf.expand_dims(e[:3], 0), [n_atoms, 1])
-    v = v[:, :3]
+    e = tf.math.sqrt(tf.tile(tf.expand_dims(e[-3:], 0), [n_atoms, 1]))
+    v = v[:, -3:]
 
     x = v * e
 
@@ -359,7 +484,6 @@ class Conformers(object):
         bond_idxs = tf.boolean_mask(
             all_idxs_stack,
             is_bond)
-
 
         # get the types
         typing_assignment = self.typing(self.mol).get_assignment()
@@ -429,11 +553,13 @@ class Conformers(object):
             tf.zeros((self.n_atoms, ), dtype=tf.float32))
 
         upper_bound, lower_bound = set_12_bounds(upper_bound, lower_bound)
-
+        upper_bound, lower_bound = set_13_bounds(upper_bound, lower_bound,
+            self.adjacency_map, typing_assignment, self.forcefield)
 
         # NOTE: the following code is commented out because
         # because we don't want to use tfp for now
         # sample from a uniform distribution
+
         # distance_matrix_distribution = tfp.distributions.Uniform(
         #     low=lower_bound,
         #     high=upper_bound)
