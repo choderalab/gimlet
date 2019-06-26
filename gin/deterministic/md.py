@@ -43,7 +43,7 @@ def get_distance_matrix(coordinates):
     """ Calculate the distance matrix from coordinates.
 
     $$
-    D_{ij} = <X_i, X_i> - 2<X_i, X_j> + <X_j, X_j>
+    D_{ij}^2 = <X_i, X_i> - 2<X_i, X_j> + <X_j, X_j>
 
     Parameters
     ----------
@@ -57,11 +57,10 @@ def get_distance_matrix(coordinates):
             1),
         [-1, 1])
 
-    return X_2 - 2 * tf.matmul(coordinates, tf.transpose(coordinates)) \
-        + tf.transpose(X_2)
+    return tf.math.sqrt(
+        X_2 - 2 * tf.matmul(coordinates, tf.transpose(coordinates)) \
+            + tf.transpose(X_2))
 
-
-# @tf.function
 def get_angles(coordinates, angle_idxs):
     """ Calculate the angles from coordinates and angle indices.
 
@@ -301,7 +300,6 @@ class SingleMoleculeMechanicsSystem:
 
         energy_tot = bond_energy + proper_torsion_energy + improper_torsion_energy + lj_energy
 
-
         return energy_tot
 
     def force(self, coordinates=None):
@@ -376,8 +374,6 @@ class SingleMoleculeMechanicsSystem:
                     coordinates - tf.reduce_mean(coordinates, 0)
                 ]],
                 'caffeine_out.sdf')
-
-
 
     def get_bond_params(self):
         """ Get the config of all the bonds in the system.

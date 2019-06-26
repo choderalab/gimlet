@@ -9,9 +9,9 @@ import pandas as pd
 # read data
 print('start reading data')
 df = pd.read_csv('data/delaney-processed.csv')
-x_array = df[['smiles']].values.flatten()[:4096]
+x_array = df[['smiles']].values.flatten()
 y_array = \
-    df[['measured log solubility in mols per litre']].values.flatten()[:4096]
+    df[['measured log solubility in mols per litre']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 
 print('putting into ds')
@@ -19,7 +19,7 @@ ds = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 
 print('batching')
 ds = gin.probabilistic.gn.GraphNet.batch(ds, 1024)
-ds = ds.shuffle(y_array.shape[0])
+
 
 class f_r(tf.keras.Model):
     def __init__(self, config):

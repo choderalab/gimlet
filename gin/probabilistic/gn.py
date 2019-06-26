@@ -129,12 +129,12 @@ class GraphNet(tf.keras.Model):
                                         axis=0),
                                     dtype=tf.float32)),
                             2),
-                        [1, 1, h_e.shape[1]]),
+                        [1, 1, tf.shape(h_e)[1]]),
                     tf.tile( # (n_bonds, n_mols, d_e)
                         tf.expand_dims(
                             h_e, # (n_bonds, d_e)
                             1),
-                        [1, bond_in_mol.shape[1], 1])),
+                        [1, tf.shape(bond_in_mol)[1], 1])),
                 axis=0)),
 
             rho_v_u=(lambda h_v, atom_in_mol: tf.reduce_sum(
@@ -150,12 +150,12 @@ class GraphNet(tf.keras.Model):
                                     atom_in_mol,
                                     dtype=tf.float32)),
                             2),
-                        [1, 1, h_v.shape[1]]),
+                        [1, 1, tf.shape(h_v)[1]]),
                     tf.tile( # (n_bonds, n_mols, d_e)
                         tf.expand_dims(
                             h_v, # (n_bonds, d_e)
                             1),
-                        [1, atom_in_mol.shape[1], 1])),
+                        [1, tf.shape(atom_in_mol)[1], 1])),
                 axis=0)),
 
             # readout phase
@@ -322,7 +322,7 @@ class GraphNet(tf.keras.Model):
                             tf.expand_dims(
                                 h_u, # (n_mols, d_u)
                                 0), # (1, n_mols, d_u)
-                            [h_e.shape[0], 1, 1]),
+                            [tf.shape(h_e)[0], 1, 1]),
                         tf.boolean_mask(
                             bond_in_mol,
                             tf.reduce_any(
@@ -364,7 +364,7 @@ class GraphNet(tf.keras.Model):
                             tf.expand_dims(
                                 atom_in_mol,
                                 2),
-                            [1, 1, h_u.shape[1]]),
+                            [1, 1, tf.shape(h_u)[1]]),
                         tf.tile(
                             tf.expand_dims(
                                 h_u,
@@ -454,9 +454,9 @@ class GraphNet(tf.keras.Model):
                 h_e.get_shape(),
                 h_v.get_shape(),
                 h_u.get_shape(),
-                tf.TensorShape((h_e.shape[0], None, h_e.shape[1])),
-                tf.TensorShape((h_v.shape[0], None, h_v.shape[1])),
-                tf.TensorShape((h_u.shape[0], None, h_u.shape[1]))
+                tf.TensorShape((None, None, None)),
+                tf.TensorShape((None, None, None)),
+                tf.TensorShape((None, None, None)),
                 ])
 
         y_bar = self.f_r(
@@ -498,9 +498,8 @@ class GraphNet(tf.keras.Model):
 
         # @tf.function # decorators not available in Alpha stage of tf 2.0
         def _batch(
-            mols_with_attributes=mols_with_attributes,
-            inner_batch_size=inner_batch_size,
-            outer_batch_size=outer_batch_size):
+            mols_with_attributes,
+            inner_batch_size=inner_batch_size):
 
             # init the sum of batch size
             atom_idx = tf.constant(0, dtype=tf.int64)
@@ -524,7 +523,7 @@ class GraphNet(tf.keras.Model):
             batched_bond_in_mol_cache = tf.constant(
                 False,
                 shape=[
-                        4 * inner_batch_size,
+                        2 * inner_batch_size,
                         inner_batch_size // 4,
                     ]) # safe choice
 
@@ -645,7 +644,7 @@ class GraphNet(tf.keras.Model):
                             [[True]],
                             [n_bonds, 1]),
                         [
-                            [0, 4 * inner_batch_size - n_bonds],
+                            [0, 2 * inner_batch_size - n_bonds],
                             [0, inner_batch_size//4 - 1]
                         ],
                         constant_values=False)
@@ -772,7 +771,7 @@ class GraphNet(tf.keras.Model):
                             [
                                 [
                                     bond_idx,
-                                    4 * inner_batch_size - bond_idx - n_bonds
+                                    2 * inner_batch_size - bond_idx - n_bonds
                                 ],
                                 [
                                     mol_idx,
@@ -805,20 +804,21 @@ class GraphNet(tf.keras.Model):
                     bond_idx = bond_idx + n_bonds
                     mol_idx = mol_idx + 1
 
-                    assert tf.equal(
-                        bond_idx,
-                        tf.math.count_nonzero(batched_bond_in_mol_cache))
+            inner_ds = tf.data.Dataset.from_tensor_slices(
+                (
+                    batched_atoms,
+                    batched_adjacency_map,
+                    batched_atom_in_mol,
+                    batched_bond_in_mol,
+                    batched_attr,
+                    batched_attr_mask
+                ))
 
-            return (
-                batched_atoms,
-                batched_adjacency_map,
-                batched_atom_in_mol,
-                batched_bond_in_mol,
-                batched_attr,
-                batched_attr_mask)
+            inner_ds = inner_ds.skip(1)
 
-        inner_ds = tf.data.Dataset.from_tensor_slices(_batch())
-        inner_ds = inner_ds.skip(1)
+            return inner_ds
+
+        inner_ds = mols_with_attributes.apply(_batch)
 
         if type(outer_batch_size) == type(None):
             return inner_ds

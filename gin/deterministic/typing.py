@@ -416,7 +416,7 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     self.is_heavy,
                     axis=1),
-                axis=0),
+                axis=1),
             tf.constant(1, dtype=tf.int64))
 
     @property
@@ -434,7 +434,7 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     self.is_heavy,
                     axis=1),
-                axis=0),
+                axis=1),
             tf.constant(2, dtype=tf.int64))
 
     @property
@@ -452,7 +452,7 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     self.is_heavy,
                     axis=1),
-                axis=0),
+                axis=1),
             tf.constant(3, dtype=tf.int64))
 
     @property
@@ -470,7 +470,7 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     self.is_heavy,
                     axis=1),
-                axis=0),
+                axis=1),
             tf.constant(4, dtype=tf.int64))
 
     @property
@@ -1291,7 +1291,7 @@ class TypingBase(object):
 
 class Typing(TypingBase):
     def __init__(self, mol):
-        super(Typing, self).__init__()
+        super(Typing, self).__init__(mol)
 
 class TypingGAFF(TypingBase):
     """ Produce typing for GAFF.
