@@ -84,11 +84,12 @@ def get_angles(coordinates, angle_idxs):
 
     # (n_angles, )
     angles = tf.math.acos(
-        tf.reduce_sum(
-            angle_left * angle_right,
-            axis=1),
-        tf.norm(angle_left, axis=1) \
-            * tf.norm(angle_right, axis=1))
+        tf.math.divide(
+            tf.reduce_sum(
+                angle_left * angle_right,
+                axis=1),
+            tf.norm(angle_left, axis=1) \
+                * tf.norm(angle_right, axis=1)))
 
     return angles
 
@@ -116,11 +117,12 @@ def get_dihedrals(coordinates, torsion_idxs):
 
     # (n_torsions, )
     dihedrals = tf.math.acos(
-        tf.reduce_sum(
-            normal_left * normal_right,
-            axis=1),
-        tf.norm(normal_left, axis=1) \
-            * tf.norm(normal_right, axis=1))
+        tf.math.divide(
+            tf.reduce_sum(
+                normal_left * normal_right,
+                axis=1),
+            tf.norm(normal_left, axis=1) \
+                * tf.norm(normal_right, axis=1)))
 
     return dihedrals
 
@@ -207,6 +209,7 @@ class SingleMoleculeMechanicsSystem:
         # E_\mathtt{angle}
         # = \frac{1}{2} k (\theta - theta_0) ^ 2
         # $$
+        print(angles)
         angle_energy = 0.5 * self.angle_k \
             * tf.pow(
                 angles - self.angle_angle,
@@ -298,7 +301,7 @@ class SingleMoleculeMechanicsSystem:
 
         '''
 
-        energy_tot = bond_energy
+        energy_tot = bond_energy + angle_energy
 
         return energy_tot
 
