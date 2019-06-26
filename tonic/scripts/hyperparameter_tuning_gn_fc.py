@@ -40,11 +40,15 @@ y_array = df[['measured log solubility in mols per litre']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 n_samples = y_array.shape[0]
 
+
 ds_all = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
+print('putting into batch')
+ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256)
 
-n_global_te = int(0.2 * n_samples)
-ds = ds_all.skip(n_global_te)
+n_global_te = int(0.2 * (n_samples // 256))
+
+ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
 
 config_space = {
@@ -75,10 +79,8 @@ config_space = {
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
-    n_te = int(0.2 * 0.8 * n_samples)
-    ds = ds_all.shuffle(n_samples)
-    print('batching global training')
-    ds_batched = gin.probabilistic.gn.GraphNet.batch(ds, 256)
+    n_te = int(0.2 * 0.8 * n_samples // 256)
+    ds = ds_global_tr.shuffle((n_samples // 256))
 
     mse_train = []
     mse_test = []
@@ -88,9 +90,6 @@ def obj_fn(point):
             ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
 
         ds_te = ds.skip(idx * n_te).take((idx + 1) * n_te)
-
-        print('batching local training')
-        ds_tr_batched = gin.probabilistic.gn.GraphNet.batch(ds_tr, 256)
 
         class f_r(tf.keras.Model):
             def __init__(self, config):
@@ -158,7 +157,7 @@ def obj_fn(point):
             print('=========================')
             print('epoch %s' % dummy_idx)
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-                in ds_tr_batched:
+                in ds_tr:
                 with tf.GradientTape() as tape:
                     y_bar = gn.call(
                         atoms,
@@ -176,68 +175,70 @@ def obj_fn(point):
 
         # test on train data
         mse_train.append(tf.reduce_mean(
-            [tf.pow(gn(atoms, adjacency_map) - y, 2) \
-                for atoms, adjacency_map, y in ds_tr]))
+            [tf.losses.mean_squared_error(y, y_bar) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_tr]))
         mse_test.append(tf.reduce_mean(
-            [tf.pow(gn(atoms, adjacency_map) - y, 2) \
-                for atoms, adjacency_map, y in ds_te]))
+            [tf.losses.mean_squared_error(y, y_bar) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_te]))
 
-        class f_r(tf.keras.Model):
-            def __init__(self, config):
-                super(f_r, self).__init__()
-                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+    class f_r(tf.keras.Model):
+        def __init__(self, config):
+            super(f_r, self).__init__()
+            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
-            @tf.function
-            def call(self, h_e, h_v, h_u,
-                    h_e_history, h_v_history, h_u_history,
-                    atom_in_mol, bond_in_mol):
-                y = self.d(h_u)[0]
-                return y
+        @tf.function
+        def call(self, h_e, h_v, h_u,
+                h_e_history, h_v_history, h_u_history,
+                atom_in_mol, bond_in_mol):
+            y = self.d(h_u)[0]
+            return y
 
-        class f_v(tf.keras.Model):
-            def __init__(self, units):
-                super(f_v, self).__init__()
-                self.d = tf.keras.layers.Dense(units)
+    class f_v(tf.keras.Model):
+        def __init__(self, units):
+            super(f_v, self).__init__()
+            self.d = tf.keras.layers.Dense(units)
 
-            @tf.function
-            def call(self, x):
-                return self.d(tf.one_hot(x, 8))
+        @tf.function
+        def call(self, x):
+            return self.d(tf.one_hot(x, 8))
 
-        class phi_u(tf.keras.Model):
-            def __init__(self, config):
-                super(phi_u, self).__init__()
-                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+    class phi_u(tf.keras.Model):
+        def __init__(self, config):
+            super(phi_u, self).__init__()
+            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
-            @tf.function
-            def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
-                return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
+        @tf.function
+        def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
+            return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
 
-        gn = gin.probabilistic.gn.GraphNet(
-            f_e=tf.keras.layers.Dense(point['f_e_0']),
+    gn = gin.probabilistic.gn.GraphNet(
+        f_e=tf.keras.layers.Dense(point['f_e_0']),
 
-            f_v=f_v(point['f_v_0']),
+        f_v=f_v(point['f_v_0']),
 
-            f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
+        f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
 
-            phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-                (point['phi_e_0'],
-                 point['phi_e_a_0'],
-                 point['f_e_0'],
-                 point['phi_e_a_1'])),
+        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_e_0'],
+             point['phi_e_a_0'],
+             point['f_e_0'],
+             point['phi_e_a_1'])),
 
-            phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-                (point['phi_v_0'],
-                 point['phi_v_a_0'],
-                 point['f_v_0'],
-                 point['phi_v_a_1'])),
+        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_v_0'],
+             point['phi_v_a_0'],
+             point['f_v_0'],
+             point['phi_v_a_1'])),
 
-            phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-                (point['phi_u_0'],
-                 point['phi_u_a_0'],
-                 point['f_u_0'],
-                 point['phi_u_a_1'])),
+        phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_u_0'],
+             point['phi_u_a_0'],
+             point['f_u_0'],
+             point['phi_u_a_1'])),
 
-            f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
+        f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
 
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
@@ -251,7 +252,7 @@ def obj_fn(point):
             print('=========================')
             print('epoch %s' % dummy_idx)
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-                in ds_batched:
+                in ds_global_te:
                 with tf.GradientTape() as tape:
                     y_bar = gn.call(
                         atoms,
@@ -268,8 +269,9 @@ def obj_fn(point):
     time1 = time.time()
 
     mse_global_test = tf.reduce_mean(
-        [tf.pow(gn(atoms, adjacency_map) - y, 2) \
-            for atoms, adjacency_map, y in ds_global_te])
+        [tf.losses.mean_squared_error(y, y_bar) \
+            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+            in ds_global_te])
 
     mse_train = tf.reduce_mean(mse_train)
     mse_test = tf.reduce_mean(mse_test)
