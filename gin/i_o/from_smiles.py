@@ -170,6 +170,7 @@ def smiles_to_organic_topological_molecule(smiles):
     -------
     molecule : molecule.Molecule object.
     """
+
     with tf.init_scope(): # register the variables
         # it is still eager environment here
         # we need to get:
@@ -231,7 +232,7 @@ def smiles_to_organic_topological_molecule(smiles):
 
     # remove chiral stuff
     smiles = tf.strings.regex_replace(
-        smiles, '\[C@H\]|\[C@@H\]', 'C')
+        smiles, '\[C@H\]|\[C@@H\]|\[C@\]|\[C@@\]', 'C')
 
     smiles = tf.strings.regex_replace(
         smiles, '\[nH\]', 'n')
