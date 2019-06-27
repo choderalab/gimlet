@@ -56,9 +56,9 @@ n_samples = y_array.shape[0]
 ds_all = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 64)
+ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256)
 
-n_global_te = int(0.2 * (n_samples // 64))
+n_global_te = int(0.2 * (n_samples // 256))
 ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
 
@@ -89,8 +89,8 @@ config_space = {
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
-    n_te = int(0.2 * 0.8 * n_samples // 64)
-    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 64))
+    n_te = int(0.2 * 0.8 * n_samples // 256)
+    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 256))
 
     mse_train = []
     mse_test = []
@@ -136,7 +136,7 @@ def obj_fn(point):
 
             f_v=f_v(point['f_v_0']),
 
-            f_u=(lambda x, y: tf.zeros((16, point['f_u_0']), dtype=tf.float32)),
+            f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
 
             phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
                 (point['phi_e_0'],
@@ -228,7 +228,7 @@ def obj_fn(point):
 
         f_v=f_v(point['f_v_0']),
 
-        f_u=(lambda x, y: tf.zeros((16, point['f_u_0']), dtype=tf.float32)),
+        f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
 
         phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_e_0'],
