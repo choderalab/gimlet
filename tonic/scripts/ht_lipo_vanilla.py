@@ -33,6 +33,7 @@ import tonic
 import time
 import pandas as pd
 import numpy as np
+import sklearn
 
 df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
@@ -95,11 +96,14 @@ def obj_fn(point):
     mse_train = []
     mse_test = []
 
+    r2_train = []
+    r2_test = []
+
     for idx in range(5):
         ds_tr = ds.take(idx * n_te).concatenate(
             ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
 
-        ds_te = ds.skip(idx * n_te).take((idx + 1) * n_te)
+        ds_te = ds.skip(idx * n_te).take(n_te)
 
         class f_r(tf.keras.Model):
             def __init__(self, config):
@@ -193,6 +197,15 @@ def obj_fn(point):
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_te]))
 
+        r2_train.append(tf.reduce_mean(
+            [sklearn.metrics.r2_score(y, y_bar) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_tr]))
+        r2_test.append(tf.reduce_mean(
+            [sklearn.metrics.r2_score(y, y_bar) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_te]))
+
     class f_r(tf.keras.Model):
         def __init__(self, config):
             super(f_r, self).__init__()
@@ -250,7 +263,6 @@ def obj_fn(point):
 
         f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
-
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
     n_epoch = 10
     loss = 0
@@ -258,39 +270,50 @@ def obj_fn(point):
 
     time0 = time.time()
     for dummy_idx in range(n_epoch):
-        for dummy_idx in range(n_epoch):
-            print('=========================')
-            print('epoch %s' % dummy_idx)
-            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-                in ds_global_tr:
-                with tf.GradientTape() as tape:
-                    y_bar = gn.call(
-                        atoms,
-                        adjacency_map,
-                        atom_in_mol=atom_in_mol,
-                        bond_in_mol=bond_in_mol)
-                    loss = tf.losses.mean_squared_error(y, y_bar)
-                print(loss)
-                variables = gn.variables
-                grad = tape.gradient(loss, variables)
-                optimizer.apply_gradients(
-                    zip(grad, variables))
+        print('=========================')
+        print('epoch %s' % dummy_idx)
+        for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+            in ds_global_tr:
+            with tf.GradientTape() as tape:
+                y_bar = gn.call(
+                    atoms,
+                    adjacency_map,
+                    atom_in_mol=atom_in_mol,
+                    bond_in_mol=bond_in_mol)
+                loss = tf.losses.mean_squared_error(y, y_bar)
+            print(loss)
+            variables = gn.variables
+            grad = tape.gradient(loss, variables)
+            optimizer.apply_gradients(
+                zip(grad, variables))
 
     time1 = time.time()
+
+    gn.switch(True)
 
     mse_global_test = tf.reduce_mean(
         [tf.losses.mean_squared_error(y, y_bar) \
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
             in ds_global_te])
 
+    r2_global_test = tf.reduce_mean(
+        [sklearn.metrics.r2_score(y, y_bar) \
+            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+            in ds_global_te])
+
     mse_train = tf.reduce_mean(mse_train)
     mse_test = tf.reduce_mean(mse_test)
+    r2_train = tf.reduce_mean(r2_train)
+    r2_test = tf.reduce_mean(r2_test)
 
     print(point)
     print('training time %s ' % (time1 - time0))
     print('mse_train %s' % mse_train.numpy())
+    print('r2_train %s' % r2_train.numpy())
     print('mse_test %s' % mse_test.numpy())
+    print('r2_test %s' % r2_test.numpy())
     print('mse_global_test %s' % mse_global_test.numpy())
+    print('r2_global_test %s ' % r2_global_test.numpy())
 
     return mse_test
 
