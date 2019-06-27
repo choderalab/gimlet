@@ -172,7 +172,7 @@ def obj_fn(point):
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
                 in ds_tr:
                 with tf.GradientTape() as tape:
-                    y_bar = gn.call(
+                    y_bar = gn(
                         atoms,
                         adjacency_map,
                         atom_in_mol=atom_in_mol,
@@ -187,20 +187,40 @@ def obj_fn(point):
 
         # test on train data
         mse_train.append(tf.reduce_mean(
-            [tf.losses.mean_squared_error(y, y_bar) \
+            [tf.losses.mean_squared_error(y, gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol
+            )) \
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_tr]))
         mse_test.append(tf.reduce_mean(
-            [tf.losses.mean_squared_error(y, y_bar) \
+            [tf.losses.mean_squared_error(y, gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol
+            )) \
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_te]))
 
         r2_train.append(tf.reduce_mean(
-            [metrics.r2_score(y, y_bar) \
+            [metrics.r2_score(y, gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol
+            )) \
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_tr]))
         r2_test.append(tf.reduce_mean(
-            [metrics.r2_score(y, y_bar) \
+            [metrics.r2_score(y, gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol
+            )) \
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_te]))
 
@@ -288,12 +308,22 @@ def obj_fn(point):
     gn.switch(True)
 
     mse_global_test = tf.reduce_mean(
-        [tf.losses.mean_squared_error(y, y_bar) \
+        [tf.losses.mean_squared_error(y, gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol
+        )) \
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
             in ds_global_te])
 
     r2_global_test = tf.reduce_mean(
-        [metrics.r2_score(y, y_bar) \
+        [metrics.r2_score(y, gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol
+        )) \
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
             in ds_global_te])
 
