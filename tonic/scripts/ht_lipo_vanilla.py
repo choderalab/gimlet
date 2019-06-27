@@ -168,8 +168,7 @@ def obj_fn(point):
         tape = tf.GradientTape()
 
         for dummy_idx in range(n_epoch):
-            print('=========================')
-            print('epoch %s' % dummy_idx)
+
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
                 in ds_tr:
                 with tf.GradientTape() as tape:
@@ -179,7 +178,6 @@ def obj_fn(point):
                         atom_in_mol=atom_in_mol,
                         bond_in_mol=bond_in_mol)
                     loss = tf.losses.mean_squared_error(y, y_bar)
-                print(loss)
                 variables = gn.variables
                 grad = tape.gradient(loss, variables)
                 optimizer.apply_gradients(
@@ -270,8 +268,6 @@ def obj_fn(point):
 
     time0 = time.time()
     for dummy_idx in range(n_epoch):
-        print('=========================')
-        print('epoch %s' % dummy_idx)
         for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
             in ds_global_tr:
             with tf.GradientTape() as tape:
@@ -281,7 +277,7 @@ def obj_fn(point):
                     atom_in_mol=atom_in_mol,
                     bond_in_mol=bond_in_mol)
                 loss = tf.losses.mean_squared_error(y, y_bar)
-            print(loss)
+
             variables = gn.variables
             grad = tape.gradient(loss, variables)
             optimizer.apply_gradients(
