@@ -33,7 +33,7 @@ import tonic
 import time
 import pandas as pd
 import numpy as np
-import sklearn
+from sklearn import metrics
 
 df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
@@ -196,11 +196,11 @@ def obj_fn(point):
                 in ds_te]))
 
         r2_train.append(tf.reduce_mean(
-            [sklearn.metrics.r2_score(y, y_bar) \
+            [metrics.r2_score(y, y_bar) \
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_tr]))
         r2_test.append(tf.reduce_mean(
-            [sklearn.metrics.r2_score(y, y_bar) \
+            [metrics.r2_score(y, y_bar) \
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_te]))
 
@@ -293,7 +293,7 @@ def obj_fn(point):
             in ds_global_te])
 
     r2_global_test = tf.reduce_mean(
-        [sklearn.metrics.r2_score(y, y_bar) \
+        [metrics.r2_score(y, y_bar) \
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
             in ds_global_te])
 
