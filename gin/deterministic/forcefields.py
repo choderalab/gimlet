@@ -133,7 +133,10 @@ class ForceFieldBase(object):
                     atom1_str,
                 ))
 
-
+        if type(bond_entry) == type(None):
+            print(atom1_str)
+            print(atom2_str)
+        
         # get length and k
         length = float(bond_entry.get('length'))
         k = float(bond_entry.get('k'))

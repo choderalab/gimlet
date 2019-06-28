@@ -332,6 +332,14 @@ def set_13_bounds(upper, lower, adjacency_map,
                 axis=0
             )) + DIST12_TOL)
 
+    upper = tf.linalg.band_part(
+        upper,
+        0, -1) + \
+        tf.transpose(
+            tf.linalg.band_part(
+                upper,
+                0, -1))
+
     lower = tf.tensor_scatter_nd_update(
         lower,
         tf.concat(
@@ -386,6 +394,14 @@ def set_13_bounds(upper, lower, adjacency_map,
                 ],
                 axis=0
             )) - DIST12_TOL)
+
+    lower = tf.linalg.band_part(
+        lower,
+        0, -1) + \
+        tf.transpose(
+            tf.linalg.band_part(
+                lower,
+                0, -1))
 
     return upper, lower
 

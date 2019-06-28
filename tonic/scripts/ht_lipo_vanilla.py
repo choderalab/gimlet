@@ -35,6 +35,8 @@ import pandas as pd
 import numpy as np
 from sklearn import metrics
 
+N_EPOCH = 10
+
 df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
 df = df[~df['smiles'].str.contains('\%')]
@@ -49,6 +51,7 @@ df = df[~df['smiles'].str.contains('9')]
 df = df[~df['smiles'].str.contains('\+')]
 df = df[~df['smiles'].str.contains('\-')]
 
+df = df[:2048]
 x_array = df[['smiles']].values.flatten()
 y_array = df[['exp']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
@@ -87,143 +90,7 @@ config_space = {
     'learning_rate': [1e-5, 1e-4, 1e-3, 1e-2]
 }
 
-
-def obj_fn(point):
-    point = dict(zip(config_space.keys(), point))
-    n_te = int(0.2 * 0.8 * n_samples // 256)
-    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 256))
-
-    mse_train = []
-    mse_test = []
-
-    r2_train = []
-    r2_test = []
-
-    for idx in range(5):
-        ds_tr = ds.take(idx * n_te).concatenate(
-            ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
-
-        ds_te = ds.skip(idx * n_te).take(n_te)
-
-        class f_r(tf.keras.Model):
-            def __init__(self, config):
-                super(f_r, self).__init__()
-                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
-
-            @tf.function
-            def call(self, h_e, h_v, h_u,
-                    h_e_history, h_v_history, h_u_history,
-                    atom_in_mol, bond_in_mol):
-                y = self.d(h_u)[0]
-                return y
-
-        class f_v(tf.keras.Model):
-            def __init__(self, units):
-                super(f_v, self).__init__()
-                self.d = tf.keras.layers.Dense(units)
-
-            @tf.function
-            def call(self, x):
-                return self.d(tf.one_hot(x, 8))
-
-        class phi_u(tf.keras.Model):
-            def __init__(self, config):
-                super(phi_u, self).__init__()
-                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
-
-            @tf.function
-            def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
-                return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
-
-        gn = gin.probabilistic.gn.GraphNet(
-            f_e=tf.keras.layers.Dense(point['f_e_0']),
-
-            f_v=f_v(point['f_v_0']),
-
-            f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
-
-            phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-                (point['phi_e_0'],
-                 point['phi_e_a_0'],
-                 point['f_e_0'],
-                 point['phi_e_a_1'])),
-
-            phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-                (point['phi_v_0'],
-                 point['phi_v_a_0'],
-                 point['f_v_0'],
-                 point['phi_v_a_1'])),
-
-            phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
-                (point['phi_u_0'],
-                 point['phi_u_a_0'],
-                 point['f_u_0'],
-                 point['phi_u_a_1'])),
-
-            f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
-
-        optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
-        n_epoch = 10
-        loss = 0
-        tape = tf.GradientTape()
-
-        for dummy_idx in range(n_epoch):
-
-            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-                in ds_tr:
-                with tf.GradientTape() as tape:
-                    y_bar = gn(
-                        atoms,
-                        adjacency_map,
-                        atom_in_mol=atom_in_mol,
-                        bond_in_mol=bond_in_mol)
-                    loss = tf.losses.mean_squared_error(y, y_bar)
-                variables = gn.variables
-                grad = tape.gradient(loss, variables)
-                optimizer.apply_gradients(
-                    zip(grad, variables))
-
-        gn.switch(True)
-
-        # test on train data
-        mse_train.append(tf.reduce_mean(
-            [tf.losses.mean_squared_error(y, gn(
-                atoms,
-                adjacency_map,
-                atom_in_mol=atom_in_mol,
-                bond_in_mol=bond_in_mol
-            )) \
-                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
-                in ds_tr]))
-        mse_test.append(tf.reduce_mean(
-            [tf.losses.mean_squared_error(y, gn(
-                atoms,
-                adjacency_map,
-                atom_in_mol=atom_in_mol,
-                bond_in_mol=bond_in_mol
-            )) \
-                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
-                in ds_te]))
-
-        r2_train.append(tf.reduce_mean(
-            [metrics.r2_score(y, gn(
-                atoms,
-                adjacency_map,
-                atom_in_mol=atom_in_mol,
-                bond_in_mol=bond_in_mol
-            )) \
-                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
-                in ds_tr]))
-        r2_test.append(tf.reduce_mean(
-            [metrics.r2_score(y, gn(
-                atoms,
-                adjacency_map,
-                atom_in_mol=atom_in_mol,
-                bond_in_mol=bond_in_mol
-            )) \
-                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
-                in ds_te]))
-
+def init():
     class f_r(tf.keras.Model):
         def __init__(self, config):
             super(f_r, self).__init__()
@@ -233,7 +100,7 @@ def obj_fn(point):
         def call(self, h_e, h_v, h_u,
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
-            y = self.d(h_u)[0]
+            y = tf.reshape(self.d(h_u)[0], [-1])
             return y
 
     class f_v(tf.keras.Model):
@@ -259,7 +126,10 @@ def obj_fn(point):
 
         f_v=f_v(point['f_v_0']),
 
-        f_u=(lambda x, y: tf.zeros((64, point['f_u_0']), dtype=tf.float32)),
+        f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
+            tf.boolean_mask(
+                tf.zeros((64, 128), dtype=tf.float32),
+                batched_attr_mask)),
 
         phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_e_0'],
@@ -282,21 +152,123 @@ def obj_fn(point):
         f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
-    n_epoch = 10
-    loss = 0
-    tape = tf.GradientTape()
 
-    time0 = time.time()
-    for dummy_idx in range(n_epoch):
-        for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-            in ds_global_tr:
-            with tf.GradientTape() as tape:
-                y_bar = gn.call(
+    global gn
+    global optimizer
+
+
+def obj_fn(point):
+    point = dict(zip(config_space.keys(), point))
+    n_te = int(0.2 * 0.8 * n_samples // 256)
+    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 256))
+
+    mse_train = []
+    mse_test = []
+
+    r2_train = []
+    r2_test = []
+
+    for idx in range(5):
+        init()
+        ds_tr = ds.take(idx * n_te).concatenate(
+            ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
+
+        ds_te = ds.skip(idx * n_te).take(n_te)
+
+        for dummy_idx in range(N_EPOCH):
+            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+                in ds_tr:
+                with tf.GradientTape() as tape:
+                    y_hat = gn(
+                        atoms,
+                        adjacency_map,
+                        atom_in_mol=atom_in_mol,
+                        bond_in_mol=bond_in_mol,
+                        batched_attr_mask=y_mask)
+
+                    y = tf.boolean_mask(
+                        y,
+                        y_mask)
+
+                    loss = tf.losses.mean_squared_error(y, y_hat)
+                variables = gn.variables
+                grad = tape.gradient(loss, variables)
+                optimizer.apply_gradients(
+                    zip(grad, variables))
+
+        gn.switch(True)
+
+        # test on train data
+        mse_train.append(tf.reduce_mean(
+            [tf.losses.mean_squared_error(
+                tf.boolean_mask(y, y_mask),
+                gn(
                     atoms,
                     adjacency_map,
                     atom_in_mol=atom_in_mol,
-                    bond_in_mol=bond_in_mol)
-                loss = tf.losses.mean_squared_error(y, y_bar)
+                    bond_in_mol=bond_in_mol,
+                    batched_attr_mask=y_mask
+            )) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_tr]))
+
+        mse_test.append(tf.reduce_mean(
+            [tf.losses.mean_squared_error(
+                tf.boolean_mask(y, y_mask),
+                gn(
+                    atoms,
+                    adjacency_map,
+                    atom_in_mol=atom_in_mol,
+                    bond_in_mol=bond_in_mol,
+                    batched_attr_mask=y_mask
+            )) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_te]))
+
+        r2_train.append(tf.reduce_mean(
+            [metrics.r2_score(
+                tf.boolean_mask(y, y_mask),
+                gn(
+                    atoms,
+                    adjacency_map,
+                    atom_in_mol=atom_in_mol,
+                    bond_in_mol=bond_in_mol,
+                    batched_attr_mask=y_mask
+            )) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_tr]))
+
+        r2_test.append(tf.reduce_mean(
+            [metrics.r2_score(
+                tf.boolean_mask(y, y_mask),
+                gn(
+                    atoms,
+                    adjacency_map,
+                    atom_in_mol=atom_in_mol,
+                    bond_in_mol=bond_in_mol,
+                    batched_attr_mask=y_mask
+            )) \
+                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
+                in ds_te]))
+
+    init()
+    time0 = time.time()
+    for dummy_idx in range(N_EPOCH):
+        for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+            in ds_global_tr:
+            with tf.GradientTape() as tape:
+                y_hat = gn.call(
+                    atoms,
+                    adjacency_map,
+                    atom_in_mol=atom_in_mol,
+                    bond_in_mol=bond_in_mol,
+                    batched_attr_mask=y_mask)
+
+                y = tf.boolean_mask(
+                    y,
+                    y_mask)
+
+                loss = tf.losses.mean_squared_error(y, y_hat)
 
             variables = gn.variables
             grad = tape.gradient(loss, variables)
@@ -308,21 +280,27 @@ def obj_fn(point):
     gn.switch(True)
 
     mse_global_test = tf.reduce_mean(
-        [tf.losses.mean_squared_error(y, gn(
+        [tf.losses.mean_squared_error(
+            tf.boolean_mask(y, y_mask),
+            gn(
                 atoms,
                 adjacency_map,
                 atom_in_mol=atom_in_mol,
-                bond_in_mol=bond_in_mol
+                bond_in_mol=bond_in_mol,
+                batched_attr_mask=y_mask
         )) \
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
             in ds_global_te])
 
     r2_global_test = tf.reduce_mean(
-        [metrics.r2_score(y, gn(
+        [metrics.r2_score(
+            tf.boolean_mask(y, y_mask),
+            gn(
                 atoms,
                 adjacency_map,
                 atom_in_mol=atom_in_mol,
-                bond_in_mol=bond_in_mol
+                bond_in_mol=bond_in_mol,
+                batched_attr_mask=y_mask
         )) \
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
             in ds_global_te])

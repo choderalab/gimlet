@@ -352,7 +352,7 @@ def add_hydrogen(mol):
     atoms = tf.concat(
         [
             atoms,
-            8 * tf.ones((n_hydrogens, ), dtype=tf.int64)
+            9 * tf.ones((n_hydrogens, ), dtype=tf.int64)
         ],
         axis=0)
 

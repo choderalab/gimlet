@@ -1393,13 +1393,13 @@ class TypingGAFF(TypingBase):
         """
         return tf.logical_and(
             self.is_nitrogen,
-            tf.greater_equal(
-                tf.math.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(1, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(2, dtype=tf.int64)))
+            tf.logical_and(
+                    self.is_connected_to_2_heavy,
+                    tf.reduce_any(
+                        tf.greater(
+                            self.adjacency_map_full,
+                            tf.constant(1, dtype=tf.float32)),
+                        axis=0)))
 
     def is_9(self):
         """ n3
@@ -1573,7 +1573,7 @@ class TypingGAFF(TypingBase):
             tf.logical_and(
                 self.is_connected_to_carbon,
                 tf.logical_not(
-                    self.is_aromatic)))
+                    self.is_connected_to_aromatic)))
 
     def is_27(self):
         """ ha
@@ -1583,7 +1583,7 @@ class TypingGAFF(TypingBase):
             self.is_hydrogen,
             tf.logical_and(
                 self.is_connected_to_carbon,
-                self.is_aromatic))
+                self.is_connected_to_aromatic))
 
     def is_28(self):
         """ hn

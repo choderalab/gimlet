@@ -84,12 +84,14 @@ def get_angles(coordinates, angle_idxs):
 
     # (n_angles, )
     angles = tf.math.acos(
-        tf.math.divide(
-            tf.reduce_sum(
-                angle_left * angle_right,
-                axis=1),
-            tf.norm(angle_left, axis=1) \
-                * tf.norm(angle_right, axis=1)))
+        tf.clip_by_value(
+            tf.math.divide(
+                tf.reduce_sum(
+                    angle_left * angle_right,
+                    axis=1),
+                tf.norm(angle_left, axis=1) \
+                    * tf.norm(angle_right, axis=1)),
+            -1, 1))
 
     return angles
 
@@ -154,14 +156,15 @@ class SingleMoleculeMechanicsSystem:
             self.forcefield = gin.deterministic.forcefields.gaff
 
         if len(mol) == 3:
-            self.coordinates = mol[2]
+            self.coordinates = tf.math.divide(
+                mol[2],
+                tf.constant(10, dtype=tf.float32))
 
         else:
             self.coordinates = gin.deterministic.conformer.Conformers(
                 mol,
                 self.forcefield,
                 self.typing).get_conformers_from_distance_geometry(1)[0]
-
 
         # get the types
         self.typing_assignment = self.typing(self.mol).get_assignment()
@@ -194,6 +197,7 @@ class SingleMoleculeMechanicsSystem:
         # = \frac{1}{2} k (x - x_0) ^ 2
         # $$
         # NOTE: it's impossible for bonds to return NaN
+
         bond_energy = 0.5 * self.bond_k \
             * tf.pow(
                 tf.gather_nd(
@@ -209,7 +213,6 @@ class SingleMoleculeMechanicsSystem:
         # E_\mathtt{angle}
         # = \frac{1}{2} k (\theta - theta_0) ^ 2
         # $$
-        print(angles)
         angle_energy = 0.5 * self.angle_k \
             * tf.pow(
                 angles - self.angle_angle,
@@ -292,16 +295,16 @@ class SingleMoleculeMechanicsSystem:
                     lj_energy_matrix,
                     self.is_onefour)))
 
-        '''
+        constraint = tf.constant(100, dtype=tf.float32) * tf.reduce_sum(
+            tf.pow(
+                coordinates,
+                2))
+
         energy_tot = bond_energy \
             + angle_energy \
             + proper_torsion_energy \
             + improper_torsion_energy \
             + lj_energy
-
-        '''
-
-        energy_tot = bond_energy + angle_energy
 
         return energy_tot
 
@@ -332,10 +335,10 @@ class SingleMoleculeMechanicsSystem:
             coordinates = tf.Variable(coordinates)
 
             # keep a history
-            recent_hundred = tf.zeros((100, ), dtype=tf.float32)
+            recent_ten = tf.zeros((10, ), dtype=tf.float32)
 
             # get the Adam optimizer
-            optimizer = tf.keras.optimizers.Adam(10000)
+            optimizer = tf.keras.optimizers.Adam(1000)
 
             # init
             iter_idx = tf.constant(0, dtype=tf.int64)
@@ -345,9 +348,10 @@ class SingleMoleculeMechanicsSystem:
                     energy = self.energy(coordinates)
 
                 print(energy)
-                recent_hundred = tf.concat(
+
+                recent_ten = tf.concat(
                     [
-                        recent_hundred[1:],
+                        recent_ten[1:],
                         tf.expand_dims(energy, 0)
                     ],
                     axis=0)
@@ -361,10 +365,11 @@ class SingleMoleculeMechanicsSystem:
 
                 optimizer.apply_gradients(zip([grad], [coordinates]))
 
+
                 if tf.logical_and(
                     tf.greater(iter_idx, 100),
                     tf.less(
-                        tf.math.reduce_std(recent_hundred),
+                        tf.math.reduce_std(recent_ten),
                         1e-3)):
                     break
 
@@ -374,7 +379,8 @@ class SingleMoleculeMechanicsSystem:
                 [[
                     self.atoms,
                     self.adjacency_map,
-                    coordinates - tf.reduce_mean(coordinates, 0)
+                    tf.constant(10, dtype=tf.float32) * (
+                        coordinates - tf.reduce_mean(coordinates, 0))
                 ]],
                 'caffeine_out.sdf')
 
@@ -423,10 +429,12 @@ class SingleMoleculeMechanicsSystem:
         self.bond_idxs = bond_idxs
 
         # (n_bonds, )
-        self.bond_k = bond_specs[:, 0]
+        self.bond_length = bond_specs[:, 0]
 
         # (n_bonds, )
-        self.bond_length = bond_specs[:, 1]
+        self.bond_k = bond_specs[:, 1]
+
+
 
     def get_angle_params(self):
         """ Get all the angles in the system.
