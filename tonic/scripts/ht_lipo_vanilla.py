@@ -91,6 +91,9 @@ config_space = {
 }
 
 def init():
+    global gn
+    global optimizer
+
     class f_r(tf.keras.Model):
         def __init__(self, config):
             super(f_r, self).__init__()
@@ -152,10 +155,6 @@ def init():
         f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
 
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
-
-    global gn
-    global optimizer
-
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
