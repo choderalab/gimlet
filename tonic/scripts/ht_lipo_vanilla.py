@@ -131,7 +131,7 @@ def init(point):
 
         f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
             tf.boolean_mask(
-                tf.zeros((64, 128), dtype=tf.float32),
+                tf.zeros((64, point['f_u_0']), dtype=tf.float32),
                 batched_attr_mask)),
 
         phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
