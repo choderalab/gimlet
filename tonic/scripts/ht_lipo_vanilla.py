@@ -90,7 +90,7 @@ config_space = {
     'learning_rate': [1e-5, 1e-4, 1e-3, 1e-2]
 }
 
-def init():
+def init(point):
     global gn
     global optimizer
 
@@ -168,7 +168,7 @@ def obj_fn(point):
     r2_test = []
 
     for idx in range(5):
-        init()
+        init(point)
         ds_tr = ds.take(idx * n_te).concatenate(
             ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
 
@@ -250,7 +250,7 @@ def obj_fn(point):
                 for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask\
                 in ds_te]))
 
-    init()
+    init(point)
     time0 = time.time()
     for dummy_idx in range(N_EPOCH):
         for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
