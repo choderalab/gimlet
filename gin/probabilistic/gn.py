@@ -230,7 +230,7 @@ class GraphNet(tf.keras.Model):
                 [[True]],
                 [n_bonds, 1])
 
-        if tf.logical_not(tf.reduce_all(batched_attr_mask)):
+        if tf.logical_not(tf.reduce_any(batched_attr_mask)):
             batched_attr_mask = tf.constant([[True]])
 
         # (n_bonds, n_atoms)
@@ -284,12 +284,33 @@ class GraphNet(tf.keras.Model):
 
         # (n_mols, ...)
         # NOTE: here $h_u$ could have more than one first dimensions
-        h_u = self.f_u(atoms, adjacency_map)
+        h_u = self.f_u(atoms, adjacency_map, batched_attr_mask)
         h_u_0 = h_u
         h_u_history = tf.expand_dims(h_u_0, 1)
         d_u = tf.shape(h_u, tf.int64)[1]
-
         n_mols = tf.shape(h_u, tf.int64)[0]
+
+        # trim the extra `False` from `bond_in_mol` and from `atom_in_mol`
+        bond_in_mol = tf.boolean_mask(
+            bond_in_mol,
+            tf.reduce_any(
+                bond_in_mol,
+                axis=0),
+            axis=1)
+
+        bond_in_mol = tf.boolean_mask(
+            bond_in_mol,
+            tf.reduce_any(
+                bond_in_mol,
+                axis=1),
+            axis=0)
+
+        atom_in_mol = tf.boolean_mask(
+            atom_in_mol,
+            tf.reduce_any(
+                atom_in_mol,
+                axis=0),
+        axis=1)
 
         def propagate_one_time(
                 iter_idx,
@@ -323,13 +344,8 @@ class GraphNet(tf.keras.Model):
                                 h_u, # (n_mols, d_u)
                                 0), # (1, n_mols, d_u)
                             [tf.shape(h_e)[0], 1, 1]),
-                        tf.boolean_mask(
-                            bond_in_mol,
-                            tf.reduce_any(
-                                bond_in_mol,
-                                axis=1),
-                            axis=0)),
-                    1,
+                        bond_in_mol),
+                    axis=1,
                     keepdims=True))
 
             h_e_history = tf.concat(
@@ -512,7 +528,7 @@ class GraphNet(tf.keras.Model):
                 dtype=tf.int64)
 
             batched_adjacency_map_cache = tf.constant(
-                -1,
+                0,
                 shape=[inner_batch_size, inner_batch_size],
                 dtype=tf.float32)
 
@@ -531,13 +547,13 @@ class GraphNet(tf.keras.Model):
                 tf.expand_dims(
                     tf.constant(-1, dtype=tf.float32),
                     0),
-                [inner_batch_size])
+                [inner_batch_size // 4])
 
             batched_attr_mask_cache = tf.tile(
                 tf.expand_dims(
-                    tf.constant(True),
+                    tf.constant(False),
                     0),
-                [inner_batch_size])
+                [inner_batch_size // 4])
 
             batched_atoms = tf.expand_dims(
                 batched_atoms_cache, 0)
@@ -561,6 +577,14 @@ class GraphNet(tf.keras.Model):
             for atoms, adjacency_map, attr in mols_with_attributes:
                 n_atoms = tf.shape(atoms, tf.int64)[0]
                 n_bonds = tf.math.count_nonzero(adjacency_map)
+
+                # NOTE:
+                # here we exclude the single-atom molecule from our
+                # dataset
+                if tf.equal(
+                    n_bonds,
+                    tf.constant(0, dtype=tf.int64)):
+                    continue
 
                 if tf.greater(
                     atom_idx + n_atoms,
@@ -657,7 +681,7 @@ class GraphNet(tf.keras.Model):
                                     -1,
                                     shape=(1,),
                                     dtype=tf.float32),
-                                [inner_batch_size - 1])
+                                [inner_batch_size // 4 - 1])
                         ],
                         axis=0)
 
@@ -668,7 +692,7 @@ class GraphNet(tf.keras.Model):
                                 tf.constant(
                                     False,
                                     shape=(1,)),
-                            [inner_batch_size -1])
+                            [inner_batch_size // 4 -1])
                         ],
                         axis=0)
 
@@ -784,11 +808,11 @@ class GraphNet(tf.keras.Model):
                     batched_attr_cache = tf.where(
                         tf.equal(
                             tf.range(
-                                inner_batch_size,
+                                inner_batch_size // 4,
                                 dtype=tf.int64),
                             mol_idx),
-                        tf.ones(
-                            (inner_batch_size,),
+                        attr * tf.ones(
+                            (inner_batch_size // 4,),
                             dtype=tf.float32),
                         batched_attr_cache)
 
@@ -796,7 +820,7 @@ class GraphNet(tf.keras.Model):
                         batched_attr_mask_cache,
                         tf.equal(
                             tf.range(
-                                inner_batch_size,
+                                inner_batch_size // 4,
                                 dtype=tf.int64),
                             mol_idx))
 
