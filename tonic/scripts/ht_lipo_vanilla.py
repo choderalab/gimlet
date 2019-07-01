@@ -37,7 +37,7 @@ from sklearn import metrics
 
 N_EPOCH = 10
 
-df = pd.read_csv('data/delaney-processed.csv')
+df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
 df = df[~df['smiles'].str.contains('\%')]
 df = df[~df['smiles'].str.contains('\.')]
@@ -52,17 +52,16 @@ df = df[~df['smiles'].str.contains('\+')]
 df = df[~df['smiles'].str.contains('\-')]
 
 x_array = df[['smiles']].values.flatten()
-# y_array = df[['exp']].values.flatten()
-y_array = df[['measured log solubility in mols per litre']].values.flatten()
+y_array = df[['exp']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 n_samples = y_array.shape[0]
 
 ds_all = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 64)
+ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256)
 
-n_global_te = int(0.2 * (n_samples // 64))
+n_global_te = int(0.2 * (n_samples // 256))
 ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
 
@@ -131,7 +130,7 @@ def init(point):
 
         f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
             tf.boolean_mask(
-                tf.zeros((16, point['f_u_0']), dtype=tf.float32),
+                tf.zeros((64, point['f_u_0']), dtype=tf.float32),
                 batched_attr_mask)),
 
         phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
@@ -158,8 +157,8 @@ def init(point):
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
-    n_te = int(0.2 * 0.8 * n_samples // 64)
-    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 64))
+    n_te = int(0.2 * 0.8 * n_samples // 256)
+    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 256))
 
     y_true_train = tf.constant([-1], dtype=tf.float32)
     y_pred_train = tf.constant([-1], dtype=tf.float32)
