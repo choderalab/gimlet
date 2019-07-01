@@ -85,6 +85,8 @@ for epoch_idx in range(50):
                 y,
                 y_mask)
 
+            print(y)
+            print(y_hat)
             loss = tf.losses.mean_squared_error(y, y_hat)
 
         variables = gn.variables
