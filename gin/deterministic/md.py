@@ -792,7 +792,7 @@ class SingleMoleculeMechanicsSystem:
             lambda atom: tf.convert_to_tensor(
                     self.forcefield.get_nonbonded(
                         int(tf.gather(self.typing_assignment, atom).numpy()))),
-            self.atoms,
+            tf.range(self.n_atoms, tf.int64),
             dtype=tf.float32)
 
         # get the constants of nonbonded forces and put as attributes

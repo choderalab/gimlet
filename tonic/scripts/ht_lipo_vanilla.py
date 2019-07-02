@@ -315,7 +315,6 @@ def obj_fn(point):
     r2_global_test = metrics.r2_score(y_true_global_test,
         y_pred_global_test)
 
-
     print(point)
     print('training time %s ' % (time1 - time0))
     print('mse_train %s' % mse_train.numpy())
