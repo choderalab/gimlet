@@ -306,7 +306,7 @@ def obj_fn(point):
     y_pred_global_test = y_pred_global_test[1:]
 
     mse_train = tf.losses.mean_squared_error(y_true_train, y_pred_train)
-    mes_test = tf.losses.mean_squared_error(y_true_test, y_pred_test)
+    mse_test = tf.losses.mean_squared_error(y_true_test, y_pred_test)
     mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
         y_pred_global_test)
 
