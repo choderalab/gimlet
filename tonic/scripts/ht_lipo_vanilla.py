@@ -35,7 +35,7 @@ import pandas as pd
 import numpy as np
 from sklearn import metrics
 
-N_EPOCH = 10
+N_EPOCH = 30
 
 df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
@@ -151,7 +151,9 @@ def init(point):
              point['f_u_0'],
              point['phi_u_a_1'])),
 
-        f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)))
+        f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)),
+
+        repeat=5)
 
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
 
@@ -191,20 +193,6 @@ def obj_fn(point):
 
                     loss = tf.losses.mean_squared_error(y, y_hat)
 
-                y_true_train = tf.concat(
-                    [
-                        y_true_train,
-                        tf.reshape(y, [-1])
-                    ],
-                    axis=0)
-
-                y_pred_train = tf.concat(
-                    [
-                        y_pred_train,
-                        tf.reshape(y_hat, [-1])
-                    ],
-                    axis=0)
-
                 variables = gn.variables
                 grad = tape.gradient(loss, variables)
                 optimizer.apply_gradients(
@@ -236,6 +224,34 @@ def obj_fn(point):
             y_pred_test = tf.concat(
                 [
                     y_pred_test,
+                    tf.reshape(y_hat, [-1])
+                ],
+                axis=0)
+
+        for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+            in ds_tr:
+
+            y_hat = gn(
+                atoms,
+                adjacency_map,
+                atom_in_mol=atom_in_mol,
+                bond_in_mol=bond_in_mol,
+                batched_attr_mask=y_mask)
+
+            y = tf.boolean_mask(
+                y,
+                y_mask)
+
+            y_true_train = tf.concat(
+                [
+                    y_true_train,
+                    tf.reshape(y, [-1])
+                ],
+                axis=0)
+
+            y_pred_train = tf.concat(
+                [
+                    y_pred_train,
                     tf.reshape(y_hat, [-1])
                 ],
                 axis=0)
