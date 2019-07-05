@@ -59,7 +59,17 @@ n_samples = y_array.shape[0]
 ds_all = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256)
+ds_all = ds_all.map(
+    (lambda atoms, adjacency_map, y: \
+        (
+            tf.py_function(
+                gin.probabilistic.featurization.featurize_atoms,
+                [atoms, adjacency_map],
+                tf.float32),
+            adjacency_map,
+            y)))
+
+ds_all = gin.probabilistic.gn.GraphNet.batch(ds, 256, feature_dimension=11)
 
 n_global_te = int(0.2 * (n_samples // 256))
 ds_global_tr = ds_all.skip(n_global_te)
@@ -111,7 +121,7 @@ def init(point):
             y_u = self.gru_u(h_u_history)
 
             y = self.d(y_e, y_v, y_u)
-            
+
             y = tf.reshape(y, [-1])
 
             return y
@@ -121,9 +131,9 @@ def init(point):
             super(f_v, self).__init__()
             self.d = tf.keras.layers.Dense(units)
 
-        @tf.function
+        # @tf.function
         def call(self, x):
-            return self.d(tf.one_hot(x, 8))
+            return self.d(x)
 
     class phi_u(tf.keras.Model):
         def __init__(self, config):
