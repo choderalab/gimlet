@@ -64,7 +64,7 @@ class TypingBase(object):
 
         self.atoms = mol[0]
 
-        self.n_atoms = self.atoms.numpy().shape[0]
+        # self.n_atoms = int(self.atoms.shape[0])
 
     def _is_carbon(self):
         return tf.equal(
@@ -695,7 +695,7 @@ class TypingBase(object):
                 root.get_shape(),
                 is_in_ring_.get_shape()],
 
-            parallel_iterations=self.n_atoms)
+            )# parallel_iterations=self.n_atoms)
 
         return is_in_ring_
 
@@ -1214,7 +1214,7 @@ class TypingBase(object):
                 root.get_shape(),
                 is_in_ring_.get_shape()],
 
-            parallel_iterations=self.n_atoms)
+            ) # parallel_iterations=self.n_atoms)
 
         # get the aromatic indices
         aromatic_idxs = tf.gather(
@@ -1647,8 +1647,8 @@ class TypingGAFF(TypingBase):
         # use paralleled while loop for this assignment
         idx = tf.constant(1, dtype=tf.int64)
         assignment = tf.constant(-1, dtype=tf.int64) \
-            * tf.ones(
-                (self.n_atoms, ),
+            * tf.ones_like(
+                self.atoms,
                 dtype=tf.int64)
 
         def loop_body(idx, assignment):

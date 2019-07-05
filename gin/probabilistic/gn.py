@@ -495,7 +495,8 @@ class GraphNet(tf.keras.Model):
     def batch(
             mols_with_attributes,
             inner_batch_size=128,
-            outer_batch_size=None):
+            outer_batch_size=None,
+            feature_dimension=0):
         """ Group molecules into batches.
 
         Parameters
@@ -512,7 +513,6 @@ class GraphNet(tf.keras.Model):
 
         """
 
-        # @tf.function # decorators not available in Alpha stage of tf 2.0
         def _batch(
             mols_with_attributes,
             inner_batch_size=inner_batch_size):
@@ -522,10 +522,17 @@ class GraphNet(tf.keras.Model):
             bond_idx = tf.constant(0, dtype=tf.int64)
             mol_idx = tf.constant(0, dtype=tf.int64)
 
-            batched_atoms_cache = tf.constant(
-                -1,
-                shape=[inner_batch_size,],
-                dtype=tf.int64)
+            if feature_dimension == 0:
+                batched_atoms_cache = tf.constant(
+                    -1,
+                    shape=[inner_batch_size,],
+                    dtype=tf.int64)
+
+            else:
+                batched_atoms_cache = tf.constant(
+                    -1,
+                    shape=[inner_batch_size, feature_dimension],
+                    dtype=tf.float32)
 
             batched_adjacency_map_cache = tf.constant(
                 0,
@@ -634,17 +641,33 @@ class GraphNet(tf.keras.Model):
                         axis=0)
 
                     # use this one extra molecule to initiate the next batch
-                    batched_atoms_cache = tf.concat(
-                        [
-                            atoms,
-                            tf.tile(
-                                tf.constant(
-                                    -1,
-                                    shape=(1,),
-                                    dtype=tf.int64),
-                                [inner_batch_size - n_atoms])
-                        ],
-                        axis=0)
+                    if feature_dimension == 0:
+                        batched_atoms_cache = tf.concat(
+                            [
+                                atoms,
+                                tf.tile(
+                                    tf.constant(
+                                        -1,
+                                        shape=(1,),
+                                        dtype=tf.int64),
+                                    [inner_batch_size - n_atoms])
+                            ],
+                            axis=0)
+
+                    else:
+
+                        batched_atoms_cache = tf.concat(
+                            [
+                                atoms,
+                                tf.tile(
+                                    tf.constant(
+                                        -1,
+                                        shape=(1, feature_dimension),
+                                        dtype=tf.float32
+                                    ),
+                                    [inner_batch_size - n_atoms, 1])
+                            ],
+                            axis=0)
 
                     batched_adjacency_map_cache = tf.pad(
                         adjacency_map,
@@ -727,25 +750,53 @@ class GraphNet(tf.keras.Model):
                                 1),
                             [1, inner_batch_size]))
 
-                    batched_atoms_cache = tf.where(
-                        # cond
-                        one_d_atom_mask,
+                    if feature_dimension == 0:
+                        batched_atoms_cache = tf.where(
+                            # cond
+                            one_d_atom_mask,
 
-                        # where True
-                        tf.concat(
-                            [
-                                tf.tile(
-                                    [tf.constant(-1, dtype=tf.int64)],
-                                    [atom_idx]),
-                                atoms,
-                                tf.tile(
-                                    [tf.constant(-1, dtype=tf.int64)],
-                                    [inner_batch_size - atom_idx - n_atoms])
-                            ],
-                            axis=0),
+                            # where True
+                            tf.concat(
+                                [
+                                    tf.tile(
+                                        [tf.constant(-1, dtype=tf.int64)],
+                                        [atom_idx]),
+                                    atoms,
+                                    tf.tile(
+                                        [tf.constant(-1, dtype=tf.int64)],
+                                        [inner_batch_size - atom_idx - n_atoms])
+                                ],
+                                axis=0),
 
-                        # where False
-                        batched_atoms_cache)
+                            # where False
+                            batched_atoms_cache)
+
+                    else:
+                        batched_atoms_cache = tf.where(
+                            # cond
+                            one_d_atom_mask,
+
+                            # where True
+                            tf.concat(
+                                [
+                                    tf.tile(
+                                        tf.constant(
+                                            -1,
+                                            shape=(1, feature_dimension),
+                                            dtype=tf.float32),
+                                        [atom_idx, 1]),
+                                    atoms,
+                                    tf.tile(
+                                        tf.constant(
+                                            -1,
+                                            shape=(1, feature_dimension),
+                                            dtype=tf.float32),
+                                        [inner_batch_size-atom_idx-n_atoms, 1])
+                                ],
+                                axis=0),
+
+                            # where False
+                            batched_atoms_cache)
 
                     batched_adjacency_map_cache = tf.where(
                         # cond

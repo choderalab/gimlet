@@ -51,77 +51,91 @@ def featurize_atoms(
 
     # init the feature vector
     feature = tf.expand_dims(
-        tf.zeros_like(atoms),
-        0)
+        tf.zeros_like(atoms, dtype=tf.float32),
+        1)
 
     if element == True:
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_carbon,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_carbon,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_nitrogen,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_nitrogen,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_oxygen,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_oxygen,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_sulfur,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_sulfur,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_flourine,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_flourine,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_chlorine,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_chlorine,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_iodine,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_iodine,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
@@ -129,30 +143,36 @@ def featurize_atoms(
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_sp1,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_sp1,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_sp2,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_sp2,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_sp3,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_sp3,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
 
@@ -160,9 +180,14 @@ def featurize_atoms(
         feature = tf.concat(
             [
                 feature,
-                tf.where(
-                    typing.is_aromatic,
-                    tf.ones_like(atoms, dtype=tf.float32),
-                    tf.zeros_like(atoms, dtype=tf.float32))
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_aromatic,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
             ],
             axis=1)
+
+    feature = feature[:, 1:]
+    return feature
