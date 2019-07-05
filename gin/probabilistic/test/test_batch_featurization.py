@@ -52,7 +52,8 @@ class f_v(tf.keras.Model):
 class phi_u(tf.keras.Model):
     def __init__(self):
         super(phi_u, self).__init__()
-        self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu'))
+        self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            (128, 'elu', 128, 'elu'))
 
     def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
         return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
@@ -94,9 +95,9 @@ for epoch_idx in range(50):
                 y,
                 y_mask)
 
-            print(loss)
-
             loss = tf.losses.mean_squared_error(y, y_hat)
+
+            print(loss)
 
         variables = gn.variables
         grad = tape.gradient(loss, variables)
