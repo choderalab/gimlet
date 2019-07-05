@@ -69,7 +69,7 @@ ds_all = ds_all.map(
             adjacency_map,
             y)))
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds, 256, feature_dimension=11)
+ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, feature_dimension=11)
 
 n_global_te = int(0.2 * (n_samples // 256))
 ds_global_tr = ds_all.skip(n_global_te)
