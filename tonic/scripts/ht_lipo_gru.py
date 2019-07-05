@@ -96,6 +96,8 @@ config_space = {
     'f_r_a': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'f_r_1': [32, 64, 128, 256],
 
+    'gru_unit': [64, 128, 256, 512],
+
     'learning_rate': [1e-5, 1e-4, 1e-3, 1e-2]
 }
 
@@ -172,7 +174,8 @@ def init(point):
              point['f_u_0'],
              point['phi_u_a_1'])),
 
-        f_r=f_r((point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)),
+        f_r=f_r(point['gru_unit'],
+            (point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)),
 
         repeat=5)
 
