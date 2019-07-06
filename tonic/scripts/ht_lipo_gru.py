@@ -106,7 +106,7 @@ def init(point):
     global optimizer
 
     class f_r(tf.keras.Model):
-        def __init__(self, gru_unit, d_config):
+        def __init__(self, unit, config):
             super(f_r, self).__init__()
             self.gru_e = tf.keras.layers.GRU(unit)
             self.gru_v = tf.keras.layers.GRU(unit)
