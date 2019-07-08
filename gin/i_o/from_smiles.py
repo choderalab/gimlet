@@ -321,9 +321,9 @@ def smiles_to_organic_topological_molecule(smiles):
         '8')
 
     # split it in order to convert to tf.Tensor with dtype=tf.int64
-    atoms = tf.string_split(
-        [smiles_atoms_only],
-        '').values # NOTE: add values here because this is suppose to be sparse
+    atoms = tf.strings.bytes_split(
+        smiles_atoms_only) # NOTE: add values here because this is suppose to be sparse
+
 
     atoms = tf.strings.to_number(
         atoms,
@@ -339,9 +339,8 @@ def smiles_to_organic_topological_molecule(smiles):
         '0')
 
     # split it into array
-    smiles_topology_only = tf.string_split(
-        [smiles_topology_only],
-        '').values
+    smiles_topology_only = tf.strings.bytes_split(
+        smiles_topology_only)
 
     # find all the indices and characters indicating topology
     topology_idxs = tf.reshape(
@@ -809,9 +808,8 @@ def smiles_to_organic_topological_molecule(smiles):
     # hard code aromaticity:
     #   where the aromatic atoms are coded as lower case letters
     # update the aromatic bond orders to half bonds
-    smiles_aromatic = tf.string_split(
-        [smiles_aromatic],
-        '').values
+    smiles_aromatic = tf.strings.bytes_split(
+        smiles_aromatic)
 
     # all the aromatic bonds where marked
     aromatic_idxs = tf.reshape(
