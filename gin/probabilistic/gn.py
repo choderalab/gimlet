@@ -774,7 +774,11 @@ class GraphNet(tf.keras.Model):
                     else:
                         batched_atoms_cache = tf.where(
                             # cond
-                            one_d_atom_mask,
+                            tf.tile(
+                                tf.expand_dims(
+                                    one_d_atom_mask,
+                                    1),
+                                [1, feature_dimension]),
 
                             # where True
                             tf.concat(
