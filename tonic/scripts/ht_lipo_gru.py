@@ -108,9 +108,19 @@ def init(point):
     class f_r(tf.keras.Model):
         def __init__(self, unit, config):
             super(f_r, self).__init__()
-            self.gru_e = tf.keras.layers.GRU(unit)
-            self.gru_v = tf.keras.layers.GRU(unit)
-            self.gru_u = tf.keras.layers.GRU(unit)
+            self.gru_e = tf.keras.layers.GRU(
+                unit,
+                return_state=True,
+                unroll=True)
+            self.gru_v = tf.keras.layers.GRU(
+                unit,
+                return_state=True,
+                unroll=True)
+            self.gru_u = tf.keras.layers.GRU(
+                unit,
+                return_state=True,
+                unroll=True)
+
             self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         # @tf.function
@@ -118,9 +128,9 @@ def init(point):
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
 
-            y_e = self.gru_e(h_e_history)
-            y_v = self.gru_v(h_v_history)
-            y_u = self.gru_u(h_u_history)
+            y_e = self.gru_e(h_e_history)[1]
+            y_v = self.gru_v(h_v_history)[1]
+            y_u = self.gru_u(h_u_history)[1]
 
             y = self.d(y_e, y_v, y_u)
 
