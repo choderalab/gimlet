@@ -132,7 +132,65 @@ def init(point):
             y_v = self.gru_v(h_v_history)[1]
             y_u = self.gru_u(h_u_history)[1]
 
-            y = self.d(y_e, y_v, y_u)
+            y_e_bar = tf.reduce_sum(
+                            tf.multiply(
+                                tf.tile(
+                                    tf.expand_dims(
+                                        tf.where( # (n_bonds, n_mols)
+                                            tf.boolean_mask(
+                                                bond_in_mol,
+                                                tf.reduce_any(
+                                                    bond_in_mol,
+                                                    axis=1),
+                                                axis=0),
+                                            tf.ones_like(
+                                                tf.boolean_mask(
+                                                    bond_in_mol,
+                                                    tf.reduce_any(
+                                                        bond_in_mol,
+                                                        axis=1),
+                                                    axis=0),
+                                                dtype=tf.float32),
+                                            tf.zeros_like(
+                                                tf.boolean_mask(
+                                                    bond_in_mol,
+                                                    tf.reduce_any(
+                                                        bond_in_mol,
+                                                        axis=1),
+                                                    axis=0),
+                                                dtype=tf.float32)),
+                                        2),
+                                    [1, 1, tf.shape(y_e)[1]]),
+                                tf.tile( # (n_bonds, n_mols, d_e)
+                                    tf.expand_dims(
+                                        y_e, # (n_bonds, d_e)
+                                        1),
+                                    [1, tf.shape(bond_in_mol)[1], 1])),
+                            axis=0)
+
+
+            y_v_bar = tf.reduce_sum(
+                    tf.multiply(
+                        tf.tile(
+                            tf.expand_dims(
+                                tf.where( # (n_bonds, n_mols)
+                                    atom_in_mol,
+                                    tf.ones_like(
+                                        atom_in_mol,
+                                        dtype=tf.float32),
+                                    tf.zeros_like(
+                                        atom_in_mol,
+                                        dtype=tf.float32)),
+                                2),
+                            [1, 1, tf.shape(y_v)[1]]),
+                        tf.tile( # (n_bonds, n_mols, d_e)
+                            tf.expand_dims(
+                                y_v, # (n_bonds, d_e)
+                                1),
+                            [1, tf.shape(atom_in_mol)[1], 1])),
+                    axis=0)
+
+            y = self.d(y_e_bar, y_v_bar, y_u)
 
             y = tf.reshape(y, [-1])
 
