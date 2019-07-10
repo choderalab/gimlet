@@ -1,5 +1,5 @@
 """
-gc_architectures.py
+vcharge.py
 
 VCharge model pubslihed by Gilson et al. (2003)
 doi://10.1021/ci034148o
