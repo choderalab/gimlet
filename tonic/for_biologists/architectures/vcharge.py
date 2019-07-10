@@ -559,8 +559,8 @@ class VCharge(tf.keras.Model):
 
         # read the electronegtivity of all atoms from the attributes.
         e_all_atoms = tf.gather(
-            atoms,
-            self.e)
+            self.e,
+            atoms)
 
         # $ D_{ij} = e_i - e_j $
         delta_e_all_atoms = tf.math.substract(
