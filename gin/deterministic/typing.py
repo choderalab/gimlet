@@ -200,11 +200,19 @@ class TypingBase(object):
         return self.__is_heavy
 
     def _is_sp1(self):
-        return tf.reduce_any(
+        return tf.logical_or(
+            tf.reduce_any(
+                tf.greater(
+                    self.adjacency_map_full,
+                    tf.constant(2, dtype=tf.float32)),
+                axis=0),
             tf.greater(
-                self.adjacency_map_full,
-                tf.constant(2, dtype=tf.float32)),
-            axis=0)
+                tf.math.count_nonzero(
+                    tf.greater_equal(
+                        self.adjacency_map_full,
+                        tf.constant(2, dtype=tf.float32))
+                    axis=0),
+                tf.constant(2, dtype=tf.float32)))
 
     @property
     def is_sp1(self):
@@ -243,10 +251,10 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     tf.constant(1, dtype=tf.float32)),
                 axis=0),
-            tf.logical_not(
+            tf.logical_not( # NOTE: safety measure here
                 tf.logical_and(
                     self.is_nitrogen,
-                    self.is_connected_to_3_heavy)))
+                    self.is_connected_to_3)))
 
     @property
     def is_sp3(self):
@@ -427,6 +435,21 @@ class TypingBase(object):
 
         return self.__is_connected_to_1_heavy
 
+    def _is_connected_to_1(self):
+        return tf.equal(
+            tf.math.count_nonzero(
+                self.adjacency_map_full,
+                axis=0),
+            tf.constant(1, dtype=tf.int64))
+
+    @property
+    def is_connected_to_1(self):
+        if not hasattr(self, '__is_connected_to_1'):
+            self.__is_connected_to_1 \
+                = self._is_connected_to_1()
+
+        return self.__is_connected_to_1
+
     def _is_connected_to_2_heavy(self):
         return tf.equal(
             tf.math.count_nonzero(
@@ -444,6 +467,21 @@ class TypingBase(object):
                 = self._is_connected_to_2_heavy()
 
         return self.__is_connected_to_2_heavy
+
+    def _is_connected_to_2(self):
+        return tf.equal(
+            tf.math.count_nonzero(
+                self.adjacency_map_full,
+                axis=0),
+            tf.constant(2, dtype=tf.int64))
+
+    @property
+    def is_connected_to_2(self):
+        if not hasattr(self, '__is_connected_to_2'):
+            self.__is_connected_to_2 \
+                = self._is_connected_to_2()
+
+        return self.__is_connected_to_2
 
     def _is_connected_to_3_heavy(self):
         return tf.equal(
@@ -463,6 +501,21 @@ class TypingBase(object):
 
         return self.__is_connected_to_3_heavy
 
+    def _is_connected_to_3(self):
+        return tf.equal(
+            tf.math.count_nonzero(
+                self.adjacency_map_full,
+                axis=0),
+            tf.constant(3, dtype=tf.int64))
+
+    @property
+    def is_connected_to_3(self):
+        if not hasattr(self, '__is_connected_to_3'):
+            self.__is_connected_to_3 \
+                = self._is_connected_to_3()
+
+        return self.__is_connected_to_3
+
     def _is_connected_to_4_heavy(self):
         return tf.equal(
             tf.math.count_nonzero(
@@ -480,6 +533,21 @@ class TypingBase(object):
                 = self._is_connected_to_4_heavy()
 
         return self.__is_connected_to_4_heavy
+
+    def _is_connected_to_4(self):
+        return tf.equal(
+            tf.math.count_nonzero(
+                self.adjacency_map_full,
+                axis=0),
+            tf.constant(4, dtype=tf.int64))
+
+    @property
+    def is_connected_to_4(self):
+        if not hasattr(self, '__is_connected_to_4'):
+            self.__is_connected_to_4 \
+                = self._is_connected_to_4()
+
+        return self.__is_connected_to_4
 
     # @tf.function
     def _is_in_ring(self):
