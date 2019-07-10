@@ -44,7 +44,7 @@ def get_single_bond_neighbors(atoms, adjacency_map):
     pass
 
 # =============================================================================
-# utility classes
+# module classes
 # =============================================================================
 # define special typing
 class VChargeTyping(gin.deterministic.typing.TypingBase):
