@@ -676,7 +676,7 @@ class VCharge(tf.keras.Model):
                 [
                     tf.math.multiply(
                         self.alpha_1,
-                        is_connected_by_single)m
+                        is_connected_by_single),
                     tf.math.multiply(
                         self.alpha_2,
                         is_connected_by_double),
