@@ -33,15 +33,14 @@ SOFTWARE.
 import tensorflow as tf
 # tf.enable_eager_execution()
 
-import gin.molecule
-
-
 # =============================================================================
 # module classes
 # =============================================================================
-class GraphNet(tf.keras.Model):
+class GraphNetPairwise(tf.keras.Model):
     """ A group of functions trainable under back-propagation to update atoms
-    and molecules based on their neighbors and global attributes.
+    and molecules based on their neighbors and global attributes. Note that
+    here we also use hyperedges, which are angles, dihedral angles, as well
+    as pairwise relationships.
 
     Structures adopted from:
     arXiv:1806.01261v3
@@ -166,9 +165,12 @@ class GraphNet(tf.keras.Model):
             f_v=lambda x:x,
             f_u=lambda x:x,
 
+            # pairwise
+            pairwise_update=lambda x:x,
+
             repeat=3):
 
-        super(GraphNet, self).__init__()
+        super(GraphNetPairwise, self).__init__()
         self.phi_e = phi_e
         self.rho_e_v = rho_e_v
         self.phi_v = phi_v
@@ -179,6 +181,7 @@ class GraphNet(tf.keras.Model):
         self.f_e = f_e
         self.f_v = f_v
         self.f_u = f_u
+        self.pairwise_update = pairwise_update
         self.repeat = repeat
 
     # @tf.function
@@ -327,11 +330,44 @@ class GraphNet(tf.keras.Model):
                 bond_in_mol=bond_in_mol # (n_bonds, n_mols)
             ):
 
+            # use a while_loop to loop through all molecules
+            mol_idx = tf.constant(0, dtype=tf.int64)
+            n_mol = tf.shape(atom_in_mol, tf.int64)[1]
+
+            def pairwise_update_in_mol(h_v, mol_idx):
+                # (n_atoms, )
+                this_mol_has_atom = atom_in_mol[:, mol_idx]
+
+                # (n_atoms_in_this_mol, )
+                this_mol_atom_idxs = tf.where(
+                    this_mol_has_atom)
+
+                # (n_atoms_in_this_mol, d_v)
+                h_v_this_mol = tf.boolean_mask(
+                    h_v
+                    this_mol_has_atom)
+
+                # (n_atoms_in_this_mol, d_v)
+                h_v_this_mol = self.pairwise_update(h_v_this_mol)
+
+                # (n_atoms, )
+                h_v = tf.tensor_scatter_nd_update(
+                    h_v,
+                    this_mol_atom_idxs,
+                    h_v_this_mol)
+
+                return h_v, mol_idx + 1
+
+            h_v, _ = tf.while_loop(
+                lambda: tf.less(mol_idx, n_mol),
+                pairwise_update_in_mol,
+                [mol_idx])
+
             # update $ e'_k $
             # $$
             # e'_k = \phi^e (e_k, v_{rk}, v_{sk}, u)
             # $$
-            
+
             h_left = tf.gather(
                 h_v,
                 left_idxs)

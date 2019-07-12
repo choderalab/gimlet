@@ -190,7 +190,7 @@ class TypingBase(object):
         return tf.logical_not(
             tf.equal(
                 self.atoms,
-                tf.constant(8, dtype=tf.int64)))
+                tf.constant(9, dtype=tf.int64)))
 
     @property
     def is_heavy(self):
@@ -210,9 +210,9 @@ class TypingBase(object):
                 tf.math.count_nonzero(
                     tf.greater_equal(
                         self.adjacency_map_full,
-                        tf.constant(2, dtype=tf.float32))
+                        tf.constant(2, dtype=tf.float32)),
                     axis=0),
-                tf.constant(2, dtype=tf.float32)))
+                tf.constant(2, dtype=tf.int64)))
 
     @property
     def is_sp1(self):
