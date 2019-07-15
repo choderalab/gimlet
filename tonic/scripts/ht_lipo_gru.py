@@ -418,8 +418,19 @@ def obj_fn(point):
     mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
         y_pred_global_test)
 
-    r2_train = metrics.r2_score(y_true_train, y_pred_train)
-    r2_test = metrics.r2_score(y_true_test, y_pred_test)
+    y_true_train_splits = tf.split(y_true_train, 5)
+    y_pred_train_splits = tf.split(y_pred_train, 5)
+    y_true_test_splits = tf.split(y_true_test, 5)
+    y_pred_test_splits = tf.split(y_pred_test, 5)
+
+    r2_train = np.mean(
+        [metrics.r2_score(y_true_train_splits[idx], y_pred_train[idx]) \
+            for idx in range(5)])
+
+    r2_test = np.mean(
+        [metrics.r2_score(y_true_test_splits[idx], y_pred_test[idx]) \
+            for idx in range(5)])
+
     r2_global_test = metrics.r2_score(y_true_global_test,
         y_pred_global_test)
 
