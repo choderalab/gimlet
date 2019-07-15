@@ -35,7 +35,7 @@ import pandas as pd
 import numpy as np
 from sklearn import metrics
 
-N_EPOCH = 30
+N_EPOCH = 80
 
 df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
