@@ -9,7 +9,7 @@ import tonic.for_biologists.architectures.vcharge
 
 df = pd.read_csv('data/SAMPL.csv')
 df = df[~df['smiles'].str.contains('B')]
-df = df[~df['smiles'].str.contains('P')]
+# df = df[~df['smiles'].str.contains('P')]
 df = df[~df['smiles'].str.contains('\+')]
 df = df[~df['smiles'].str.contains('\-')]
 smiles_array = df[['smiles']].values.flatten()
@@ -23,13 +23,12 @@ def test_VCharge_typing_mutually_exclusive(smiles):
         tf.expand_dims(
             getattr(typing, 'is_' + str(idx)).__call__(),
             0) \
-        for idx in list(range(1, 32)) + [38, 39]]
+        for idx in range(1, 40)]
 
     gaff_typing = tf.concat(
         gaff_typing,
         axis=0)
 
-    print(smiles)
 
     print(tf.where(
         tf.logical_not(

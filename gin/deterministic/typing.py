@@ -206,7 +206,7 @@ class TypingBase(object):
                     self.adjacency_map_full,
                     tf.constant(2, dtype=tf.float32)),
                 axis=0),
-            tf.greater(
+            tf.greater_equal(
                 tf.math.count_nonzero(
                     tf.greater_equal(
                         self.adjacency_map_full,
@@ -222,20 +222,19 @@ class TypingBase(object):
         return self.__is_sp1
 
     def _is_sp2(self):
-        return tf.logical_or(
+        return tf.logical_and(
             tf.reduce_any(
-                tf.logical_and(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(1, dtype=tf.float32)),
-                    tf.less(
-                        self.adjacency_map_full,
-                        tf.constant(3, dtype=tf.float32)
-                    )),
-                axis=1),
-            tf.logical_and(
-                self.is_nitrogen,
-                self.is_connected_to_3_heavy))
+                    tf.logical_and(
+                        tf.greater(
+                            self.adjacency_map_full,
+                            tf.constant(1, dtype=tf.float32)),
+                        tf.less(
+                            self.adjacency_map_full,
+                            tf.constant(3, dtype=tf.float32)
+                        )),
+                    axis=1),
+            tf.logical_not(
+                self.is_sp1))
 
     @property
     def is_sp2(self):
@@ -245,17 +244,11 @@ class TypingBase(object):
         return self.__is_sp2
 
     def _is_sp3(self):
-        return tf.logical_and(
-            tf.reduce_all(
+        return tf.reduce_all(
                 tf.less_equal(
                     self.adjacency_map_full,
                     tf.constant(1, dtype=tf.float32)),
-                axis=0),
-            tf.logical_not( # NOTE: safety measure here
-                tf.logical_and(
-                    self.is_nitrogen,
-                    self.is_connected_to_3)))
-
+                axis=0)
     @property
     def is_sp3(self):
         if not hasattr(self, '__is_sp3'):
@@ -472,7 +465,7 @@ class TypingBase(object):
 
                     ],
                     axis=0),
-                [-1, tf.shape(atoms, tf.int64)[0]]),
+                [-1, tf.shape(self.atoms, tf.int64)[0]]),
             axis=0)
 
     @property
@@ -513,7 +506,7 @@ class TypingBase(object):
 
                     ],
                     axis=0),
-                [-1, tf.shape(atoms)[0]]),
+                [-1, tf.shape(self.atoms)[0]]),
             axis=0)
 
     @property

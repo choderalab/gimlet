@@ -11,7 +11,7 @@ x_array = df[['smiles']].values.flatten()
 y_array = df[['measured log solubility in mols per litre']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 
-ds = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
+ds = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 
 
 class f_r(tf.keras.Model):

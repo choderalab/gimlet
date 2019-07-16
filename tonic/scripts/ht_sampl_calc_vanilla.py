@@ -44,7 +44,7 @@ y_array = df[['expt']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 n_samples = y_array.shape[0]
 
-ds_all = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
+ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
 ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 64)

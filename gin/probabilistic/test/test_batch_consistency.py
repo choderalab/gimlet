@@ -62,8 +62,8 @@ def test_consistency():
 
         repeat=5)
 
-    cyclobutane = gin.i_o.from_smiles.smiles_to_mol('C1CCC1')
-    caffeine = gin.i_o.from_smiles.smiles_to_mol('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
+    cyclobutane = gin.i_o.from_smiles.to_mol('C1CCC1')
+    caffeine = gin.i_o.from_smiles.to_mol('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
 
     cyclobutane_atoms = cyclobutane[0]
     caffeine_atoms = caffeine[0]
@@ -274,7 +274,7 @@ def test_consistency_ds():
         df[['measured log solubility in mols per litre']].values.flatten()
     y_array = (y_array - np.mean(y_array) / np.std(y_array))
 
-    ds = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
+    ds = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 
     ds_batched = gin.probabilistic.gn.GraphNet.batch(ds, 256)
 

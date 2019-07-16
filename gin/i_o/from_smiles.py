@@ -1279,7 +1279,7 @@ def smiles_to_organic_topological_molecule(smiles):
 
     return atoms, adjacency_map.read_value()
 
-def smiles_to_mol(
+def to_mol(
         smiles,
         chiral=False):
     """ Wrapper function for translating one SMILES string to molecule.
@@ -1290,7 +1290,7 @@ def smiles_to_mol(
     return mol
 
 
-def smiles_to_mols(
+def to_mols(
         smiles_array,
         chiral=False):
     """ Wrapper function for translating multiple SMILES strings to molecules.
@@ -1301,14 +1301,14 @@ def smiles_to_mols(
     ds_smiles = tf.data.Dataset.from_tensor_slices(smiles_array)
 
     ds = ds_smiles.map(lambda x: tf.py_function(
-        smiles_to_mol,
+        to_mol,
         [x],
         [tf.int64, tf.float32]),
     num_parallel_calls=4*N_CPUS)
 
     return ds
 
-def smiles_to_mols_with_attributes(
+def to_mols_with_attributes(
         smiles_array,
         attributes_array,
         chiral=False):
@@ -1321,7 +1321,7 @@ def smiles_to_mols_with_attributes(
     ds = tf.data.Dataset.from_tensor_slices((smiles_array, attributes_array))
 
     ds = ds.map(lambda x, y: tf.py_function(
-        lambda x,y: (smiles_to_mol(x)[0], smiles_to_mol(x)[1], y),
+        lambda x,y: (to_mol(x)[0], to_mol(x)[1], y),
         [x, y],
         [tf.int64, tf.float32, tf.float32]),
     num_parallel_calls=4*N_CPUS)
