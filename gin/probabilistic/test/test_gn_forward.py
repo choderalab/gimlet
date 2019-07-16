@@ -4,7 +4,7 @@ import tensorflow as tf
 # tf.enable_eager_execution()
 import pandas as pd
 
-caffeine = gin.i_o.from_smiles.smiles_to_mol('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
+caffeine = gin.i_o.from_smiles.to_mol('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
 
 class f_r(tf.keras.Model):
     def __init__(self, config):

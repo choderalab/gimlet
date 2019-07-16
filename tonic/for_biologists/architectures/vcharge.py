@@ -40,8 +40,6 @@ import tensorflow as tf
 # =============================================================================
 # utility functions
 # =============================================================================
-def get_single_bond_neighbors(atoms, adjacency_map):
-    pass
 
 # =============================================================================
 # module classes
@@ -116,7 +114,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
             self.is_sp3)
 
     def is_8(self):
-        """ O3
+        """ O2
         """
         return tf.logical_and(
             self.is_oxygen,
@@ -271,8 +269,10 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """ N1m
         """
         return tf.logical_and(
-            self.is_sp2,
-            self.is_connected_to_1)
+            self.is_nitrogen,
+            tf.logical_and(
+                self.is_connected_to_1,
+                self.is_sp2))
 
     def is_23(self):
         """ N2m
@@ -387,8 +387,67 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
             self.is_sulfur,
             self.is_aromatic)
 
-    # NOTE:
-    # here we do not implement 33-36 since P is not included in our elements
+    def is_33(self):
+        """ S3n
+        """
+        return tf.logical_and(
+            self.is_sulfur,
+            tf.logical_and(
+                self.is_sp3,
+                self.is_connected_to_1))
+
+    def is_34(self):
+        """ S2a
+        """
+        return tf.logical_and(
+            self.is_sulfur,
+            tf.logical_and(
+                self.is_sp2,
+                tf.logical_not(
+                    self.is_aromatic)))
+
+    def is_35(self):
+        """ P3
+        """
+        return tf.logical_and(
+            self.is_phosphorus,
+            tf.logical_and(
+                self.is_sp3,
+                tf.logical_and(
+                    tf.logical_not(
+                        self.is_connected_to_aromatic),
+                    tf.logical_not(
+                        self.is_connected_to_4))))
+
+    def is_36(self):
+        """ P3p
+        """
+        return tf.logical_and(
+            self.is_phosphorus,
+            tf.logical_and(
+                self.is_connected_to_4,
+                self.is_sp3))
+
+    def is_37(self):
+        """ P5
+        """
+        return tf.logical_and(
+            self.is_phosphorus,
+            tf.logical_and(
+                tf.equal(
+                    tf.math.count_nonzero(
+                        tf.equal(
+                            self.adjacency_map_full,
+                            tf.constant(1, dtype=tf.float32)),
+                        axis=0),
+                    tf.constant(3, dtype=tf.int64)),
+                tf.equal(
+                    tf.math.count_nonzero(
+                        tf.greater_equal(
+                            self.adjacency_map_full,
+                            tf.constant(2, dtype=tf.float32)),
+                        axis=0),
+                    tf.constant(1, dtype=tf.int64))))
 
     def is_38(self):
         """ I
@@ -720,3 +779,29 @@ class VCharge(tf.keras.Model):
 
         charges = get_charges(e_i, s_i, Q)
         return charges
+
+
+def train(ds, charge_model, n_epochs=10):
+    """ Main function to execute. Fit
+    """
+    optimizer = optimizer = tf.keras.optimizers.Adam(1e-5)
+    logger = tf.get_logger()
+    for dummy_idx in range(n_epochs):
+        # loop through the molecules in the dataset
+        for atoms, adjacency_map, q, q_i in ds:
+            with tf.GradientTape() as tape:
+                # get predicted
+                q_i_hat = charge_model(atoms, adjacency_map, q)
+                loss = tf.losses.mean_squared_error(
+                    q_i,
+                    q_i_hat)
+
+            logger.log(msg=loss, level=0)
+
+            # backprop
+            variables = charge_model.variables
+            grad = tape.gradient(loss, variables)
+            optimizer.apply_gradients(
+                zip(grad, variables))
+
+    return charge_model

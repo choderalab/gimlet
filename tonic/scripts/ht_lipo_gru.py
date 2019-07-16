@@ -55,8 +55,9 @@ x_array = df[['smiles']].values.flatten()
 y_array = df[['exp']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 n_samples = y_array.shape[0]
+print(n_samples)
 
-ds_all = gin.i_o.from_smiles.smiles_to_mols_with_attributes(x_array, y_array)
+ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
 ds_all = ds_all.map(
@@ -74,6 +75,7 @@ ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, feature_dimension=11)
 n_global_te = int(0.2 * (n_samples // 256))
 ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
+print(n_global_te)
 
 config_space = {
     'f_e_0': [32, 64, 128, 256],
@@ -320,6 +322,9 @@ def obj_fn(point):
                 ],
                 axis=0)
 
+        print(y_true_test.shape)
+        print(y_pred_test.shape)
+
         for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
             in ds_tr:
 
@@ -347,6 +352,9 @@ def obj_fn(point):
                     tf.reshape(y_hat, [-1])
                 ],
                 axis=0)
+
+        print(y_true_train.shape)
+        print(y_pred_train.shape)
 
 
     init(point)
@@ -405,6 +413,9 @@ def obj_fn(point):
                 tf.reshape(y_hat, [-1])
             ],
             axis=0)
+
+    print(y_true_global_test.shape)
+    print(y_pred_global_test.shape)
 
     y_true_train = y_true_train[1:]
     y_pred_train = y_pred_train[1:]
