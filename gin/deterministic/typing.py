@@ -417,6 +417,128 @@ class TypingBase(object):
 
         return self.__is_connected_to_nitrogen
 
+    def _has_1_hydrogen(self):
+        # calculate the number of hydrogens added to heavy atoms
+        # the heavy atoms with one hydrogen
+        return tf.reduce_any(
+            tf.reshape(
+                tf.concat(
+                    [
+                        # sp3 carbon
+                        tf.logical_and(
+                            self.is_carbon,
+                            tf.logical_and(
+                                self.is_sp3,
+                                self.is_connected_to_3_heavy)),
+
+                        # sp2 carbon
+                        tf.logical_and(
+                            self.is_carbon,
+                            tf.logical_and(
+                                self.is_sp2,
+                                self.is_connected_to_2_heavy)),
+
+                        # sp1 carbon
+                        tf.logical_and(
+                            self.is_carbon,
+                            tf.logical_and(
+                                self.is_sp1,
+                                self.is_connected_to_1_heavy)),
+
+                        # sp3 nitrogen or phosphorus
+                        tf.logical_and(
+                            tf.logical_or(
+                                self.is_nitrogen,
+                                self.is_phosphorus),
+                            tf.logical_and(
+                                self.is_sp3,
+                                self.is_connected_to_2_heavy)),
+
+                        # sp2 nitrogen or phosphorus
+                        tf.logical_and(
+                            tf.logical_or(
+                                self.is_nitrogen,
+                                self.is_phosphorus),
+                            tf.logical_and(
+                                self.is_sp2,
+                                self.is_connected_to_1_heavy)),
+
+                        # sp3 oxygen or sulfur
+                        tf.logical_and(
+                            tf.logical_or(
+                                self.is_oxygen,
+                                self.is_sulfur),
+                            self.is_sp3)
+
+                    ],
+                    axis=0),
+                [-1, tf.shape(atoms, tf.int64)[0]]),
+            axis=0)
+
+    @property
+    def has_1_hydrogen(self):
+        if not hasattr(self, '__has_1_hydrogen'):
+            self.__has_1_hydrogen \
+                = self._has_1_hydrogen()
+
+        return self.__has_1_hydrogen
+
+    def _has_2_hydrogen(self):
+        return tf.reduce_any(
+            tf.reshape(
+                tf.concat(
+                    [
+                        # sp3 carbon
+                        tf.logical_and(
+                            self.is_carbon,
+                            tf.logical_and(
+                                self.is_sp3,
+                                self.is_connected_to_2_heavy)),
+
+                        # sp2 carbon
+                        tf.logical_and(
+                            self.is_carbon,
+                            tf.logical_and(
+                                self.is_sp2,
+                                self.is_connected_to_1_heavy)),
+
+                        # sp3 nitrogen or phosphorus
+                        tf.logical_and(
+                            tf.logical_or(
+                                self.is_nitrogen,
+                                self.is_phosphorus),
+                            tf.logical_and(
+                                self.is_sp3,
+                                self.is_connected_to_1_heavy))
+
+                    ],
+                    axis=0),
+                [-1, tf.shape(atoms)[0]]),
+            axis=0)
+
+    @property
+    def has_2_hydrogen(self):
+        if not hasattr(self, '__has_2_hydrogen'):
+            self.__has_2_hydrogen \
+                = self._has_2_hydrogen()
+
+        return self.__has_2_hydrogen
+
+    def _has_3_hydrogen(self):
+        return tf.logical_and(
+            self.is_carbon,
+            tf.logical_and(
+                self.is_sp3,
+                self.is_connected_to_1_heavy))
+
+    @property
+    def has_3_hydrogen(self):
+        if not hasattr(self, '__has_3_hydrogen'):
+            self.__has_3_hydrogen \
+                = self._has_3_hydrogen()
+
+        return self.__has_3_hydrogen
+
     def _is_connected_to_1_heavy(self):
         return tf.equal(
             tf.math.count_nonzero(
