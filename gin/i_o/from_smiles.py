@@ -430,7 +430,6 @@ def smiles_to_organic_topological_molecule(smiles):
             triple_bond_idxs,
             dtype=tf.float32) * 3)
 
-
     # ========
     # branches
     # ========
@@ -575,7 +574,6 @@ def smiles_to_organic_topological_molecule(smiles):
                     [1, right_bracket_idxs.shape[0]])),
             tf.constant(0, dtype=tf.int64)))
 
-
     def process_right_left_overlap(
             idx,
             left_bracket_idxs,
@@ -599,10 +597,10 @@ def smiles_to_organic_topological_molecule(smiles):
 
 
     _, left_bracket_idxs = tf.while_loop(
-        lambda idx, _: tf.less(idx, tf.shape(left_right_overlaps, tf.int64)[0]),
+        lambda idx, _: \
+            tf.less(idx, tf.shape(left_right_overlaps, tf.int64)[0]),
         process_right_left_overlap,
         [idx, left_bracket_idxs])
-
 
     current_bond_idxs = tf.transpose(
         tf.concat(
@@ -643,7 +641,7 @@ def smiles_to_organic_topological_molecule(smiles):
     # the left bracket
     adjacency_map.scatter_nd_update(
         new_bond_idxs,
-        tf.ones_like(current_bond_order))
+        current_bond_order)
 
 
     # =====

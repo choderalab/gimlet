@@ -51,8 +51,8 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
     """ Define the atom typing designed in Gilson et al. paper.
 
     """
-    def __init__(self):
-        super(VChargeTyping, self).__init__()
+    def __init__(self, mol):
+        super(VChargeTyping, self).__init__(mol)
 
     def is_1(self):
         """ H1
@@ -71,7 +71,10 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """
         return tf.logical_and(
             self.is_carbon,
-            self.is_sp2)
+            tf.logical_and(
+                self.is_sp2,
+                tf.logical_not(
+                    self.is_aromatic)))
 
     def is_4(self):
         """ C1a
@@ -142,8 +145,11 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
             self.is_nitrogen,
             tf.logical_and(
                 self.is_sp3,
-                self.logical_not(
-                    self.is_in_ring)))
+                tf.logical_and(
+                    tf.logical_not(
+                        self.is_connected_to_aromatic),
+                    tf.logical_not(
+                        self.is_connected_to_4))))
 
     def is_12(self):
         """ N3s
@@ -152,15 +158,23 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
             self.is_nitrogen,
             tf.logical_and(
                 self.is_sp3,
-                self.logical_not(
-                    self.is_in_ring)))
+                tf.logical_and(
+                    self.is_connected_to_aromatic,
+                    tf.logical_not(
+                        self.is_connected_to_4))))
 
     def is_13(self):
         """ N2
         """
         return tf.logical_and(
             self.is_nitrogen,
-            self.is_sp2)
+            tf.logical_and(
+                self.is_sp2,
+                tf.logical_and(
+                    tf.logical_not(
+                        self.is_connected_to_4),
+                    tf.logical_not(
+                        self.is_aromatic))))
 
     def is_14(self):
         """ N1
@@ -181,7 +195,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """
         return tf.logical_and(
             self.is_nitrogen,
-            self.logical_and(
+            tf.logical_and(
                 self.is_sp2,
                 self.is_connected_to_4))
 
@@ -189,25 +203,31 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """ N1pa
         """
         return tf.logical_and(
-            tf.is_nitrogen,
-            tf.greater(
-                tf.math.count_nonzero(
-                    tf.greater(
-                        self.adjacency_map_full,
-                        tf.constant(1, dtype=tf.float32)),
-                    axis=0),
-                tf.constant(2, dtype=tf.float32)))
+            self.is_nitrogen,
+            tf.logical_and(
+                self.is_sp1,
+                tf.greater(
+                    tf.math.count_nonzero(
+                        tf.greater(
+                            self.adjacency_map_full,
+                            tf.constant(1, dtype=tf.float32)),
+                        axis=0),
+                    tf.constant(2, dtype=tf.int64))))
 
     def is_18(self):
         """ N1pb
         """
         return tf.logical_and(
-            tf.is_nitrogen,
-            tf.reduce_any(
+            self.is_nitrogen,
+            tf.logical_and(
+                self.is_sp1,
                 tf.greater(
-                    self.adjacency_map_full,
-                    tf.constant(2, dtype=tf.float32))
-                axis=0))
+                    tf.math.count_nonzero(
+                        tf.greater(
+                            self.adjacency_map_full,
+                            tf.constant(0, dtype=tf.float32)),
+                        axis=0),
+                    tf.constant(2, dtype=tf.int64))))
 
     def is_19(self):
         """ Nar3
@@ -237,11 +257,11 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """
         return tf.logical_and(
             self.is_nitrogen,
-            self.logical_and(
+            tf.logical_and(
                 self.is_connected_to_2,
                 tf.logical_and(
                     self.is_aromatic,
-                    self.reduce_all(
+                    tf.reduce_all(
                         tf.less_equal(
                             self.adjacency_map_full,
                             tf.constant(1, dtype=tf.float32)),
@@ -251,7 +271,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """ N1m
         """
         return tf.logical_and(
-            self.is_nitrogen,
+            self.is_sp2,
             self.is_connected_to_1)
 
     def is_23(self):
@@ -264,7 +284,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
                 tf.logical_and(
                     tf.logical_not(
                         self.is_in_ring),
-                    self.reduce_all(
+                    tf.reduce_all(
                         tf.less_equal(
                             self.adjacency_map_full,
                             tf.constant(1, dtype=tf.float32)),
@@ -279,7 +299,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
                 self.is_connected_to_2,
                 tf.logical_and(
                     self.is_in_ring,
-                    self.reduce_all(
+                    tf.reduce_all(
                         tf.less_equal(
                             self.adjacency_map_full,
                             tf.constant(1, dtype=tf.float32)),
@@ -365,7 +385,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """
         return tf.logical_and(
             self.is_sulfur,
-            self.aromatic)
+            self.is_aromatic)
 
     # NOTE:
     # here we do not implement 33-36 since P is not included in our elements
