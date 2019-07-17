@@ -7,10 +7,38 @@ import numpy.testing as npt
 import tensorflow as tf
 import tonic.for_biologists.architectures.vcharge
 
-ds = gin.i_o.from_sdf.to_ds('data/mols.sdf', True)
 
-for mol in ds:
-    print(mol)
+def test_mini_fit():
+    ds = gin.i_o.from_sdf.to_ds('data/mols.sdf', True)
+
+    ds = ds.map(lambda atoms, adjacency_map, coordinates, charges:
+        (
+            tf.py_function(
+                lambda atoms, adjacency_map: \
+                    tf.reshape(
+                        tonic.for_biologists.architectures.vcharge\
+                        .VChargeTyping(
+                        [atoms, adjacency_map]).get_assignment(),
+                    [-1]),
+                [atoms, adjacency_map],
+                tf.int64),
+            adjacency_map,
+            coordinates,
+            charges
+        ))
+
+    charge_model = tonic.for_biologists.architectures.vcharge.VCharge()
+    tonic.for_biologists.architectures.vcharge.train(
+        ds,
+        charge_model)
+
+
+
+
+
+test_mini_fit()
+
+
 
 '''
 df = pd.read_csv('data/SAMPL.csv')

@@ -463,6 +463,42 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
             self.is_iodine,
             self.is_connected_to_2)
 
+    def get_assignment(self):
+        fn_array = [getattr(self, 'is_' + str(idx)) for idx in range(1, 40)]
+
+        # use paralleled while loop for this assignment
+        idx = tf.constant(1, dtype=tf.int64)
+        assignment = tf.constant(-1, dtype=tf.int64) \
+            * tf.ones_like(
+                self.atoms,
+                dtype=tf.int64)
+
+        def loop_body(idx, assignment):
+            # get the function
+            fn = fn_array[idx - 1]
+            is_this_type = fn()
+            assignment = tf.where(
+                is_this_type,
+
+                # when it is of this type
+                idx * tf.ones(
+                    (tf.shape(assignment)[0], ),
+                    dtype=tf.int64),
+
+                # when it is not
+                assignment)
+
+            return idx + 1, assignment
+
+        _, assignment = tf.while_loop(
+            lambda idx, _: tf.less(idx, 40),
+
+            loop_body,
+
+            [idx, assignment])
+
+        self.assignment = assignment
+        return self.assignment
 
 # =============================================================================
 # module classes
@@ -497,56 +533,62 @@ class VCharge(tf.keras.Model):
 
         # $ e_i^0 $
         self.e = tf.Variable(
-            tf.constant(
-                0,
-                shape=(34, ),
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(39, ),
+                dtype=tf.float32),
+            name='e')
 
         # $ s_i $
         self.s = tf.Variable(
-            tf.constant(
-                0,
-                shape=(34, ),
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(39, ),
+                dtype=tf.float32),
+            name='s')
 
         # $ \alpha_1 $
         self.alpha_1 = tf.Variable(
-            tf.constant(
-                0,
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(),
+                dtype=tf.float32),
+            name='alpha_1')
 
         # $ \alpha_2 $
         self.alpha_2 = tf.Variable(
-            tf.constant(
-                0,
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(),
+                dtype=tf.float32),
+            name='alpha_2')
 
         # $ \alpha_3 $
         self.alpha_3 = tf.Variable(
-            tf.constant(
-                0,
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(),
+                dtype=tf.float32),
+            name='alpha_3')
 
         # $ \alpha_4 $
         self.alpha_4 = tf.Variable(
-            tf.constant(
-                0,
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(),
+                dtype=tf.float32),
+            name='alpha_4')
 
         # $ \alpha_5 $
         self.alpha_5 = tf.Variable(
-            tf.constant(
-                0,
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(),
+                dtype=tf.float32),
+            name='alpha_5')
 
         # $ \beta $
         self.beta = tf.Variable(
-            tf.constant(
-                0,
-                dtype=tf.float32))
+            tf.random.normal(
+                shape=(),
+                dtype=tf.float32),
+            name='beta')
 
 
-    @tf.function
+    # @tf.function
     def get_charges(self, e, s, Q):
         """ Solve the function to get the absolute charges of atoms in a
         molecule from parameters.
@@ -616,7 +658,7 @@ class VCharge(tf.keras.Model):
                             -1)))))
 
 
-    @tf.function
+    # @tf.function
     def call(self, atoms, adjacency_map, Q):
         """ Main method of the module.
 
@@ -631,6 +673,9 @@ class VCharge(tf.keras.Model):
         Q : tf.Tensor, dtype = tf.float32, shape = (),
             total charge.
         """
+        # full adjacency map could be calculated by
+        # $ X^T + X, $
+        # where $X$ is the adjacency map.
         adjacency_map_full = tf.math.add(
             adjacency_map,
             tf.transpose(
@@ -642,7 +687,7 @@ class VCharge(tf.keras.Model):
             atoms)
 
         # $ D_{ij} = e_i - e_j $
-        delta_e_all_atoms = tf.math.substract(
+        delta_e_all_atoms = tf.math.subtract(
             tf.expand_dims(
                 e_all_atoms,
                 0),
@@ -699,35 +744,32 @@ class VCharge(tf.keras.Model):
         # deal with aromaticity
         # under such atom typing, only 6, 10, 19, 20, 21, 22, and 32
         # are aromatic (altogether seven types)
-        is_aromatic = tf.where(
-            tf.reduce_any(
-                tf.equal(
-                    tf.tile(
-                        tf.expand_dims(
-                            atoms,
-                            1),
-                        [1, 7]),
-                    tf.tile(
-                        tf.expand_dims(
-                            tf.constant(
-                                [
-                                    6,
-                                    10,
-                                    19,
-                                    20,
-                                    21,
-                                    22,
-                                    32
-                                ],
-                                dtype=tf.float32),
-                            0),
-                        [
-                            tf.shape(atoms, dtype=tf.int64)[0],
-                            1
-                        ])),
-                axis=1),
-            tf.ones_like(adjacency_map_full),
-            tf.zeros_like(adjacency_map_full))
+        is_aromatic = tf.reduce_any(
+            tf.equal(
+                tf.tile(
+                    tf.expand_dims(
+                        atoms,
+                        1),
+                    [1, 7]),
+                tf.tile(
+                    tf.expand_dims(
+                        tf.constant(
+                            [
+                                6,
+                                10,
+                                19,
+                                20,
+                                21,
+                                22,
+                                32
+                            ],
+                            dtype=tf.int64),
+                        0),
+                    [
+                        tf.shape(atoms, tf.int64)[0],
+                        1
+                    ])),
+            axis=1)
 
         is_connected_by_aromatic = tf.where(
             tf.logical_and(
@@ -739,12 +781,12 @@ class VCharge(tf.keras.Model):
                         tf.expand_dims(
                             is_aromatic,
                             0),
-                        [tf.shape(atoms, dtype=tf.int64)[0], 1]),
+                        [tf.shape(atoms, tf.int64)[0], 1]),
                     tf.tile(
                         tf.expand_dims(
                             is_aromatic,
                             1),
-                        [1, tf.shape(atoms, dtype=tf.int64)[0]]))),
+                        [1, tf.shape(atoms, tf.int64)[0]]))),
             tf.ones_like(adjacency_map_full),
             tf.zeros_like(adjacency_map_full))
 
@@ -755,19 +797,29 @@ class VCharge(tf.keras.Model):
                 [
                     tf.math.multiply(
                         self.alpha_1,
-                        is_connected_by_single),
+                        tf.math.multiply(
+                            is_connected_by_single,
+                            delta_e_all_atoms_scaled)),
                     tf.math.multiply(
                         self.alpha_2,
-                        is_connected_by_double),
+                        tf.math.multiply(
+                            is_connected_by_double,
+                            delta_e_all_atoms_scaled)),
                     tf.math.multiply(
                         self.alpha_3,
-                        is_connected_by_triple),
+                        tf.math.multiply(
+                            is_connected_by_triple,
+                            delta_e_all_atoms_scaled)),
                     tf.math.multiply(
                         self.alpha_4,
-                        is_connected_by_aromatic),
+                        tf.math.multiply(
+                            is_connected_by_aromatic,
+                            delta_e_all_atoms_scaled)),
                     tf.math.multiply(
                         self.alpha_5,
-                        is_onethree)
+                        tf.math.multiply(
+                            is_onethree,
+                            delta_e_all_atoms_scaled))
                 ],
                 axis=0),
             axis=0)
@@ -777,18 +829,19 @@ class VCharge(tf.keras.Model):
             self.s,
             atoms)
 
-        charges = get_charges(e_i, s_i, Q)
+        charges = self.get_charges(e_i, s_i, Q)
         return charges
 
 
 def train(ds, charge_model, n_epochs=10):
     """ Main function to execute. Fit
     """
-    optimizer = optimizer = tf.keras.optimizers.Adam(1e-5)
+    optimizer = optimizer = tf.keras.optimizers.Adam(1e-6)
     logger = tf.get_logger()
     for dummy_idx in range(n_epochs):
         # loop through the molecules in the dataset
-        for atoms, adjacency_map, q, q_i in ds:
+        for atoms, adjacency_map, coordinates, q_i in ds:
+            q = tf.reduce_sum(q_i)
             with tf.GradientTape() as tape:
                 # get predicted
                 q_i_hat = charge_model(atoms, adjacency_map, q)
@@ -796,10 +849,10 @@ def train(ds, charge_model, n_epochs=10):
                     q_i,
                     q_i_hat)
 
-            logger.log(msg=loss, level=0)
-
+            # logger.log(msg=loss, level=0)
+            print(loss)
             # backprop
-            variables = charge_model.variables
+
             grad = tape.gradient(loss, variables)
             optimizer.apply_gradients(
                 zip(grad, variables))

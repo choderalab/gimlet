@@ -72,7 +72,7 @@ def to_ds(file_path, has_charge=False):
     lines = tf.strings.split(
         tf.expand_dims(text, 0),
         '\n').values
-    print(lines)
+
     # get the starts and the ends
     starts = tf.strings.regex_full_match(
         lines,
@@ -145,10 +145,26 @@ def to_ds(file_path, has_charge=False):
         charges = tf.zeros((n_atoms, ), dtype=tf.float32)
 
         if has_charge:
-            charge_lines = tf.slice(
-                lines,
-                tf.expand_dims(start+n_atoms+n_bonds+1, 0),
-                tf.expand_dims(2*n_atoms, 0))
+            # check if there is any total charge annotated in the system
+            has_total_charge = tf.reduce_any(
+                tf.strings.regex_full_match(
+                    tf.slice(
+                        lines,
+                        tf.expand_dims(start+1, 0),
+                        tf.expand_dims(end-start, 0)),
+                    '.*CHG.*'))
+
+            if has_total_charge:
+                charge_lines = tf.slice(
+                    lines,
+                    tf.expand_dims(start+n_atoms+n_bonds+2, 0),
+                    tf.expand_dims(2*n_atoms, 0))
+
+            else:
+                charge_lines = tf.slice(
+                    lines,
+                    tf.expand_dims(start+n_atoms+n_bonds+1, 0),
+                    tf.expand_dims(2*n_atoms, 0))
 
             charge_lines = tf.gather(
                 charge_lines,
