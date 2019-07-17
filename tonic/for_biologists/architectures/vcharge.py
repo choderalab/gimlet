@@ -54,11 +54,13 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_1(self):
         """ H1
+            Definition: element H, one single-bond
         """
         return self.is_hydrogen
 
     def is_2(self):
         """ C3
+            Definition: element C, 4 single-bonds
         """
         return tf.logical_and(
             self.is_carbon,
@@ -66,6 +68,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_3(self):
         """ C2
+            Definition: element C, 2 single-bonds, one double-bond
         """
         return tf.logical_and(
             self.is_carbon,
@@ -76,6 +79,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_4(self):
         """ C1a
+            Definition: element C, 2 double-bonds
         """
         return tf.logical_and(
             self.is_carbon,
@@ -87,6 +91,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_5(self):
         """ C1b
+            Definition: element C, 1 single-bond and 1 triple-bond
         """
         return tf.logical_and(
             self.is_carbon,
@@ -101,6 +106,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_6(self):
         """ Car
+            Definition: element C, 2 single-bonds, one double-bond, aromatic
         """
         return tf.logical_and(
             self.is_carbon,
@@ -108,6 +114,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_7(self):
         """ O3
+            Definition: element O, 2 single-bonds
         """
         return tf.logical_and(
             self.is_oxygen,
@@ -115,6 +122,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_8(self):
         """ O2
+            Definition: element O, 1 double-bond
         """
         return tf.logical_and(
             self.is_oxygen,
@@ -122,6 +130,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_9(self):
         """ O3n
+            Definition: element O, 1 single-bond, -1 charge
         """
         return tf.logical_and(
             self.is_oxygen,
@@ -131,6 +140,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_10(self):
         """ Oar
+            Definition: element O, 2 single-bonds, aromatic
         """
         return tf.logical_and(
             self.is_oxygen,
@@ -138,6 +148,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_11(self):
         """ N3
+            Definition: element N, 3 single-bonds
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -151,6 +162,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_12(self):
         """ N3s
+            Definition: element N, 3 single-bonds, planar
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -163,6 +175,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_13(self):
         """ N2
+            Definition: element N, 1 single-bond, 1 double-bond
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -176,6 +189,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_14(self):
         """ N1
+            Definition: element N, 1 triple-bond
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -183,6 +197,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_15(self):
         """ N3p
+            Definition: element N, 4 single-bonds, +1 charge
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -190,6 +205,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_16(self):
         """ N2p
+            Definition: element N, 2 single-bonds, 1 double-bond, +1 charge
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -199,6 +215,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_17(self):
         """ N1pa
+            Definition: element N, 2 double-bonds, +1 charge
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -214,6 +231,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_18(self):
         """ N1pb
+            Definition: element N, 1 single-bond, 1 triple-bond, +1 charge
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -229,6 +247,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_19(self):
         """ Nar3
+            Definition: element N, 3 single-bonds, aromatic
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -243,6 +262,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_20(self):
         """ Nar2
+            Definition: element N, 1 single-bond, 1 double-bond, aromatic
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -252,6 +272,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_21(self):
         """ Narp
+            Definition: element N, 2 single-bonds, 1 double-bond, +1 charge, aromatic
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -267,6 +288,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_22(self):
         """ N1m
+            Definition: element N, 1 double-bond, -1 charge
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -276,6 +298,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_23(self):
         """ N2m
+            Definition: element N, 2 single-bonds, -1 charge
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -292,6 +315,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_24(self):
         """ N2mR
+            Definition: element N, 2 single-bonds, -1 charge, planar
         """
         return tf.logical_and(
             self.is_nitrogen,
@@ -307,21 +331,25 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_25(self):
         """ Cl3
+            Definition: element Cl, 1 single-bond
         """
         return self.is_chlorine
 
     def is_26(self):
         """ F3
+            Definition: element F, 1 single-bond
         """
         return self.is_flourine
 
     def is_27(self):
         """ Br3
+            Definition: element Br, 1 single-bond
         """
         return self.is_bromine
 
     def is_28(self):
         """ S3
+            Definition: element S, 2 single-bonds
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -331,6 +359,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_29(self):
         """ S3p
+            Definition: element S, 3 single-bonds, +1 charge
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -340,6 +369,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_30(self):
         """ S4
+            Definition: element S, 2 single-bonds, 1 double-bond
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -361,6 +391,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_31(self):
         """ S6
+            Definition: element S, 2 single-bonds, 2 double-bonds
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -382,6 +413,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_32(self):
         """ Sar
+            Definition: element S, 2 single-bonds, aromatic
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -389,6 +421,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_33(self):
         """ S3n
+            Definition: element S, 1 single-bond, -1 charge
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -398,6 +431,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_34(self):
         """ S2a
+            Definition: element S, 1 double-bond
         """
         return tf.logical_and(
             self.is_sulfur,
@@ -408,6 +442,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_35(self):
         """ P3
+            Definition: element P, 3 single-bonds
         """
         return tf.logical_and(
             self.is_phosphorus,
@@ -421,6 +456,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_36(self):
         """ P3p
+            Definition: element P, 4 single-bonds, +1 charge
         """
         return tf.logical_and(
             self.is_phosphorus,
@@ -430,6 +466,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_37(self):
         """ P5
+            Definition: element P, 3 single-bonds, 1 double-bond
         """
         return tf.logical_and(
             self.is_phosphorus,
@@ -451,6 +488,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_38(self):
         """ I
+            Definition: element I, 1 single-bond
         """
         return tf.logical_and(
             self.is_iodine,
@@ -458,6 +496,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_39(self):
         """ Ip
+            Definition: element I, 2 single-bonds, +1 charge
         """
         return tf.logical_and(
             self.is_iodine,
