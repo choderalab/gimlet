@@ -55,7 +55,6 @@ x_array = df[['smiles']].values.flatten()
 y_array = df[['exp']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 n_samples = y_array.shape[0]
-print(n_samples)
 
 ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
@@ -70,12 +69,12 @@ ds_all = ds_all.map(
             adjacency_map,
             y)))
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, feature_dimension=11)
+ds_all, n_batched_samples_total \
+    = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, feature_dimension=11)
 
-n_global_te = int(0.2 * (n_samples // 256))
+n_global_te = int(0.2 * n_batched_samples_total)
 ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
-print(n_global_te)
 
 config_space = {
     'f_e_0': [32, 64, 128, 256],
@@ -253,18 +252,22 @@ def init(point):
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
-    n_te = int(0.2 * 0.8 * n_samples // 256)
-    ds = ds_global_tr.shuffle(int(0.8 * n_samples // 256))
+    n_te = int(0.2 * 0.8 * n_batched_samples_total)
+    ds = ds_global_tr.shuffle(0.8 * n_batched_samples_total)
 
-    y_true_train = tf.constant([-1], dtype=tf.float32)
-    y_pred_train = tf.constant([-1], dtype=tf.float32)
-    y_true_test = tf.constant([-1], dtype=tf.float32)
-    y_pred_test = tf.constant([-1], dtype=tf.float32)
-    y_true_global_test = tf.constant([-1], dtype=tf.float32)
-    y_pred_global_test = tf.constant([-1], dtype=tf.float32)
+    r2_train = []
+    r2_test = []
+    mse_train = []
+    mse_test = []
 
     for idx in range(5):
         init(point)
+
+        y_true_train = tf.constant([-1], dtype=tf.float32)
+        y_pred_train = tf.constant([-1], dtype=tf.float32)
+        y_true_test = tf.constant([-1], dtype=tf.float32)
+        y_pred_test = tf.constant([-1], dtype=tf.float32)
+
         ds_tr = ds.take(idx * n_te).concatenate(
             ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
 
@@ -322,9 +325,6 @@ def obj_fn(point):
                 ],
                 axis=0)
 
-        print(y_true_test.shape)
-        print(y_pred_test.shape)
-
         for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
             in ds_tr:
 
@@ -353,9 +353,26 @@ def obj_fn(point):
                 ],
                 axis=0)
 
-        print(y_true_train.shape)
-        print(y_pred_train.shape)
+        y_true_train = y_true_train[1:]
+        y_pred_train = y_pred_train[1:]
+        y_true_test = y_true_test[1:]
+        y_pred_test = y_pred_test[1:]
 
+        r2_train.append(metrics.r2_score(y_true_train, y_pred_train))
+        r2_test.append(metrics.r2_score(y_true_test, y_pred_test))
+        mse_train.append(
+            tf.losses.mean_squared_error(
+                y_true_train,
+                y_pred_train).numpy())
+        mse_test.append(
+            tf.losses.mean_squared_error(
+                y_true_test,
+                y_pred_test).numpy())
+
+
+
+    y_true_global_test = tf.constant([-1], dtype=tf.float32)
+    y_pred_global_test = tf.constant([-1], dtype=tf.float32)
 
     init(point)
     time0 = time.time()
@@ -414,43 +431,20 @@ def obj_fn(point):
             ],
             axis=0)
 
-    print(y_true_global_test.shape)
-    print(y_pred_global_test.shape)
-
-    y_true_train = y_true_train[1:]
-    y_pred_train = y_pred_train[1:]
-    y_true_test = y_true_test[1:]
-    y_pred_test = y_pred_test[1:]
     y_true_global_test = y_true_global_test[1:]
     y_pred_global_test = y_pred_global_test[1:]
 
-    mse_train = tf.losses.mean_squared_error(y_true_train, y_pred_train)
-    mse_test = tf.losses.mean_squared_error(y_true_test, y_pred_test)
     mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
         y_pred_global_test)
-
-    y_true_train_splits = tf.split(y_true_train, 5)
-    y_pred_train_splits = tf.split(y_pred_train, 5)
-    y_true_test_splits = tf.split(y_true_test, 5)
-    y_pred_test_splits = tf.split(y_pred_test, 5)
-
-    r2_train = np.mean(
-        [metrics.r2_score(y_true_train_splits[idx], y_pred_train[idx]) \
-            for idx in range(5)])
-
-    r2_test = np.mean(
-        [metrics.r2_score(y_true_test_splits[idx], y_pred_test[idx]) \
-            for idx in range(5)])
-
     r2_global_test = metrics.r2_score(y_true_global_test,
         y_pred_global_test)
 
     print(point)
     print('training time %s ' % (time1 - time0))
-    print('mse_train %s' % mse_train.numpy())
-    print('r2_train %s' % r2_train)
-    print('mse_test %s' % mse_test.numpy())
-    print('r2_test %s' % r2_test)
+    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)))
+    print('r2_train %s +- %s' % (np.mean(r2_train), np.std(r2_train)))
+    print('mse_test %s +- %s' % (np.mean(mse_train), np.std(mse_train)))
+    print('r2_test %s +- %s' % (np.mean(r2_test), np.std(r2_test)))
     print('mse_global_test %s' % mse_global_test.numpy())
     print('r2_global_test %s ' % r2_global_test)
 

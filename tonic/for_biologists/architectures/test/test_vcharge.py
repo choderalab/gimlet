@@ -7,6 +7,12 @@ import numpy.testing as npt
 import tensorflow as tf
 import tonic.for_biologists.architectures.vcharge
 
+ds = gin.i_o.from_sdf.to_ds('data/mols.sdf', True)
+
+for mol in ds:
+    print(mol)
+
+'''
 df = pd.read_csv('data/SAMPL.csv')
 df = df[~df['smiles'].str.contains('B')]
 # df = df[~df['smiles'].str.contains('P')]
@@ -56,3 +62,4 @@ def test_VCharge_typing_mutually_exclusive(smiles):
                     axis=0),
                 tf.constant(1, dtype=tf.int64))),
         data=[smiles])
+'''

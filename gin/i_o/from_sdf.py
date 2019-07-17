@@ -56,7 +56,7 @@ TRANSLATION = {
 # =============================================================================
 # utility functions
 # =============================================================================
-def to_ds(file_path):
+def to_ds(file_path, has_charge=False):
     """
 
     Organic atoms:
@@ -69,8 +69,10 @@ def to_ds(file_path):
     text = tf.io.read_file(
         file_path)
 
-    lines = tf.string_split(tf.expand_dims(text, 0), '\n', False).values
-
+    lines = tf.strings.split(
+        tf.expand_dims(text, 0),
+        '\n').values
+    print(lines)
     # get the starts and the ends
     starts = tf.strings.regex_full_match(
         lines,
@@ -107,7 +109,7 @@ def to_ds(file_path):
         ],
         axis=1)
 
-    def read_one_mol(idx):
+    def read_one_mol(idx, has_charge=has_charge):
         mol_chunk = mol_chunks[idx]
         start = mol_chunk[0]
         end = mol_chunk[1]
@@ -139,6 +141,30 @@ def to_ds(file_path):
             lines,
             tf.expand_dims(start+n_atoms+1, 0),
             tf.expand_dims(n_bonds, 0))
+
+        charges = tf.zeros((n_atoms, ), dtype=tf.float32)
+
+        if has_charge:
+            charge_lines = tf.slice(
+                lines,
+                tf.expand_dims(start+n_atoms+n_bonds+1, 0),
+                tf.expand_dims(2*n_atoms, 0))
+
+            charge_lines = tf.gather(
+                charge_lines,
+                tf.add(
+                    tf.math.multiply(
+                        tf.constant(2, dtype=tf.int64),
+                        tf.range(
+                            n_atoms,
+                            dtype=tf.int64)),
+                    tf.constant(1, dtype=tf.int64)))
+
+            charges = tf.strings.to_number(
+                tf.reshape(
+                    charge_lines,
+                    [-1]),
+                tf.float32)
 
         # process atom lines
         atoms_lines = tf.strings.split(atoms_lines, ' ').values
@@ -192,7 +218,7 @@ def to_ds(file_path):
 
         adjacency_map = adjacency_map.read_value()
 
-        return atoms, adjacency_map, coordinates
+        return atoms, adjacency_map, coordinates, charges
 
     ds = tf.data.Dataset.from_tensor_slices(
         tf.range(
@@ -204,7 +230,7 @@ def to_ds(file_path):
     ds = ds.map(lambda x: tf.py_function(
         read_one_mol,
         [x],
-        [tf.int64, tf.float32, tf.float32]),
+        [tf.int64, tf.float32, tf.float32, tf.float32]),
     num_parallel_calls=4*N_CPUS)
 
     return ds
