@@ -1,7 +1,7 @@
 """
 vcharge.py
 
-VCharge model pubslihed by Gilson et al. (2003)
+VCharge model published by Gilson et al. (2003)
 doi://10.1021/ci034148o
 
 MIT License
