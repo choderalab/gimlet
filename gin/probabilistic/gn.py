@@ -331,7 +331,7 @@ class GraphNet(tf.keras.Model):
             # $$
             # e'_k = \phi^e (e_k, v_{rk}, v_{sk}, u)
             # $$
-            
+
             h_left = tf.gather(
                 h_v,
                 left_idxs)
@@ -520,6 +520,8 @@ class GraphNet(tf.keras.Model):
         def _batch(
             mols_with_attributes,
             inner_batch_size=inner_batch_size):
+
+            global n_batched_samples_total
 
             # init the sum of batch size
             atom_idx = tf.constant(0, dtype=tf.int64)
@@ -898,8 +900,11 @@ class GraphNet(tf.keras.Model):
                 ))
 
             inner_ds = inner_ds.skip(1)
+            n_batched_samples_total = tf.shape(
+                batched_atoms,
+                tf.int64)[0]
 
-            return inner_ds
+            return inner_ds, n_batched_samples_total
 
         inner_ds = mols_with_attributes.apply(_batch)
 
