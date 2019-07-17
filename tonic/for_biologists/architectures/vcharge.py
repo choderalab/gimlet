@@ -854,7 +854,9 @@ def train(ds, charge_model, n_epochs=10):
             # logger.log(msg=loss, level=0)
             print(loss)
             # backprop
+            variables = charge_model.variables
 
+            print(variables)
             grad = tape.gradient(loss, variables)
             optimizer.apply_gradients(
                 zip(grad, variables))
