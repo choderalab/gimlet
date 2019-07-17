@@ -831,37 +831,39 @@ class VCharge(tf.keras.Model):
 
         # get the final results of
         # $ e_i $
-        e_i = tf.reduce_sum(
+        e_i = tf.math.add(
             tf.reduce_sum(
-                [
-                    tf.math.multiply(
-                        self.alpha_1,
+                tf.reduce_sum(
+                    [
                         tf.math.multiply(
-                            is_connected_by_single,
-                            delta_e_all_atoms_scaled)),
-                    tf.math.multiply(
-                        self.alpha_2,
+                            self.alpha_1,
+                            tf.math.multiply(
+                                is_connected_by_single,
+                                delta_e_all_atoms_scaled)),
                         tf.math.multiply(
-                            is_connected_by_double,
-                            delta_e_all_atoms_scaled)),
-                    tf.math.multiply(
-                        self.alpha_3,
+                            self.alpha_2,
+                            tf.math.multiply(
+                                is_connected_by_double,
+                                delta_e_all_atoms_scaled)),
                         tf.math.multiply(
-                            is_connected_by_triple,
-                            delta_e_all_atoms_scaled)),
-                    tf.math.multiply(
-                        self.alpha_4,
+                            self.alpha_3,
+                            tf.math.multiply(
+                                is_connected_by_triple,
+                                delta_e_all_atoms_scaled)),
                         tf.math.multiply(
-                            is_connected_by_aromatic,
-                            delta_e_all_atoms_scaled)),
-                    tf.math.multiply(
-                        self.alpha_5,
+                            self.alpha_4,
+                            tf.math.multiply(
+                                is_connected_by_aromatic,
+                                delta_e_all_atoms_scaled)),
                         tf.math.multiply(
-                            is_onethree,
-                            delta_e_all_atoms_scaled))
-                ],
+                            self.alpha_5,
+                            tf.math.multiply(
+                                is_onethree,
+                                delta_e_all_atoms_scaled))
+                    ],
+                    axis=0),
                 axis=0),
-            axis=0)
+            e_all_atoms)
 
         # get $ s_i $
         s_i = tf.gather(
@@ -891,7 +893,9 @@ def train(ds, charge_model, n_epochs=10):
             # logger.log(msg=loss, level=0)
             print(loss)
             # backprop
+            variables = charge_model.variables
 
+            print(variables)
             grad = tape.gradient(loss, variables)
             optimizer.apply_gradients(
                 zip(grad, variables))
