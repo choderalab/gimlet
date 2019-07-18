@@ -544,13 +544,13 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 # module classes
 # =============================================================================
 class VCharge(tf.keras.Model):
-    """ V Charge model. Pubslihed by Gilson et al. (2003)
+    """ V Charge model. Published by Gilson et al. (2003)
     doi://10.1021/ci034148o
 
     Attributes
     ----------
     e : tf.Variable, shape = (34, ), dtype=float32,
-        electronegtivity.
+        electronegativity.
     s : tf.Variable, shape = (34, ), dtype=float32,
         hardness.
     alpha_1 : tf.Variable, shape = (), dtype=tf.float32,
@@ -636,7 +636,7 @@ class VCharge(tf.keras.Model):
         Parameters
         ----------
         e : tf.Tensor, dtype = tf.float32, shape = (34, ),
-            electronegtivity.
+            electronegativity.
         s : tf.Tensor, dtype = tf.float32, shape = (34, ),
             hardness.
         Q : tf.Tensor, dtype = tf.float32, shape=(),
@@ -721,7 +721,7 @@ class VCharge(tf.keras.Model):
             tf.transpose(
                 adjacency_map))
 
-        # read the electronegtivity of all atoms from the attributes.
+        # read the electronegativity of all atoms from the attributes.
         e_all_atoms = tf.gather(
             self.e,
             atoms)
