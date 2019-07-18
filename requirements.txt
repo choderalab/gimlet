@@ -1,3 +1,6 @@
+numpy
+sklearn
 pytest
 tensorflow==2.0.0-beta1
 pandas
+rdkit
