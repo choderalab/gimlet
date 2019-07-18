@@ -245,10 +245,10 @@ def obj_fn(point):
     tape = tf.GradientTape()
 
     time0 = time.time()
-    for dummy_idx in range(n_epoch):
-        for dummy_idx in range(n_epoch):
+    for _ in range(n_epoch):
+        for epoch in range(n_epoch):
             print('=========================')
-            print('epoch %s' % dummy_idx)
+            print('epoch %s' % epoch)
             for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
                 in ds_global_tr:
                 with tf.GradientTape() as tape:

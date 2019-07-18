@@ -28,7 +28,7 @@ def test_ethene():
         np.array(
             [0, 0]))
 
-def test_ethnol():
+def test_ethanol():
     atom, adjacency_map = smiles_to_organic_topological_molecule('CCO')
     npt.assert_almost_equal(
         adjacency_map.numpy(),

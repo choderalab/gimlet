@@ -35,19 +35,20 @@ tf.enable_eager_execution
 
 import gin.molecule
 
-class MoleculesTrainable(Object):
+class MoleculesTrainable(object):
     """ A wrapper class for a list of molecules.
 
     """
     def __init__(self):
         pass
 
-    def from_list_of_smiles(list_of_smiles, batch_size=-1):
+    def from_list_of_smiles(self, list_of_smiles, batch_size=-1):
         """ Parsing from a list of smiles string.
 
         Parameters
         ----------
         list_of_smiles : list
+        batch_size : int
 
         """
         from gin.i_o import from_smiles
@@ -57,12 +58,12 @@ class MoleculesTrainable(Object):
 
         # decide batch_size
         if batch_size == -1:
-            batch_size = len(ds_smiles)
+            batch_size = len(list_of_smiles)
 
         # calculate the number of batches
-        n_batches = int(len(ds_smiles) // batch_size) + 1
+        n_batches = int(len(list_of_smiles) // batch_size) + 1
 
-        for idx_batch in n_batches: # loop through batches
+        for idx in n_batches: # loop through batches
             # process on batch
             batch = list_of_smiles[idx * batch_size : (idx + 1) * batch_size]
 

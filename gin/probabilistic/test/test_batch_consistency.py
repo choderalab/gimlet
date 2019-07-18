@@ -350,14 +350,14 @@ def test_consistency_ds():
         ds_debatched = ds.skip(start_idx).take(batch_size)
         y_hat_debatched = tf.constant([-1], dtype=tf.float32)
 
-        for atoms, adjacency_map, attr in ds_debatched:
+        for atoms_debatched, adjacency_map_debatched, attr in ds_debatched:
 
             y_hat_debatched = tf.concat(
                 [
                     y_hat_debatched,
                     gn(
-                        atoms,
-                        adjacency_map,
+                        atoms_debatched,
+                        adjacency_map_debatched,
                         batched_attr_mask=tf.concat(
                             [
                                 [True],

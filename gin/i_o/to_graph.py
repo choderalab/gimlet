@@ -48,6 +48,7 @@ def get_unweighted_adjacency_matrix(molecule, laplacian=False):
     ----------
     molecule : object
         the Molecule object
+    laplacian : bool
 
     Returns
     -------

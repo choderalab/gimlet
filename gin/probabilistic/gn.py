@@ -291,7 +291,7 @@ class GraphNet(tf.keras.Model):
 
         # (n_mols, ...)
         # NOTE: here $h_u$ could have more than one first dimensions
-        h_u = self.f_u(atoms, adjacency_map, batched_attr_mask)
+        h_u = self.f_u(atoms, adjacency_map, batched_attr_mask) # TODO: self.f_u expects only one argument
         h_u_0 = h_u
         h_u_history = tf.expand_dims(h_u_0, 1)
         d_u = tf.shape(h_u, tf.int64)[1]
@@ -506,10 +506,12 @@ class GraphNet(tf.keras.Model):
 
         Parameters
         ----------
-        mols : list
+        mols_with_attributes : list
             molecules to be batched
-        outer_batch_size : int
         inner_batch_size : int
+        outer_batch_size : int
+        feature_dimension : int
+
 
         Returns
         -------

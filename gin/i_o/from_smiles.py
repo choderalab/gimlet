@@ -356,7 +356,7 @@ def smiles_to_organic_topological_molecule(smiles):
 
 
     # map the topology idxs onto the atoms
-    # this is achieved by shifting the indicies of the topology characters
+    # this is achieved by shifting the indices of the topology characters
     topology_idxs = topology_idxs\
         - tf.range(
             tf.cast(
@@ -470,7 +470,7 @@ def smiles_to_organic_topological_molecule(smiles):
         # it is a right bracket
         # we need to do the following things
         #   - get a left bracket out of the queue
-        #   - modify the adjaceny matrix
+        #   - modify the adjacency matrix
         right_idx = topology_idxs[idx]
         left_idx = topology_idxs[bracket_queue[-1]]
         bracket_queue = bracket_queue[:-1]
@@ -653,7 +653,7 @@ def smiles_to_organic_topological_molecule(smiles):
     #       this is already enough for the whole ZINC database
     #
     # when a digit appears in the SMILES string
-    # a bond (sinlge bond) is formed between
+    # a bond (single bond) is formed between
     # two labeled atoms
 
     # while loop
@@ -949,7 +949,7 @@ def smiles_to_organic_topological_molecule(smiles):
             * tf.constant(-1, dtype=tf.int64),
         0)
 
-    # init visted flags
+    # init visited flags
     visited = tf.tile(
         tf.expand_dims(
             tf.constant(False),
@@ -1292,7 +1292,7 @@ def to_mol(
 
 def to_mols(
         smiles_array,
-        chiral=False):
+        chiral=False): # TODO: chiral is unused
     """ Wrapper function for translating multiple SMILES strings to molecules.
     """
     # put the smiles into a large tensor

@@ -91,7 +91,7 @@ def test_element_mutually_exclusive(smiles):
                 typing.is_chlorine,
                 0),
             tf.expand_dims(
-                typing.is_flourine,
+                typing.is_fluorine,
                 0),
             tf.expand_dims(
                 typing.is_iodine,
@@ -196,7 +196,7 @@ def test_number_of_connection__mutually_exclusive(smiles):
 '''
 @pytest.mark.parametrize('smiles', smiles_array)
 def test_GAFF_typing_mutually_exclusive(smiles):
-    mol = gin.i_o.from_smiles.smiles_to_mol(smiles)
+    mol = gin.i_o.from_smiles.to_mol(smiles)
     typing = gin.deterministic.typing.TypingGAFF(mol)
     gaff_typing = [
         tf.expand_dims(

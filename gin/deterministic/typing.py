@@ -126,17 +126,17 @@ class TypingBase(object):
 
         return self.__is_phosphorus
 
-    def _is_flourine(self):
+    def _is_fluorine(self):
         return tf.equal(
             self.atoms,
             tf.constant(5, dtype=tf.int64))
 
     @property
-    def is_flourine(self):
-        if not hasattr(self, '__is_flourine'):
-            self.__is_flourine = self._is_flourine()
+    def is_fluorine(self):
+        if not hasattr(self, '__is_fluorine'):
+            self.__is_fluorine = self._is_fluorine()
 
-        return self.__is_flourine
+        return self.__is_fluorine
 
     def _is_chlorine(self):
         return tf.equal(
@@ -359,7 +359,7 @@ class TypingBase(object):
             self.is_sp3)
         sp3_carbon_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
-            is_sp2_carbon)
+            is_sp3_carbon)
         return tf.reduce_any(
             tf.greater(
                 sp3_carbon_connection_idxs,
@@ -369,7 +369,7 @@ class TypingBase(object):
     @property
     def is_connected_to_sp3_carbon(self):
         if not hasattr(self, '__is_connected_to_sp3_carbon'):
-            self.__is_connected_to_sp1_carbon \
+            self.__is_connected_to_sp3_carbon \
                 = self._is_connected_to_sp3_carbon()
 
         return self.__is_connected_to_sp3_carbon
@@ -849,7 +849,7 @@ class TypingBase(object):
             # increment
             return root + 1, is_in_ring_
 
-        # excute the outer loop
+        # execute the outer loop
         root = tf.constant(0, dtype=tf.int64)
         is_in_ring_ = tf.tile(
             tf.expand_dims(
@@ -921,7 +921,7 @@ class TypingBase(object):
                 * tf.constant(-1, dtype=tf.int64),
             0)
 
-        # init visted flags
+        # init visited flags
         visited = tf.tile(
             tf.expand_dims(
                 tf.constant(False),
@@ -1368,7 +1368,7 @@ class TypingBase(object):
             # increment
             return root + 1, is_in_ring_
 
-        # excute the outer loop
+        # execute the outer loop
         root = tf.constant(0, dtype=tf.int64)
         is_in_ring_ = tf.tile(
             tf.expand_dims(
@@ -1804,7 +1804,7 @@ class TypingGAFF(TypingBase):
         """ f
         any fluorine
         """
-        return self.is_flourine
+        return self.is_fluorine
 
     def is_33(self):
         """ cl
