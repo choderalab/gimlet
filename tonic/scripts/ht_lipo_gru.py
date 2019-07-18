@@ -72,6 +72,7 @@ ds_all = ds_all.map(
 ds_all, n_batched_samples_total \
     = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, feature_dimension=11)
 
+n_batched_samples_total = int(n_batched_samples_total)
 n_global_te = int(0.2 * n_batched_samples_total)
 ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
