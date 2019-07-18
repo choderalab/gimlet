@@ -126,17 +126,17 @@ class TypingBase(object):
 
         return self.__is_phosphorus
 
-    def _is_flourine(self):
+    def _is_fluorine(self):
         return tf.equal(
             self.atoms,
             tf.constant(5, dtype=tf.int64))
 
     @property
-    def is_flourine(self):
-        if not hasattr(self, '__is_flourine'):
-            self.__is_flourine = self._is_flourine()
+    def is_fluorine(self):
+        if not hasattr(self, '__is_fluorine'):
+            self.__is_fluorine = self._is_fluorine()
 
-        return self.__is_flourine
+        return self.__is_fluorine
 
     def _is_chlorine(self):
         return tf.equal(
@@ -1804,7 +1804,7 @@ class TypingGAFF(TypingBase):
         """ f
         any fluorine
         """
-        return self.is_flourine
+        return self.is_fluorine
 
     def is_33(self):
         """ cl
