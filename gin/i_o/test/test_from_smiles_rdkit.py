@@ -67,7 +67,7 @@ def test_num_bonds(smiles):
 @pytest.mark.parametrize('smiles', smiles_array)
 def test_adjacency_map(smiles):
     adjacency_map_rdkit = get_adjacency_matrix_rdkit(smiles)
-    adjacency_map_gin = gin.i_o.from_smiles.smiles_to_mol(
+    adjacency_map_gin = gin.i_o.from_smiles.to_mol(
         smiles)[1]
 
     adjacency_map_gin = tf.where(
