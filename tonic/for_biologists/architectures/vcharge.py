@@ -272,7 +272,8 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
 
     def is_21(self):
         """ Narp
-            Definition: element N, 2 single-bonds, 1 double-bond, +1 charge, aromatic
+            Definition:
+                element N, 2 single-bonds, 1 double-bond, +1 charge, aromatic
         """
         return tf.logical_and(
             self.is_nitrogen,
