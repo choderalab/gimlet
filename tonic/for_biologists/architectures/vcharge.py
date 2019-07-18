@@ -340,7 +340,7 @@ class VChargeTyping(gin.deterministic.typing.TypingBase):
         """ F3
             Definition: element F, 1 single-bond
         """
-        return self.is_flourine
+        return self.is_fluorine
 
     def is_27(self):
         """ Br3
