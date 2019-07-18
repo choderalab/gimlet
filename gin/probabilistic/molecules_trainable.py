@@ -57,10 +57,10 @@ class MoleculesTrainable(object):
 
         # decide batch_size
         if batch_size == -1:
-            batch_size = len(ds_smiles)
+            batch_size = len(list_of_smiles)
 
         # calculate the number of batches
-        n_batches = int(len(ds_smiles) // batch_size) + 1
+        n_batches = int(len(list_of_smiles) // batch_size) + 1
 
         for idx_batch in n_batches: # loop through batches
             # process on batch
