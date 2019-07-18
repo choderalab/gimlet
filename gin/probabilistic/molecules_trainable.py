@@ -35,7 +35,7 @@ tf.enable_eager_execution
 
 import gin.molecule
 
-class MoleculesTrainable(Object):
+class MoleculesTrainable(object):
     """ A wrapper class for a list of molecules.
 
     """
