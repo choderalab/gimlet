@@ -849,7 +849,7 @@ class TypingBase(object):
             # increment
             return root + 1, is_in_ring_
 
-        # excute the outer loop
+        # execute the outer loop
         root = tf.constant(0, dtype=tf.int64)
         is_in_ring_ = tf.tile(
             tf.expand_dims(
@@ -921,7 +921,7 @@ class TypingBase(object):
                 * tf.constant(-1, dtype=tf.int64),
             0)
 
-        # init visted flags
+        # init visited flags
         visited = tf.tile(
             tf.expand_dims(
                 tf.constant(False),
@@ -1368,7 +1368,7 @@ class TypingBase(object):
             # increment
             return root + 1, is_in_ring_
 
-        # excute the outer loop
+        # execute the outer loop
         root = tf.constant(0, dtype=tf.int64)
         is_in_ring_ = tf.tile(
             tf.expand_dims(
