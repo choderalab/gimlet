@@ -1292,7 +1292,7 @@ def to_mol(
 
 def to_mols(
         smiles_array,
-        chiral=False):
+        chiral=False): # TODO: chiral is unused
     """ Wrapper function for translating multiple SMILES strings to molecules.
     """
     # put the smiles into a large tensor
