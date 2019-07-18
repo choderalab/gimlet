@@ -359,7 +359,7 @@ class TypingBase(object):
             self.is_sp3)
         sp3_carbon_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
-            is_sp2_carbon)
+            is_sp3_carbon)
         return tf.reduce_any(
             tf.greater(
                 sp3_carbon_connection_idxs,
@@ -369,7 +369,7 @@ class TypingBase(object):
     @property
     def is_connected_to_sp3_carbon(self):
         if not hasattr(self, '__is_connected_to_sp3_carbon'):
-            self.__is_connected_to_sp1_carbon \
+            self.__is_connected_to_sp3_carbon \
                 = self._is_connected_to_sp3_carbon()
 
         return self.__is_connected_to_sp3_carbon
