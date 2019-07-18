@@ -254,7 +254,7 @@ def init(point):
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
     n_te = int(0.2 * 0.8 * n_batched_samples_total)
-    ds = ds_global_tr.shuffle(0.8 * n_batched_samples_total)
+    ds = ds_global_tr.shuffle(int(0.8 * n_batched_samples_total))
 
     r2_train = []
     r2_test = []
