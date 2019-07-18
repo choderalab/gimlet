@@ -169,7 +169,7 @@ class OneDConvNet(tf.keras.Model):
                 setattr(
                     self,
                     name,
-                    tf.layers.Dropout(rate))
+                    tf.keras.layers.Dropout(rate))
 
             elif layer == 'F':
                 # set the attributes
@@ -178,7 +178,7 @@ class OneDConvNet(tf.keras.Model):
                 setattr(
                     self,
                     name,
-                    tf.layers.flatten)
+                    tf.keras.layers.flatten)
 
             elif layer in ['tanh', 'relu', 'sigmoid', 'leaky_relu', 'elu',
                           'softmax']:
@@ -222,4 +222,4 @@ class OneDConvNet(tf.keras.Model):
                     assert value < 1
                     name = 'O' + str(idx)
                     setattr(self, name,
-                       tf.layers.Dropout(value))
+                       tf.keras.layers.Dropout(value))

@@ -206,4 +206,4 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
                     setattr(
                         self,
                         'O_%s' % value,
-                        tf.layers.Dropout(value))
+                        tf.keras.layers.Dropout(value))
