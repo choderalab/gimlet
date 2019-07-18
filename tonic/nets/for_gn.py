@@ -198,7 +198,7 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
         if to_test == True:
             for idx, name in enumerate(self.workflow):
                 if name.startswith('O'):
-                    seattr(self, name, 'identity')
+                    setattr(self, name, 'identity')
 
         else:
             for idx, value in enumerate(self.config):
