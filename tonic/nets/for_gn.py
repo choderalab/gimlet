@@ -42,9 +42,10 @@ import tensorflow as tf
 # module functions
 # ===========================================================================
 def symmetry_specified(self, x, bond_order):
-    """ Specify the symmetry of the bond and then calculate seperately,
+    """ Specify the symmetry of the bond and then calculate separately,
     before concatenating them together.
 
+    TODO: finish implementing
     """
     return tf.cond(
         lambda: tf.greater(
