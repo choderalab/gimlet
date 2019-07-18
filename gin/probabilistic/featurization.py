@@ -108,7 +108,7 @@ def featurize_atoms(
                 feature,
                 tf.expand_dims(
                     tf.where(
-                        typing.is_flourine,
+                        typing.is_fluorine,
                         tf.ones_like(atoms, dtype=tf.float32),
                         tf.zeros_like(atoms, dtype=tf.float32)),
                     1)

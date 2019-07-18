@@ -91,7 +91,7 @@ def test_element_mutually_exclusive(smiles):
                 typing.is_chlorine,
                 0),
             tf.expand_dims(
-                typing.is_flourine,
+                typing.is_fluorine,
                 0),
             tf.expand_dims(
                 typing.is_iodine,
