@@ -151,10 +151,10 @@ class SingleMoleculeMechanicsSystem:
         self.typing = typing
         self.forcefield = forcefield
 
-        if self.typing == None:
+        if self.typing is None:
             self.typing = gin.deterministic.typing.TypingGAFF
 
-        if self.forcefield == None:
+        if self.forcefield is None:
             self.forcefield = gin.deterministic.forcefields.gaff
 
         if len(mol) == 3:
