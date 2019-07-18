@@ -254,7 +254,7 @@ def init(point):
         f_r=f_r(point['gru_unit'],
             (point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)),
 
-        pairwise_update=pairwise_update,
+        pairwise_update=pairwise_update, # TODO: unexpected argument
 
         repeat=5)
 
