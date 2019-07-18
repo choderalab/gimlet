@@ -220,7 +220,7 @@ def init(point):
             self.attention = tonic.nets.attention.Attention(64, 4)
 
         @tf.function
-        def call(h_v):
+        def call(self, h_v):
             return self.attention(h_v, h_v)
 
     gn = gin.probabilistic.gn.GraphNet(
