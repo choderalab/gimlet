@@ -69,7 +69,7 @@ class Attention(tf.keras.Model):
         self.d_v = tf.keras.layers.Dense(hidden_size, use_bias=False)
 
         # output
-        self.d_output = tf.layers.Dense(hidden_size, use_bias=False)
+        self.d_output = tf.keras.layers.Dense(hidden_size, use_bias=False)
 
     def split_heads(self, x):
         """
