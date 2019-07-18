@@ -42,7 +42,7 @@ class MoleculesTrainable(object):
     def __init__(self):
         pass
 
-    def from_list_of_smiles(list_of_smiles, batch_size=-1):
+    def from_list_of_smiles(self, list_of_smiles, batch_size=-1):
         """ Parsing from a list of smiles string.
 
         Parameters
