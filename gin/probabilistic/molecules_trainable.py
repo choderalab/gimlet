@@ -48,6 +48,7 @@ class MoleculesTrainable(object):
         Parameters
         ----------
         list_of_smiles : list
+        batch_size : int
 
         """
         from gin.i_o import from_smiles
