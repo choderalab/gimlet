@@ -904,16 +904,16 @@ class GraphNet(tf.keras.Model):
                 batched_atoms,
                 tf.int64)[0]
 
-            return inner_ds, n_batched_samples_total
+            return inner_ds
 
         inner_ds = mols_with_attributes.apply(_batch)
 
         if type(outer_batch_size) == type(None):
-            return inner_ds
+            return inner_ds, n_batched_samples_total
 
         else:
             outer_ds = inner_ds.batch(outer_batch_size, True)
-            return outer_ds
+            return outer_ds, n_batched_samples_total
 
     def call(self, *args, **kwargs):
         return self._call(*args, **kwargs)
