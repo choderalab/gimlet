@@ -344,7 +344,7 @@ class GraphNetPairwise(tf.keras.Model):
 
                 # (n_atoms_in_this_mol, d_v)
                 h_v_this_mol = tf.boolean_mask(
-                    h_v
+                    h_v,
                     this_mol_has_atom)
 
                 # (n_atoms_in_this_mol, d_v)
