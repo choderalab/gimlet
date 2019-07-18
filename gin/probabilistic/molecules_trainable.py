@@ -62,7 +62,7 @@ class MoleculesTrainable(object):
         # calculate the number of batches
         n_batches = int(len(list_of_smiles) // batch_size) + 1
 
-        for idx_batch in n_batches: # loop through batches
+        for idx in n_batches: # loop through batches
             # process on batch
             batch = list_of_smiles[idx * batch_size : (idx + 1) * batch_size]
 
