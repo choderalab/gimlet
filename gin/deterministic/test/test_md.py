@@ -1,7 +1,7 @@
 import tensorflow as tf
 import gin
 
-caffeine = list(gin.i_o.from_sdf.read_sdf('data/caffeine.sdf'))[0]
+caffeine = list(gin.i_o.from_sdf.to_ds('data/caffeine.sdf'))[0]
 print(caffeine)
 # caffeine = gin.i_o.from_smiles.smiles_to_mol('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')
 # caffeine = gin.deterministic.hydrogen.add_hydrogen(caffeine)

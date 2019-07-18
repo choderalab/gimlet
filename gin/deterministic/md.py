@@ -67,6 +67,7 @@ def get_angles(coordinates, angle_idxs):
     Parameters
     ----------
     coordinates: tf.Tensor, shape=(n_atoms, 3)
+    angle_idxs : TODO: describe
 
     """
 
@@ -102,6 +103,7 @@ def get_dihedrals(coordinates, torsion_idxs):
     Parameters
     ----------
     coordinates: tf.Tensor, shape=(n_atoms, 3)
+    torsion_idxs: # TODO: describe
     """
     # get the coordinates of the atoms forming the dihedral
     # (n_torsions, 4, 3)
@@ -149,10 +151,10 @@ class SingleMoleculeMechanicsSystem:
         self.typing = typing
         self.forcefield = forcefield
 
-        if self.typing == None:
+        if self.typing is None:
             self.typing = gin.deterministic.typing.TypingGAFF
 
-        if self.forcefield == None:
+        if self.forcefield is None:
             self.forcefield = gin.deterministic.forcefields.gaff
 
         if len(mol) == 3:

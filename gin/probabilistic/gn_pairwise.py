@@ -344,7 +344,7 @@ class GraphNetPairwise(tf.keras.Model):
 
                 # (n_atoms_in_this_mol, d_v)
                 h_v_this_mol = tf.boolean_mask(
-                    h_v
+                    h_v,
                     this_mol_has_atom)
 
                 # (n_atoms_in_this_mol, d_v)
@@ -542,10 +542,11 @@ class GraphNetPairwise(tf.keras.Model):
 
         Parameters
         ----------
-        mols : list
+        mols_with_attributes : list
             molecules to be batched
-        outer_batch_size : int
         inner_batch_size : int
+        outer_batch_size : int
+        feature_dimension : int
 
         Returns
         -------

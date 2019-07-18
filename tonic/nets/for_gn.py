@@ -42,9 +42,10 @@ import tensorflow as tf
 # module functions
 # ===========================================================================
 def symmetry_specified(self, x, bond_order):
-    """ Specify the symmetry of the bond and then calculate seperately,
+    """ Specify the symmetry of the bond and then calculate separately,
     before concatenating them together.
 
+    TODO: finish implementing
     """
     return tf.cond(
         lambda: tf.greater(
@@ -198,7 +199,7 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
         if to_test == True:
             for idx, name in enumerate(self.workflow):
                 if name.startswith('O'):
-                    seattr(self, name, 'identity')
+                    setattr(self, name, 'identity')
 
         else:
             for idx, value in enumerate(self.config):
@@ -206,4 +207,4 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
                     setattr(
                         self,
                         'O_%s' % value,
-                        tf.layers.Dropout(value))
+                        tf.keras.layers.Dropout(value))

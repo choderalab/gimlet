@@ -4,11 +4,12 @@ import numpy.testing as npt
 import tensorflow as tf
 
 def test_embed():
-    ds = gin.i_o.from_sdf.read_sdf('data/caffeine.sdf')
+    ds = gin.i_o.from_sdf.to_ds('data/caffeine.sdf')
     coordinates = list(ds)[0][2]
 
     distance_matrix = gin.deterministic.md.get_distance_matrix(coordinates)
 
+    # TODO: d_o_2 unused
     d_o_2 = tf.reduce_sum(
         tf.pow(
             coordinates - tf.reduce_mean(coordinates, 0),

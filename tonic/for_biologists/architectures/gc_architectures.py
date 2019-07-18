@@ -38,15 +38,15 @@ import tensorflow as tf
 tf.enable_eager_execution()
 
 
-def kearns_2016():
+def kearnes_2016():
     """ arXiv:1603.00856
     """
     class GCTyping(gin.deterministic.typing.TypingBase):
         def __init__(self):
-            super(GCTyping, self).__init__()
+            super(GCTyping, self).__init__() # TODO: parameter `mol` unfilled
 
         def atom_type(self):
-            return tf.one_hot()
+            return tf.one_hot() # TODO: does this require an argument?
 
     return gin.probabilistic.gn.GraphNet(
         f_e=tf.keras.layers.Dense(16),

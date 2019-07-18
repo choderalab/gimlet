@@ -78,7 +78,7 @@ def write_one_sdf(*mol):
     atoms = mol[0]
     adjacency_map = mol[1]
     n_atoms = tf.shape(atoms)[0]
-    # here we toloerate the situation where the user feed the system
+    # here we tolerate the situation where the user feed the system
     # a topology-only molecule
 
     if len(mol) == 2:

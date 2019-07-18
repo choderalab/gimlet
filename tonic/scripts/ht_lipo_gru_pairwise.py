@@ -220,7 +220,7 @@ def init(point):
             self.attention = tonic.nets.attention.Attention(64, 4)
 
         @tf.function
-        def call(h_v):
+        def call(self, h_v):
             return self.attention(h_v, h_v)
 
     gn = gin.probabilistic.gn.GraphNet(
@@ -254,7 +254,7 @@ def init(point):
         f_r=f_r(point['gru_unit'],
             (point['f_r_0'], point['f_r_a'], point['f_r_1'], 1)),
 
-        pairwise_update=pairwise_update,
+        pairwise_update=pairwise_update, # TODO: unexpected argument
 
         repeat=5)
 
