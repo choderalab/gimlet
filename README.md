@@ -1,14 +1,14 @@
 # GIN
-Graph-based Interatomic Networks. A package for modelling, learning, and inference on molecular topological space written in Python and TensorFlow.
+Graph Interatomic Networks. A package for modelling, learning, and inference on molecular topological space written in Python and TensorFlow.
 
 ## Dependencies
-`gin` doens't depend on _ANY_ pacakges except `TensorFlow 2.0 `.
+`gin` doens't depend on _ANY_ pacakges except `TensorFlow 2.0 `, and `pandas` and `pytest`, if you must.
 
 ## Examples
 Minimal working example: https://github.com/choderalab/gin/blob/master/tonic/scripts/mini_example_ESOL.ipynb
 
 ## Authors
-- yuanqing wang `<yuanqing.wang@choderalab.org>` (while at Chodera Lab at Memorial Sloan Kettering Cancer Center, Weill Cornell Medicine, and City University of New York -- City College of New York.)
+- yuanqing wang `<yuanqing.wang@choderalab.org><wangyq@wangyq.net>` (while at Chodera Lab at Memorial Sloan Kettering Cancer Center, Weill Cornell Medicine, and City University of New York -- City College of New York.)
 
 ## Manifest
 * `gin/` the core (and fun) part of the package.
