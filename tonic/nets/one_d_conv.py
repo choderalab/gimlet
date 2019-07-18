@@ -126,7 +126,7 @@ class OneDConvNet(tf.keras.Model):
                 setattr(
                     self,
                     name,
-                    lambda x: gru(gru_units)[0])
+                    lambda x: gru(gru_units)[0]) # TODO: declare gru
 
             elif layer.startswith('A'):
                 # get the configs
@@ -140,7 +140,7 @@ class OneDConvNet(tf.keras.Model):
                 setattr(
                     self,
                     name,
-                    GRUAttention(gru_units, attention_units))
+                    GRUAttention(gru_units, attention_units)) # TODO: declare GRUAttention
 
             elif layer.startswith('D'):
                 # get the configs
