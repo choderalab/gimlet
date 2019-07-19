@@ -1287,6 +1287,9 @@ def to_mol(
     if chiral == False:
         mol = smiles_to_organic_topological_molecule(smiles)
 
+    else:
+        return NotImplementedError
+
     return mol
 
 
