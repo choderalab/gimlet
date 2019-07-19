@@ -1,5 +1,5 @@
 import gin
-import tonic
+import lime
 import tensorflow as tf
 # tf.enable_eager_execution()
 import pandas as pd
@@ -17,7 +17,7 @@ ds = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 class f_r(tf.keras.Model):
     def __init__(self, config):
         super(f_r, self).__init__()
-        self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+        self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
     @tf.function
     def call(self, h_e, h_v, h_u,
@@ -41,11 +41,11 @@ gn = gin.probabilistic.gn.GraphNet(
 
     f_u=(lambda x, y: tf.zeros((1, 128), dtype=tf.float32)),
 
-    phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+    phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
-    phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+    phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
-    phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+    phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
     f_r=f_r((128, 'tanh', 128, 1)),
 
