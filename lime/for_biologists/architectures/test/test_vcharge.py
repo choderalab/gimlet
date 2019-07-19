@@ -1,11 +1,11 @@
 import gin
-import tonic
+import lime
 import pandas as pd
 import pytest
 import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
-import tonic.for_biologists.architectures.vcharge
+import lime.for_biologists.architectures.vcharge
 
 
 def test_mini_fit():
@@ -16,7 +16,7 @@ def test_mini_fit():
             tf.py_function(
                 lambda atoms, adjacency_map: \
                     tf.reshape(
-                        tonic.for_biologists.architectures.vcharge\
+                        lime.for_biologists.architectures.vcharge\
                         .VChargeTyping(
                         [atoms, adjacency_map]).get_assignment(),
                     [-1]),
@@ -27,8 +27,8 @@ def test_mini_fit():
             charges
         ))
 
-    charge_model = tonic.for_biologists.architectures.vcharge.VCharge()
-    tonic.for_biologists.architectures.vcharge.train(
+    charge_model = lime.for_biologists.architectures.vcharge.VCharge()
+    lime.for_biologists.architectures.vcharge.train(
         ds,
         charge_model)
 
@@ -52,7 +52,7 @@ smiles_array = df[['smiles']].values.flatten()
 def test_VCharge_typing_mutually_exclusive(smiles):
     mol = gin.i_o.from_smiles.smiles_to_mol(smiles)
     mol = gin.deterministic.hydrogen.add_hydrogen(mol)
-    typing = tonic.for_biologists.architectures.vcharge.VChargeTyping(mol)
+    typing = lime.for_biologists.architectures.vcharge.VChargeTyping(mol)
     gaff_typing = [
         tf.expand_dims(
             getattr(typing, 'is_' + str(idx)).__call__(),

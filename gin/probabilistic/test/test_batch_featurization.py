@@ -1,6 +1,6 @@
 import pytest
 import gin
-import tonic
+import lime
 import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
@@ -31,7 +31,7 @@ ds = gin.probabilistic.gn.GraphNet.batch(ds, 256, feature_dimension=11)
 class f_r(tf.keras.Model):
     def __init__(self, config):
         super(f_r, self).__init__()
-        self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+        self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
     # @tf.function
     def call(self, h_e, h_v, h_u,
@@ -52,7 +52,7 @@ class f_v(tf.keras.Model):
 class phi_u(tf.keras.Model):
     def __init__(self):
         super(phi_u, self).__init__()
-        self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(
             (128, 'elu', 128, 'elu'))
 
     def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
@@ -68,9 +68,9 @@ gn = gin.probabilistic.gn.GraphNet(
             tf.zeros((64, 128), dtype=tf.float32),
             batched_attr_mask)),
 
-    phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+    phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
-    phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+    phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
     phi_u=phi_u(),
 

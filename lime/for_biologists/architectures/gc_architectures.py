@@ -33,7 +33,7 @@ SOFTWARE.
 # imports
 # =============================================================================
 import gin
-import tonic
+import lime
 import tensorflow as tf
 tf.enable_eager_execution()
 
@@ -56,11 +56,11 @@ def kearnes_2016():
 
         f_u=(lambda x, y: tf.zeros((1, 16), dtype=tf.float32)),
 
-        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'sigmoid')),
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'sigmoid')),
 
-        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'sigmoid')),
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'sigmoid')),
 
-        phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'sigmoid')),
+        phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'sigmoid')),
 
         rho_e_v=(lambda h_e, atom_is_connected_to_bonds: tf.reduce_sum(
             tf.where(

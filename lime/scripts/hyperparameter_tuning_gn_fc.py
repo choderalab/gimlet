@@ -29,7 +29,7 @@ SOFTWARE.
 
 import tensorflow as tf
 import gin
-import tonic
+import lime
 import time
 import pandas as pd
 import numpy as np
@@ -91,7 +91,7 @@ def obj_fn(point):
         class f_r(tf.keras.Model):
             def __init__(self, config):
                 super(f_r, self).__init__()
-                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+                self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
             @tf.function
             def call(self, h_e, h_v, h_u,
@@ -112,7 +112,7 @@ def obj_fn(point):
         class phi_u(tf.keras.Model):
             def __init__(self, config):
                 super(phi_u, self).__init__()
-                self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+                self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
             @tf.function
             def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
@@ -125,19 +125,19 @@ def obj_fn(point):
 
             f_u=(lambda x, y: tf.zeros((16, point['f_u_0']), dtype=tf.float32)),
 
-            phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
                 (point['phi_e_0'],
                  point['phi_e_a_0'],
                  point['f_e_0'],
                  point['phi_e_a_1'])),
 
-            phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
                 (point['phi_v_0'],
                  point['phi_v_a_0'],
                  point['f_v_0'],
                  point['phi_v_a_1'])),
 
-            phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
                 (point['phi_u_0'],
                  point['phi_u_a_0'],
                  point['f_u_0'],
@@ -183,7 +183,7 @@ def obj_fn(point):
     class f_r(tf.keras.Model):
         def __init__(self, config):
             super(f_r, self).__init__()
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         @tf.function
         def call(self, h_e, h_v, h_u,
@@ -204,7 +204,7 @@ def obj_fn(point):
     class phi_u(tf.keras.Model):
         def __init__(self, config):
             super(phi_u, self).__init__()
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         @tf.function
         def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
@@ -217,19 +217,19 @@ def obj_fn(point):
 
         f_u=(lambda x, y: tf.zeros((16, point['f_u_0']), dtype=tf.float32)),
 
-        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_e_0'],
              point['phi_e_a_0'],
              point['f_e_0'],
              point['phi_e_a_1'])),
 
-        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_v_0'],
              point['phi_v_a_0'],
              point['f_v_0'],
              point['phi_v_a_1'])),
 
-        phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_u_0'],
              point['phi_u_a_0'],
              point['f_u_0'],
@@ -282,4 +282,4 @@ def obj_fn(point):
     return mse_test
 
 
-tonic.optimize.dummy.optimize(obj_fn, config_space.values(), 1000)
+lime.optimize.dummy.optimize(obj_fn, config_space.values(), 1000)

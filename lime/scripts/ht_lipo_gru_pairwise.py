@@ -29,7 +29,7 @@ SOFTWARE.
 
 import tensorflow as tf
 import gin
-import tonic
+import lime
 import time
 import pandas as pd
 import numpy as np
@@ -121,7 +121,7 @@ def init(point):
                 return_state=True,
                 unroll=True)
 
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         # @tf.function
         def call(self, h_e, h_v, h_u,
@@ -208,7 +208,7 @@ def init(point):
     class phi_u(tf.keras.Model):
         def __init__(self, config):
             super(phi_u, self).__init__()
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         @tf.function
         def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
@@ -217,7 +217,7 @@ def init(point):
     class pairwise_update(tf.keras.Model):
         def __init__(self):
             super(pairwise_update, self).__init__()
-            self.attention = tonic.nets.attention.Attention(64, 4)
+            self.attention = lime.nets.attention.Attention(64, 4)
 
         @tf.function
         def call(self, h_v):
@@ -233,19 +233,19 @@ def init(point):
                 tf.zeros((64, point['f_u_0']), dtype=tf.float32),
                 batched_attr_mask)),
 
-        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_e_0'],
              point['phi_e_a_0'],
              point['f_e_0'],
              point['phi_e_a_1'])),
 
-        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_v_0'],
              point['phi_v_a_0'],
              point['f_v_0'],
              point['phi_v_a_1'])),
 
-        phi_u=tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
             (point['phi_u_0'],
              point['phi_u_a_0'],
              point['f_u_0'],
@@ -446,4 +446,4 @@ def obj_fn(point):
     return mse_test
 
 
-tonic.optimize.dummy.optimize(obj_fn, config_space.values(), 1000)
+lime.optimize.dummy.optimize(obj_fn, config_space.values(), 1000)

@@ -1,6 +1,6 @@
 import pytest
 import gin
-import tonic
+import lime
 import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
@@ -20,7 +20,7 @@ class f_v(tf.keras.Model):
 class phi_u(tf.keras.Model):
     def __init__(self):
         super(phi_u, self).__init__()
-        self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(
+        self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(
             (32, 'elu', 32, 'elu'))
 
     def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
@@ -33,7 +33,7 @@ def test_consistency():
     class f_r(tf.keras.Model):
         def __init__(self, config):
             super(f_r, self).__init__()
-            # self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+            # self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         # @tf.function
         def call(self, h_e, h_v, h_u,
@@ -52,9 +52,9 @@ def test_consistency():
                 tf.zeros((64, 32), dtype=tf.float32),
                 batched_attr_mask)),
 
-        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'elu')),
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'elu')),
 
-        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect((8, 'elu', 8, 'elu')),
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect((8, 'elu', 8, 'elu')),
 
         phi_u=phi_u(),
 
@@ -281,7 +281,7 @@ def test_consistency_ds():
     class f_r(tf.keras.Model):
         def __init__(self, config):
             super(f_r, self).__init__()
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(config)
+            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
 
         # @tf.function
         def call(self, h_e, h_v, h_u,
@@ -302,7 +302,7 @@ def test_consistency_ds():
     class phi_u(tf.keras.Model):
         def __init__(self):
             super(phi_u, self).__init__()
-            self.d = tonic.nets.for_gn.ConcatenateThenFullyConnect(
+            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(
                 (128, 'elu', 128, 'elu'))
 
         def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
@@ -320,9 +320,9 @@ def test_consistency_ds():
                 tf.zeros((64, 128), dtype=tf.float32),
                 batched_attr_mask)),
 
-        phi_e=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
-        phi_v=tonic.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
         phi_u=phi_u(),
 
