@@ -3,11 +3,11 @@
 </div>
 
 
-# GIN
-Graph Interatomic Networks. A package for modelling, learning, and inference on molecular topological space written in Python and TensorFlow.
+# gimlet
+Graph Inference on MoLEcular Topology. A package for modelling, learning, and inference on molecular topological space written in Python and TensorFlow.
 
 ## Dependencies
-`gin` doesn't depend on _ANY_ packages except `TensorFlow 2.0 `, and `pandas` and `pytest`, if you must.
+`gimlet` doesn't depend on _ANY_ packages except `TensorFlow 2.0 `, and `pandas` and `pytest`, if you must.
 
 ## Examples
 Minimal working example: https://github.com/choderalab/gin/blob/master/tonic/scripts/mini_example_ESOL.ipynb
