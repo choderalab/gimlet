@@ -875,30 +875,43 @@ class VCharge(tf.keras.Model):
         return charges
 
 
-def train(ds, charge_model, n_epochs=10):
+def train(ds, charge_model, n_epochs=10, batch_size=16):
     """ Main function to execute. Fit
     """
-    optimizer = optimizer = tf.keras.optimizers.Adam(1e-6)
+    optimizer = tf.keras.optimizers.SGD(1e-6)
     logger = tf.get_logger()
     for dummy_idx in range(n_epochs):
         # loop through the molecules in the dataset
+        batch_idx = 0
+        loss = tf.constant(0, dtype=tf.float32)
+        tape = tf.GradientTape()
+
         for atoms, adjacency_map, coordinates, q_i in ds:
             q = tf.reduce_sum(q_i)
-            with tf.GradientTape() as tape:
+
+            with tape:
                 # get predicted
                 q_i_hat = charge_model(atoms, adjacency_map, q)
-                loss = tf.losses.mean_squared_error(
+                loss += tf.losses.mean_squared_error(
                     q_i,
                     q_i_hat)
 
-            # logger.log(msg=loss, level=0)
-            print(loss)
-            # backprop
-            variables = charge_model.variables
+            batch_idx += 1
 
-            print(variables)
-            grad = tape.gradient(loss, variables)
-            optimizer.apply_gradients(
-                zip(grad, variables))
+            if batch_idx == batch_size:
+
+                # logger.log(msg=loss, level=0)
+                print(loss)
+                # backprop
+                variables = charge_model.variables
+
+                print(variables)
+                grad = tape.gradient(loss, variables)
+                optimizer.apply_gradients(
+                    zip(grad, variables))
+
+                loss = tf.constant(0, dtype=tf.float32)
+                tape = tf.GradientTape()
+                batch_idx = 0
 
     return charge_model
