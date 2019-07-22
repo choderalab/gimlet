@@ -7,13 +7,13 @@
 Graph Inference on MoLEcular Topology. A package for modelling, learning, and inference on molecular topological space written in Python and TensorFlow.
 
 ## Dependencies
-`gimlet` doesn't depend on _ANY_ packages except `TensorFlow 2.0 `, and `pandas` and `pytest`, if you must.
+`gimlet` doesn't depend on _any_ packages except `TensorFlow 2.0 `, and `pandas` and `pytest`, if you must.
 
 ## Examples
 Minimal working example: https://github.com/choderalab/gin/blob/master/lime/scripts/mini_example_ESOL.ipynb
 
 ## Authors
-- yuanqing wang `<yuanqing.wang@choderalab.org><wangyq@wangyq.net>` (while at Chodera Lab at Memorial Sloan Kettering Cancer Center, Weill Cornell Medicine, and City University of New York -- City College of New York.)
+- yuanqing wang `<yuanqing.wang@choderalab.org><wangyq@wangyq.net>` (while at Chodera Lab at Memorial Sloan Kettering Cancer Center, Weill Cornell Medicine, and the City College of the City University of New York.)
 
 ## Manifest
 * `gin/` the core (and fun) part of the package.
