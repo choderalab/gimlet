@@ -208,3 +208,47 @@ class ConcatenateThenFullyConnect(tf.keras.Model):
                         self,
                         'O_%s' % value,
                         tf.keras.layers.Dropout(value))
+
+
+class PairwiseUpdate(tf.keras.Model):
+    """ Using an attention mechanism to model pairwise relationships and
+    update accordingly.
+
+    """
+    def __init__(self, pairwise_update):
+        super(self, PairwiseUpdate).__init__()
+        self.pairwise_update = pairwise_update
+
+    def call(self, h_v, atom_in_mol):
+        """ Main function.
+        """
+        def pairwise_update_in_mol(h_v, mol_idx):
+            # (n_atoms, )
+            this_mol_has_atom = atom_in_mol[:, mol_idx]
+
+            # (n_atoms_in_this_mol, )
+            this_mol_atom_idxs = tf.where(
+                this_mol_has_atom)
+
+            # (n_atoms_in_this_mol, d_v)
+            h_v_this_mol = tf.boolean_mask(
+                h_v,
+                this_mol_has_atom)
+
+            # (n_atoms_in_this_mol, d_v)
+            h_v_this_mol = self.pairwise_update(h_v_this_mol)
+
+            # (n_atoms, )
+            h_v = tf.tensor_scatter_nd_update(
+                h_v,
+                this_mol_atom_idxs,
+                h_v_this_mol)
+
+            return h_v, mol_idx + 1
+
+        h_v, _ = tf.while_loop(
+            lambda: tf.less(mol_idx, n_mol),
+            pairwise_update_in_mol,
+            [mol_idx])
+
+        return h_v

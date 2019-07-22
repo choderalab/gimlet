@@ -521,7 +521,8 @@ class GraphNet(tf.keras.Model):
         """
         def _batch(
             mols_with_attributes,
-            inner_batch_size=inner_batch_size):
+            inner_batch_size=inner_batch_size,
+            per_atom_attr=False):
 
             global n_batched_samples_total
 
@@ -558,17 +559,28 @@ class GraphNet(tf.keras.Model):
                         inner_batch_size // 4,
                     ]) # safe choice
 
-            batched_attr_cache = tf.tile(
-                tf.expand_dims(
-                    tf.constant(-1, dtype=tf.float32),
-                    0),
-                [inner_batch_size // 4])
+            if per_atom_cache:
+                batched_attr_cache = tf.constant(
+                    -1,
+                    shape=[inner_batch_size,],
+                    dtype=tf.int64)
 
-            batched_attr_mask_cache = tf.tile(
-                tf.expand_dims(
-                    tf.constant(False),
-                    0),
-                [inner_batch_size // 4])
+                batched_attr_mask_cache = tf.constant(
+                    False,
+                    shape=[inner_batch_size, inner_batch_size//4])
+
+            else:
+                batched_attr_cache = tf.tile(
+                    tf.expand_dims(
+                        tf.constant(-1, dtype=tf.float32),
+                        0),
+                    [inner_batch_size // 4])
+
+                batched_attr_mask_cache = tf.tile(
+                    tf.expand_dims(
+                        tf.constant(False),
+                        0),
+                    [inner_batch_size // 4])
 
             batched_atoms = tf.expand_dims(
                 batched_atoms_cache, 0)
@@ -704,28 +716,52 @@ class GraphNet(tf.keras.Model):
                         ],
                         constant_values=False)
 
-                    batched_attr_cache = tf.concat(
-                        [
-                            [attr],
-                            tf.tile(
-                                tf.constant(
-                                    -1,
-                                    shape=(1,),
-                                    dtype=tf.float32),
-                                [inner_batch_size // 4 - 1])
-                        ],
-                        axis=0)
+                    if per_atom_attr:
+                        batched_attr_cache = tf.concat(
+                            [
+                                attr,
+                                tf.tile(
+                                    tf.constant(
+                                        -1,
+                                        shape=(1,),
+                                        dtype=tf.int64),
+                                    [inner_batch_size - n_atoms])
+                            ],
+                            axis=0)
 
-                    batched_attr_mask_cache = tf.concat(
-                        [
-                            [True],
+                        batched_attr_mask_cache = tf.pad(
                             tf.tile(
-                                tf.constant(
-                                    False,
-                                    shape=(1,)),
-                            [inner_batch_size // 4 -1])
-                        ],
-                        axis=0)
+                                [[True]],
+                                [n_atoms, 1]),
+                            [
+                                [0, inner_batch_size - n_atoms],
+                                [0, inner_batch_size//4 - 1]
+                            ],
+                            constant_values=False)
+
+                    else:
+                            batched_attr_cache = tf.concat(
+                                [
+                                    [attr],
+                                    tf.tile(
+                                        tf.constant(
+                                            -1,
+                                            shape=(1,),
+                                            dtype=tf.float32),
+                                        [inner_batch_size // 4 - 1])
+                                ],
+                                axis=0)
+
+                            batched_attr_mask_cache = tf.concat(
+                                [
+                                    [True],
+                                    tf.tile(
+                                        tf.constant(
+                                            False,
+                                            shape=(1,)),
+                                    [inner_batch_size // 4 -1])
+                                ],
+                                axis=0)
 
                     # re-init counter
                     atom_idx = tf.constant(n_atoms, dtype=tf.int64)
@@ -868,24 +904,64 @@ class GraphNet(tf.keras.Model):
                             constant_values=False),
                         batched_bond_in_mol_cache)
 
-                    batched_attr_cache = tf.where(
-                        tf.equal(
-                            tf.range(
-                                inner_batch_size // 4,
-                                dtype=tf.int64),
-                            mol_idx),
-                        attr * tf.ones(
-                            (inner_batch_size // 4,),
-                            dtype=tf.float32),
-                        batched_attr_cache)
+                    if per_atom_attr:
+                        batched_attr_cache = tf.where(
+                            # cond
+                            one_d_atom_mask,
 
-                    batched_attr_mask_cache = tf.logical_or(
-                        batched_attr_mask_cache,
-                        tf.equal(
-                            tf.range(
-                                inner_batch_size // 4,
-                                dtype=tf.int64),
-                            mol_idx))
+                            # where True
+                            tf.concat(
+                                [
+                                    tf.tile(
+                                        [tf.constant(-1, dtype=tf.int64)],
+                                        [atom_idx]),
+                                    atoms,
+                                    tf.tile(
+                                        [tf.constant(-1, dtype=tf.int64)],
+                                        [inner_batch_size - atom_idx - n_atoms])
+                                ],
+                                axis=0),
+
+                            # where False
+                            batched_attr_cache)
+
+                        batched_attr_mask = tf.logical_or(
+                            tf.pad(
+                                tf.tile(
+                                    [[True]],
+                                    [n_atoms, 1]),
+                                [
+                                    [
+                                        atom_idx,
+                                        inner_batch_size - atom_idx - n_atoms
+                                    ],
+                                    [
+                                        mol_idx,
+                                        inner_batch_size//4 - mol_idx - 1
+                                    ]
+                                ],
+                                constant_values=False),
+                            batched_attr_mask)
+
+                    else:
+                        batched_attr_cache = tf.where(
+                            tf.equal(
+                                tf.range(
+                                    inner_batch_size // 4,
+                                    dtype=tf.int64),
+                                mol_idx),
+                            attr * tf.ones(
+                                (inner_batch_size // 4,),
+                                dtype=tf.float32),
+                            batched_attr_cache)
+
+                        batched_attr_mask_cache = tf.logical_or(
+                            batched_attr_mask_cache,
+                            tf.equal(
+                                tf.range(
+                                    inner_batch_size // 4,
+                                    dtype=tf.int64),
+                                mol_idx))
 
                     atom_idx = atom_idx + n_atoms
                     bond_idx = bond_idx + n_bonds
