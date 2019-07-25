@@ -21,7 +21,7 @@ class f_r(tf.keras.Model):
 
     @tf.function
     def call(self, h_e, h_v, h_u,
-            h_e_history, h_v_history, h_u_history):
+            h_e_history, h_v_history, h_u_history, _1, _2):
         y = self.d(h_u)[0][0]
         return y
 
@@ -39,7 +39,7 @@ gn = gin.probabilistic.gn.GraphNet(
 
     f_v=f_v(128),
 
-    f_u=(lambda x, y: tf.zeros((1, 128), dtype=tf.float32)),
+    f_u=(lambda x, y, _: tf.zeros((1, 128), dtype=tf.float32)),
 
     phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
@@ -73,7 +73,7 @@ def train():
 
                 def loop_body(idx, loss):
                     mol = mols[idx]
-                    y_hat = gn(mol)
+                    y_hat = gn(mol[0], mol[1])
                     loss += tf.clip_by_norm(
                         tf.pow(y - y_hat, 2),
                         1e8)
@@ -85,8 +85,8 @@ def train():
                         loop_body,
                         [idx, loss],
                         parallel_iterations=batch_size)
-                    print(loss)
 
+                print(loss)
                 variables = gn.variables
                 grad = tape.gradient(loss, variables)
                 optimizer.apply_gradients(

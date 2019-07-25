@@ -47,10 +47,14 @@ def test_consistency():
 
         f_v=f_v(8),
 
-        f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
-            tf.boolean_mask(
-                tf.zeros((64, 32), dtype=tf.float32),
-                batched_attr_mask)),
+        f_u=(lambda atoms, adjacency_map, batched_attr_in_mol: \
+            tf.tile(
+                tf.zeros((1, 32)),
+                [
+                    tf.math.count_nonzero(
+                        batched_attr_in_mol),
+                    1
+                ])),
 
         phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((16, 'elu', 16, 'elu')),
 
@@ -196,7 +200,7 @@ def test_consistency():
         h_v_history_cyclobutane,
         h_u_history_cyclobutane
     ) = gn(cyclobutane_atoms, cyclobutane_adjacency_map,
-        batched_attr_mask=tf.concat(
+        batched_attr_in_mol=tf.concat(
             [
                 tf.constant([True]),
                 tf.tile(
@@ -210,7 +214,7 @@ def test_consistency():
         h_v_history_caffeine,
         h_u_history_caffeine,
     ) = gn(caffeine_atoms, caffeine_adjacency_map,
-        batched_attr_mask=tf.concat(
+        batched_attr_in_mol=tf.concat(
             [
                 tf.constant([True]),
                 tf.tile(
@@ -315,10 +319,14 @@ def test_consistency_ds():
 
         f_v=f_v(128),
 
-        f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
-            tf.boolean_mask(
-                tf.zeros((64, 128), dtype=tf.float32),
-                batched_attr_mask)),
+        f_u=(lambda atoms, adjacency_map, batched_attr_in_mol: \
+            tf.tile(
+                tf.zeros((1, 32)),
+                [
+                    tf.math.count_nonzero(
+                        batched_attr_in_mol),
+                    1
+                ])),
 
         phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect((128, 'elu', 128, 'elu')),
 
@@ -343,7 +351,7 @@ def test_consistency_ds():
             adjacency_map,
             atom_in_mol=atom_in_mol,
             bond_in_mol=bond_in_mol,
-            batched_attr_mask=y_mask)
+            batched_attr_in_mol=y_mask)
         batch_size = int(tf.math.count_nonzero(y_mask).numpy())
         idx += batch_size
 
@@ -358,7 +366,7 @@ def test_consistency_ds():
                     gn(
                         atoms_debatched,
                         adjacency_map_debatched,
-                        batched_attr_mask=tf.concat(
+                        batched_attr_in_mol=tf.concat(
                             [
                                 [True],
                                 tf.tile(
