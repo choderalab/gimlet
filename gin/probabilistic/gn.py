@@ -898,11 +898,10 @@ class GraphNet(tf.keras.Model):
             result = (
                 atoms,
                 adjacency_map,
-                attr,
                 atom_in_mol,
                 bond_in_mol,
-                attr_in_mol
-            )
+                attr,
+                attr_in_mol)
 
             return result
 
