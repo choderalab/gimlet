@@ -464,6 +464,11 @@ class GraphNet(tf.keras.Model):
         # use while loop to execute the graph multiple times
         iter_idx = tf.constant(0, dtype=tf.int64)
 
+        propagate_one_time(
+            iter_idx,
+            h_e, h_v, h_u,
+            h_e_history, h_v_history, h_u_history)
+
         iter_idx, h_e, h_v, h_u, h_e_history, h_v_history, h_u_history \
             = tf.while_loop(
             # condition
@@ -553,7 +558,7 @@ class GraphNet(tf.keras.Model):
 
         # and max number of bonds, to which all rows and columns
         # associated with bonds are padded
-        max_n_bonds = tf.math.floordiv(
+        max_n_bonds = tf.multiply(
             inner_batch_size,
             tf.constant(4, dtype=tf.int64))
 
@@ -649,23 +654,12 @@ class GraphNet(tf.keras.Model):
 
             # shape = (inner_batch_size, max_n_mols)
             # dtype = Boolean
-            '''
-            atom_in_mol = tf.constant(
-                False,
-                shape=(inner_batch_size, max_n_mols))
-            '''
-
             atom_in_mol = tf.tile(
                 [[False]],
                 [inner_batch_size, max_n_mols])
 
             # shape = (max_n_bonds, max_n_mols)
             # dtype = Boolean
-            '''
-            bond_in_mol = tf.constant(
-                False,
-                shape=(max_n_bonds, max_n_mols))
-            '''
             bond_in_mol = tf.tile(
                 [[False]],
                 [max_n_bonds, max_n_mols])
@@ -766,6 +760,61 @@ class GraphNet(tf.keras.Model):
 
                 # update
                 _atoms)
+
+            # modify the masks
+            atom_in_mol = tf.tensor_scatter_nd_update(
+                atom_in_mol,
+
+                # idxs
+                tf.concat(
+                    [
+                        tf.expand_dims(
+                            tf.range(
+                                start=atom_count,
+                                limit=tf.add(
+                                    atom_count,
+                                    n_atoms),
+                                dtype=tf.int64),
+                            axis=1),
+                        tf.multiply(
+                            mol_count,
+                            tf.ones(
+                                (n_atoms, 1),
+                                dtype=tf.int64)),
+                    ],
+                    axis=1),
+
+                # update
+                tf.tile(
+                    [True],
+                    [n_atoms]))
+
+            bond_in_mol = tf.tensor_scatter_nd_update(
+                bond_in_mol,
+
+                # idxs
+                tf.concat(
+                    [
+                        tf.expand_dims(
+                            tf.range(
+                                start=bond_count,
+                                limit=tf.add(
+                                    bond_count,
+                                    n_bonds),
+                                dtype=tf.int64),
+                            axis=1),
+                        tf.multiply(
+                            mol_count,
+                            tf.ones(
+                                (n_bonds, 1),
+                                dtype=tf.int64)),
+                    ],
+                    axis=1),
+
+                # update
+                tf.tile(
+                    [True],
+                    [n_bonds]))
 
             adjacency_map = tf.tensor_scatter_nd_update(
                 adjacency_map,
