@@ -73,6 +73,14 @@ def to_ds(file_path, has_charge=False):
         tf.expand_dims(text, 0),
         '\n').values
 
+    lines = tf.boolean_mask(
+        lines,
+
+        tf.logical_not(
+            tf.strings.regex_full_match(
+                lines,
+                '.*RAD.*')))
+
     # get the starts and the ends
     starts = tf.strings.regex_full_match(
         lines,
@@ -109,7 +117,7 @@ def to_ds(file_path, has_charge=False):
         ],
         axis=1)
 
-    def read_one_mol(idx, has_charge=has_charge):
+    def read_one_mol(idx, has_charge=has_charge, lines=lines):
         mol_chunk = mol_chunks[idx]
         start = mol_chunk[0]
         end = mol_chunk[1]
