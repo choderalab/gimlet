@@ -870,15 +870,16 @@ class GraphNet(tf.keras.Model):
                             tf.multiply(
                                 mol_count,
                                 tf.ones(
-                                    (1, n_atoms),
+                                    (n_atoms, 1),
                                     dtype=tf.int64)),
                         ],
                         axis=1),
 
                     # update
-                    tf.constant(
-                        True,
-                        shape=(n_atoms, )))
+                    tf.tile(
+                        [True],
+                        [n_atoms]))
+
 
             else:
                 attr = tf.tensor_scatter_nd_update(
