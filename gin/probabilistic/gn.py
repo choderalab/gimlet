@@ -31,19 +31,10 @@ SOFTWARE.
 # imports
 # =============================================================================
 import tensorflow as tf
-# tf.enable_eager_execution()
-
-import gin.molecule
-
 
 # =============================================================================
 # utility functions
 # =============================================================================
-def pad_multiple_matrices(*matrix):
-    """ Pad multiple matrices together.
-    """
-    pass
-
 
 # =============================================================================
 # module classes
@@ -541,6 +532,7 @@ class GraphNet(tf.keras.Model):
         batched_adjacency_map
 
         """
+
         # convert everything to tensor
         inner_batch_size = tf.convert_to_tensor(
             inner_batch_size,
@@ -968,6 +960,17 @@ class GraphNet(tf.keras.Model):
                 key_func,
                 reducer))
 
+    @tf.function
+    def get_number_batches(ds):
+        """ Get the number of batches before they are put into dataset.
+        """
+        count = tf.constant(0, dtype=tf.int64)
+        for sample in ds:
+            count = tf.add(
+                count,
+                tf.constant(1, dtype=tf.int64))
+
+        return count
 
     @staticmethod
     def batch_old(

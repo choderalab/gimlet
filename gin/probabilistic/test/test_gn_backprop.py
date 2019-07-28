@@ -19,6 +19,8 @@ y_array = (y_array - np.mean(y_array) / np.std(y_array))
 
 ds = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds = gin.probabilistic.gn.GraphNet.batch(ds, 256)
+count = gin.probabilistic.gn.GraphNet.get_number_batches(ds)
+print(count)
 
 class f_r(tf.keras.Model):
     def __init__(self, gru_unit, d_config):
