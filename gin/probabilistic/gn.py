@@ -869,7 +869,9 @@ class GraphNet(tf.keras.Model):
                                 axis=1),
                             tf.multiply(
                                 mol_count,
-                                tf.ones((1, n_atoms))),
+                                tf.ones(
+                                    (1, n_atoms),
+                                    dtype=tf.int64)),
                         ],
                         axis=1),
 
@@ -960,6 +962,7 @@ class GraphNet(tf.keras.Model):
                 key_func,
                 reducer))
 
+    @staticmethod
     @tf.function
     def get_number_batches(ds):
         """ Get the number of batches before they are put into dataset.
