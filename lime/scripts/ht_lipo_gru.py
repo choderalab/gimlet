@@ -274,41 +274,38 @@ def obj_fn(point):
     for idx in range(5):
         init(point)
 
+        y_true_train = tf.constant([-1], dtype=tf.float32)
+        y_pred_train = tf.constant([-1], dtype=tf.float32)
+        y_true_test = tf.constant([-1], dtype=tf.float32)
+        y_pred_test = tf.constant([-1], dtype=tf.float32)
 
-        @tf.function
-        def train():
-            y_true_train = tf.constant([-1], dtype=tf.float32)
-            y_pred_train = tf.constant([-1], dtype=tf.float32)
-            y_true_test = tf.constant([-1], dtype=tf.float32)
-            y_pred_test = tf.constant([-1], dtype=tf.float32)
+        ds_tr = ds.take(idx * n_te).concatenate(
+            ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
 
-            ds_tr = ds.take(idx * n_te).concatenate(
-                ds.skip((idx + 1) * n_te).take((4 - idx) * n_te))
+        ds_te = ds.skip(idx * n_te).take(n_te)
 
-            ds_te = ds.skip(idx * n_te).take(n_te)
+        for dummy_idx in range(N_EPOCH):
+            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+                in ds_tr:
+                with tf.GradientTape() as tape:
+                    y_hat = gn(
+                        atoms,
+                        adjacency_map,
+                        atom_in_mol=atom_in_mol,
+                        bond_in_mol=bond_in_mol,
+                        batched_attr_in_mol=y_mask)
 
-            for dummy_idx in range(N_EPOCH):
-                for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-                    in ds_tr:
-                    with tf.GradientTape() as tape:
-                        y_hat = gn(
-                            atoms,
-                            adjacency_map,
-                            atom_in_mol=atom_in_mol,
-                            bond_in_mol=bond_in_mol,
-                            batched_attr_in_mol=y_mask)
+                    y = tf.boolean_mask(
+                        y,
+                        y_mask)
 
-                        y = tf.boolean_mask(
-                            y,
-                            y_mask)
+                    loss = tf.losses.mean_squared_error(y, y_hat)
 
-                        loss = tf.losses.mean_squared_error(y, y_hat)
+                variables = gn.variables
+                grad = tape.gradient(loss, variables)
+                optimizer.apply_gradients(
+                    zip(grad, variables))
 
-                    variables = gn.variables
-                    grad = tape.gradient(loss, variables)
-                    optimizer.apply_gradients(
-                        zip(grad, variables))
-        train()
 
         gn.switch(True)
 
@@ -393,30 +390,27 @@ def obj_fn(point):
 
     time0 = time.time()
 
-    @tf.function
-    def train():
-        for dummy_idx in range(N_EPOCH):
-            for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
-                in ds_global_tr:
-                with tf.GradientTape() as tape:
-                    y_hat = gn.call(
-                        atoms,
-                        adjacency_map,
-                        atom_in_mol=atom_in_mol,
-                        bond_in_mol=bond_in_mol,
-                        batched_attr_in_mol=y_mask)
+    for dummy_idx in range(N_EPOCH):
+        for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
+            in ds_global_tr:
+            with tf.GradientTape() as tape:
+                y_hat = gn.call(
+                    atoms,
+                    adjacency_map,
+                    atom_in_mol=atom_in_mol,
+                    bond_in_mol=bond_in_mol,
+                    batched_attr_in_mol=y_mask)
 
-                    y = tf.boolean_mask(
-                        y,
-                        y_mask)
+                y = tf.boolean_mask(
+                    y,
+                    y_mask)
 
-                    loss = tf.losses.mean_squared_error(y, y_hat)
+                loss = tf.losses.mean_squared_error(y, y_hat)
 
-                variables = gn.variables
-                grad = tape.gradient(loss, variables)
-                optimizer.apply_gradients(
-                    zip(grad, variables))
-    train()
+            variables = gn.variables
+            grad = tape.gradient(loss, variables)
+            optimizer.apply_gradients(
+                zip(grad, variables))
 
     time1 = time.time()
 
