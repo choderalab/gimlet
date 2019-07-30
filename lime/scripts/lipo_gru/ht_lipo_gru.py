@@ -26,16 +26,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 """
-
+from sklearn import metrics
 import tensorflow as tf
 import gin
 import lime
 import time
 import pandas as pd
 import numpy as np
-from sklearn import metrics
 
-N_EPOCH = 80
+N_EPOCH = 30
 
 df = pd.read_csv('data/Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('B')]
@@ -441,14 +440,19 @@ def obj_fn(point):
     r2_global_test = metrics.r2_score(y_true_global_test,
         y_pred_global_test)
 
-    print(point)
-    print('training time %s ' % (time1 - time0))
-    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)))
-    print('r2_train %s +- %s' % (np.mean(r2_train), np.std(r2_train)))
-    print('mse_test %s +- %s' % (np.mean(mse_train), np.std(mse_train)))
-    print('r2_test %s +- %s' % (np.mean(r2_test), np.std(r2_test)))
-    print('mse_global_test %s' % mse_global_test.numpy())
-    print('r2_global_test %s ' % r2_global_test)
+    print(point, flush=True)
+    print('training time %s ' % (time1 - time0), flush=True)
+    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
+        flush=True)
+    print('r2_train %s +- %s' % (np.mean(r2_train), np.std(r2_train)),
+        flush=True)
+    print('mse_test %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
+        flush=True)
+    print('r2_test %s +- %s' % (np.mean(r2_test), np.std(r2_test)),
+        flush=True)
+    print('mse_global_test %s' % mse_global_test.numpy(),
+        flush=True)
+    print('r2_global_test %s ' % r2_global_test, flush=True)
 
     return mse_test
 
