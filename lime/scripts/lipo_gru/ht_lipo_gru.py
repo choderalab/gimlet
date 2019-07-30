@@ -59,18 +59,8 @@ n_samples = y_array.shape[0]
 ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
-ds_all = ds_all.map(
-    (lambda atoms, adjacency_map, y: \
-        (
-            tf.py_function(
-                gin.probabilistic.featurization.featurize_atoms,
-                [atoms, adjacency_map],
-                tf.float32),
-            adjacency_map,
-            y)))
-
 ds_all, n_batched_samples_total \
-    = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, feature_dimension=11)
+    = gin.probabilistic.gn.GraphNet.batch(ds_all, 256)
 
 n_batched_samples_total = int(n_batched_samples_total)
 n_global_te = int(0.2 * n_batched_samples_total)
@@ -78,25 +68,25 @@ ds_global_tr = ds_all.skip(n_global_te)
 ds_global_te = ds_all.take(n_global_te)
 
 config_space = {
-    'f_e_0': [32, 64, 128, 256],
-    'f_v_0': [32, 64, 128, 256],
-    'f_u_0': [32, 64, 128, 256],
+    'f_e_0': [32, 64, 128],
+    'f_v_0': [32, 64, 128],
+    'f_u_0': [32, 64, 128],
 
-    'phi_e_0': [32, 64, 128, 256],
+    'phi_e_0': [32, 64, 128],
     'phi_e_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_e_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'phi_v_0': [32, 64, 128, 256],
+    'phi_v_0': [32, 64, 128],
     'phi_v_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_v_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'phi_u_0': [32, 64, 128, 256],
+    'phi_u_0': [32, 64, 128],
     'phi_u_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_u_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'f_r_0': [32, 64, 128, 256],
+    'f_r_0': [32, 64, 128],
     'f_r_a': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'f_r_1': [32, 64, 128, 256],
+    'f_r_1': [32, 64, 128],
 
     'gru_unit': [64, 128, 256, 512],
 
