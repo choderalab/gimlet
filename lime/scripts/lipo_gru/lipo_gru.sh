@@ -9,5 +9,4 @@
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr
 
-module add cuda/10.0
 python ht_lipo_gru.py
