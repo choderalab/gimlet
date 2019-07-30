@@ -1,0 +1,53 @@
+Sender: LSF System <lsfadmin@lu01>
+Subject: Job 11653880: <lipo_gru> in cluster <lila> Exited
+
+Job <lipo_gru> was submitted from host <lilac> by user <wangy1> in cluster <lila> at Tue Jul 30 01:35:06 2019
+Job was executed on host(s) <24*lu01>, in queue <gpuqueue>, as user <wangy1> in cluster <lila> at Tue Jul 30 02:10:14 2019
+</home/wangy1> was used as the home directory.
+</data/chodera/wangyq/gimlet/lime/scripts/lipo_gru> was used as the working directory.
+Started at Tue Jul 30 02:10:14 2019
+Terminated at Tue Jul 30 02:10:37 2019
+Results reported at Tue Jul 30 02:10:37 2019
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#BSUB -q gpuqueue
+#BSUB -J lipo_gru
+#BSUB -m "ld-gpu ls-gpu lt-gpu lp-gpu lg-gpu lv-gpu lu-gpu"
+#####BSUB -m "lu-gpu"
+#BSUB -q gpuqueue -n 24 -gpu "num=4:j_exclusive=yes"
+#BSUB -R "rusage[mem=4] span[hosts=1]"
+######BSUB -R V100
+#BSUB -W 24:00
+#BSUB -o %J.stdout
+#BSUB -eo %J.stderr
+
+python ht_lipo_gru.py
+
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   9.42 sec.
+    Max Memory :                                 -
+    Average Memory :                             -
+    Total Requested Memory :                     96.00 GB
+    Delta Memory :                               -
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                81
+    Run time :                                   22 sec.
+    Turnaround time :                            2131 sec.
+
+The output (if any) follows:
+
+
+
+PS:
+
+Read file <11653880.stderr> for stderr output of this job.
+

@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "ht_lipo_gru.py", line 63, in <module>
+    n_batched_samples_total = int(n_batched_samples_total)
+NameError: name 'n_batched_samples_total' is not defined
