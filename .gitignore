@@ -108,3 +108,7 @@ venv.bak/
 
 # MacOS
 .DS_Store
+
+# IBM RSF
+.stderr
+.stdout
