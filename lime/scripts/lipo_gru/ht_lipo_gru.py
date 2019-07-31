@@ -216,11 +216,11 @@ def init(point):
 
         f_v=f_v(point['f_v_0']),
 
-        f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
+        f_u=(lambda atoms, adjacency_map, batched_attr_in_mol: \
             tf.tile(
                 tf.zeros((1, point['f_u_0'])),
                 [
-                     tf.math.count_nonzero(batched_attr_mask),
+                     tf.math.count_nonzero(batched_attr_in_mol),
                      1
                 ]
             )),
@@ -306,7 +306,7 @@ def obj_fn(point):
                 adjacency_map,
                 atom_in_mol=atom_in_mol,
                 bond_in_mol=bond_in_mol,
-                batched_attr_mask=y_mask)
+                batched_attr_in_mol=y_mask)
 
             y = tf.boolean_mask(
                 y,
@@ -334,7 +334,7 @@ def obj_fn(point):
                 adjacency_map,
                 atom_in_mol=atom_in_mol,
                 bond_in_mol=bond_in_mol,
-                batched_attr_mask=y_mask)
+                batched_attr_in_mol=y_mask)
 
             y = tf.boolean_mask(
                 y,
@@ -413,7 +413,7 @@ def obj_fn(point):
             adjacency_map,
             atom_in_mol=atom_in_mol,
             bond_in_mol=bond_in_mol,
-            batched_attr_mask=y_mask)
+            batched_attr_in_mol=y_mask)
 
         y = tf.boolean_mask(
             y,
