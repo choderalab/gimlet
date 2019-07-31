@@ -673,7 +673,7 @@ def obj_fn(point):
 
     for atoms, adjacency_map, \
         atom_in_mol, bond_in_mol, q_i, attr_in_mol \
-        in ds_tr:
+        in ds_global_te:
 
         Qs = get_q_total_per_mol(q_i, attr_in_mol)
 
