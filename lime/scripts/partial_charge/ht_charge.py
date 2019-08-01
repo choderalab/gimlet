@@ -27,13 +27,14 @@ SOFTWARE.
 
 """
 
+from sklearn import metrics
 import tensorflow as tf
 import gin
 import lime
 import time
 import pandas as pd
 import numpy as np
-from sklearn import metrics
+
 
 N_EPOCHS = 20
 
