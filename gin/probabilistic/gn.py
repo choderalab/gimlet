@@ -1394,11 +1394,11 @@ class GraphNet(tf.keras.Model):
                             tf.concat(
                                 [
                                     tf.tile(
-                                        [tf.constant(-1, dtype=tf.int64)],
+                                        [tf.constant(-1, dtype=tf.float32)],
                                         [atom_idx]),
-                                    atoms,
+                                    attr,
                                     tf.tile(
-                                        [tf.constant(-1, dtype=tf.int64)],
+                                        [tf.constant(-1, dtype=tf.float32)],
                                         [inner_batch_size - atom_idx - n_atoms])
                                 ],
                                 axis=0),
