@@ -1205,7 +1205,7 @@ class GraphNet(tf.keras.Model):
                                     tf.constant(
                                         -1,
                                         shape=(1,),
-                                        dtype=tf.int64),
+                                        dtype=tf.float32),
                                     [inner_batch_size - n_atoms])
                             ],
                             axis=0)
