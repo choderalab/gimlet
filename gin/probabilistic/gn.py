@@ -1044,7 +1044,7 @@ class GraphNet(tf.keras.Model):
                 batched_attr_cache = tf.constant(
                     -1,
                     shape=[inner_batch_size,],
-                    dtype=tf.int64)
+                    dtype=tf.float32)
 
                 batched_attr_in_mol_cache = tf.constant(
                     False,
