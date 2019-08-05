@@ -33,6 +33,8 @@ import lime
 import time
 import pandas as pd
 import numpy as np
+import os
+
 
 N_EPOCH = 30
 
@@ -58,7 +60,9 @@ n_samples = y_array.shape[0]
 ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds_all = ds_all.shuffle(n_samples)
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256)
+ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256).cache(
+    str(os.getcwd()) + '/temp')
+
 n_batched_samples_total = gin.probabilistic.gn.GraphNet.get_number_batches(
     ds_all)
 n_batched_samples_total = int(n_batched_samples_total)
