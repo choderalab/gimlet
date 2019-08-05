@@ -610,7 +610,7 @@ class GraphNet(tf.keras.Model):
         # define the key func: grab the last element in an entry
         key_func = lambda atom, adjacency_map, attr, key: key
 
-        @tf.function
+        # @tf.function
         def init_func(key):
             if tf.equal(
                 feature_dimension,
@@ -706,7 +706,7 @@ class GraphNet(tf.keras.Model):
                 bond_count,
                 mol_count)
 
-        @tf.function
+        # @tf.function
         def reduce_func(old_state, input):
             # grab all tensors from the batched state
             (
@@ -807,6 +807,7 @@ class GraphNet(tf.keras.Model):
                 tf.tile(
                     [True],
                     [n_bonds]))
+
 
             adjacency_map = tf.tensor_scatter_nd_update(
                 adjacency_map,
@@ -925,7 +926,7 @@ class GraphNet(tf.keras.Model):
                 mol_count
             )
 
-        @tf.function
+        # @tf.function
         def finalize_func(*state):
             (
                 atoms,
@@ -954,6 +955,8 @@ class GraphNet(tf.keras.Model):
             init_func=init_func,
             reduce_func=reduce_func,
             finalize_func=finalize_func)
+
+
 
         return mols_with_attributes.apply(
             tf.data.experimental.scan(

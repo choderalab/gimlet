@@ -34,7 +34,7 @@ import lime
 import time
 import pandas as pd
 import numpy as np
-
+import os
 
 N_EPOCHS = 20
 
@@ -258,7 +258,9 @@ ds_all = ds_all.map(lambda atoms, adjacency_map, coordinates, charges:\
 
 
 # put them in batches
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_all, 256, per_atom_attr=True)
+ds_all = gin.probabilistic.gn.GraphNet.batch(
+    ds_all, 256, per_atom_attr=True).cache(
+        str(os.getcwd()) + '/temp')
 
 
 # get the number of samples
