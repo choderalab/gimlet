@@ -514,6 +514,7 @@ class GraphNet(tf.keras.Model):
             inner_batch_size=128,
             outer_batch_size=None,
             per_atom_attr=False,
+            attr_dimension=0,
             feature_dimension=0):
         """ Group molecules into batches.
 
@@ -540,6 +541,10 @@ class GraphNet(tf.keras.Model):
 
         feature_dimension = tf.convert_to_tensor(
             feature_dimension,
+            tf.int64)
+
+        attr_dimension = tf.convert_to_tensor(
+            attr_dimension,
             tf.int64)
 
         # define max number of molecules, to which all rows and columns
@@ -660,6 +665,7 @@ class GraphNet(tf.keras.Model):
                 # initialize attr like atoms
                 # dtype = float32,
                 # shape = (inner_batch_size, )
+
                 attr = tf.multiply(
                     tf.ones(
                         (inner_batch_size, ),
@@ -673,15 +679,25 @@ class GraphNet(tf.keras.Model):
                     [inner_batch_size, max_n_mols])
 
             else:
-                # initialize attr with number of molecules
-                # dtype = float32,
-                # shape = (max_n_mols, )
-                attr = tf.multiply(
-                    tf.ones(
-                        (max_n_mols, ),
-                        dtype=tf.float32),
-                    tf.constant(-1, dtype=tf.float32))
+                if tf.equal(
+                    attr_dimension,
+                    tf.constant(0, dtype=tf.int64)):
+                    # initialize attr with number of molecules
+                    # dtype = float32,
+                    # shape = (max_n_mols, )
+                    attr = tf.multiply(
+                        tf.ones(
+                            (max_n_mols, ),
+                            dtype=tf.float32),
+                        tf.constant(-1, dtype=tf.float32))
 
+                else:
+                    attr = tf.multiply(
+                        tf.ones(
+                            (max_n_mols, feature_dimension),
+                            dtype=tf.float32),
+                        tf.constant(-1, dtype=tf.float32))
+                        
                 # dtype = Boolean
                 # shape = (max_n_mols, max_n_mols)
                 attr_in_mol = tf.tile(
