@@ -695,7 +695,7 @@ class GraphNet(tf.keras.Model):
                 else:
                     attr = tf.multiply(
                         tf.ones(
-                            (max_n_mols, feature_dimension),
+                            (max_n_mols, attr_dimension),
                             dtype=tf.float32),
                         tf.constant(-1, dtype=tf.float32))
 
