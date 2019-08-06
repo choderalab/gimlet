@@ -515,7 +515,8 @@ class GraphNet(tf.keras.Model):
             outer_batch_size=None,
             per_atom_attr=False,
             attr_dimension=0,
-            feature_dimension=0):
+            feature_dimension=0,
+            atom_dtype=tf.int64):
         """ Group molecules into batches.
 
         Parameters
@@ -615,7 +616,7 @@ class GraphNet(tf.keras.Model):
         # define the key func: grab the last element in an entry
         key_func = lambda atom, adjacency_map, attr, key: key
 
-        # @tf.function
+        @tf.function
         def init_func(key):
             if tf.equal(
                 feature_dimension,
@@ -627,8 +628,8 @@ class GraphNet(tf.keras.Model):
                 atoms = tf.multiply(
                     tf.ones(
                         (inner_batch_size, ),
-                        dtype=tf.int64),
-                    tf.constant(-1, dtype=tf.int64))
+                        dtype=atom_dtype),
+                    tf.constant(-1, dtype=atom_dtype))
 
             else:
                 # dtype = float32
@@ -636,8 +637,8 @@ class GraphNet(tf.keras.Model):
                 atoms = tf.multiply(
                     tf.ones(
                         (inner_batch_size, feature_dimension),
-                        dtype=tf.float32),
-                    tf.constant(-1, dtype=tf.float32))
+                        dtype=atom_dtype),
+                    tf.constant(-1, dtype=atom_dtype))
 
             # initialize adjacency_map as all 0
             # shape = (inner_batch_size, inner_batch_size)
