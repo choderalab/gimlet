@@ -636,8 +636,8 @@ class GraphNet(tf.keras.Model):
                 atoms = tf.multiply(
                     tf.ones(
                         (inner_batch_size, feature_dimension),
-                        dtype=tf.int64),
-                    tf.constant(-1, dtype=tf.int64))
+                        dtype=tf.float32),
+                    tf.constant(-1, dtype=tf.float32))
 
             # initialize adjacency_map as all 0
             # shape = (inner_batch_size, inner_batch_size)
@@ -697,7 +697,7 @@ class GraphNet(tf.keras.Model):
                             (max_n_mols, feature_dimension),
                             dtype=tf.float32),
                         tf.constant(-1, dtype=tf.float32))
-                        
+
                 # dtype = Boolean
                 # shape = (max_n_mols, max_n_mols)
                 attr_in_mol = tf.tile(
