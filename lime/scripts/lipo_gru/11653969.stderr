@@ -1,4 +1,0 @@
-  File "ht_lipo_gru.py", line 444
-    print(point, flush=True)
-                      ^
-SyntaxError: invalid syntax
