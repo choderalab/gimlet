@@ -5,7 +5,7 @@
 #BSUB -q gpuqueue -n 24 -gpu "num=4:j_exclusive=yes"
 #BSUB -R "rusage[mem=4] span[hosts=1]"
 ######BSUB -R V100
-#BSUB -W 24:00
+#BSUB -W 96:00
 #BSUB -o %J.stdout
 #BSUB -eo %J.stderr
 
