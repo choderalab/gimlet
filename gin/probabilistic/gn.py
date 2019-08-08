@@ -455,11 +455,6 @@ class GraphNet(tf.keras.Model):
         # use while loop to execute the graph multiple times
         iter_idx = tf.constant(0, dtype=tf.int64)
 
-        propagate_one_time(
-            iter_idx,
-            h_e, h_v, h_u,
-            h_e_history, h_v_history, h_u_history)
-
         iter_idx, h_e, h_v, h_u, h_e_history, h_v_history, h_u_history \
             = tf.while_loop(
             # condition
