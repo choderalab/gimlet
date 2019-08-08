@@ -277,7 +277,7 @@ def init(point):
                     point['phi_e_1'],
                     point['phi_e_a_1']
                 ),
-                gru_units):
+                gru_units=point['D_E']):
             super(phi_e, self).__init__()
             self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
             self.gru = tf.keras.layers.GRU(
