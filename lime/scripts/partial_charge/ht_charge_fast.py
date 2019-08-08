@@ -439,10 +439,10 @@ def init(point):
         f_r=f_r(),
         repeat=5)
 
-    optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
+    optimizer = tf.keras.optimizers.Adam()
 
 def obj_fn(point):
-    point = dict(zip(config_space.keys(), point))
+    # point = dict(zip(config_space.keys(), point))
     print(point, flush=True)
     n_te = int(0.2 * 0.8 * n_batches)
     ds = ds_global_tr.shuffle(int(0.8 * n_batches))
@@ -453,7 +453,7 @@ def obj_fn(point):
     mse_test = []
 
     for idx in range(5):
-        print(idx, flush=True)
+        print('fold %s' % idx, flush=True)
 
         init(point)
 
@@ -502,6 +502,7 @@ def obj_fn(point):
                     loss = tf.losses.mean_squared_error(
                         q_i,
                         q_i_hat)
+
 
                 variables = gn.variables
                 grad = tape.gradient(loss, variables)
@@ -608,6 +609,7 @@ def obj_fn(point):
 
     init(point)
 
+    print('global', flush=True)
     time0 = time.time()
 
     for dummy_idx in range(N_EPOCHS):
@@ -710,17 +712,17 @@ def obj_fn(point):
 
     print(point, flush=True)
     print('training time %s ' % (time1 - time0), flush=True)
-    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)
-        flush=True))
+    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
+        flush=True)
     print('r2_train %s +- %s' % (np.mean(r2_train), np.std(r2_train)),
         flush=True)
     print('mse_test %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
         flush=True)
     print('r2_test %s +- %s' % (np.mean(r2_test), np.std(r2_test)),
         flush=True)
-    print('mse_global_test %s' % mse_global_test.numpy()
+    print('mse_global_test %s' % mse_global_test.numpy(),
         flush=True)
-    print('r2_global_test %s ' % r2_global_test
+    print('r2_global_test %s ' % r2_global_test,
         flush=True)
 
     return mse_test
@@ -731,7 +733,7 @@ if __name__ == '__main__':
     import sys
     d = int(sys.argv[1])
     d_h = int(sys.argv[2])
-    a = int(sys.argv[3])
+    a = str(sys.argv[3])
 
     point = {
         'd': d,
