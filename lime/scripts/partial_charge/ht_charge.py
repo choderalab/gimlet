@@ -729,17 +729,17 @@ def obj_fn(point):
 
     print(point, flush=True)
     print('training time %s ' % (time1 - time0), flush=True)
-    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)
-        flush=True))
+    print('mse_train %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
+        flush=True)
     print('r2_train %s +- %s' % (np.mean(r2_train), np.std(r2_train)),
         flush=True)
     print('mse_test %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
         flush=True)
     print('r2_test %s +- %s' % (np.mean(r2_test), np.std(r2_test)),
         flush=True)
-    print('mse_global_test %s' % mse_global_test.numpy()
+    print('mse_global_test %s' % mse_global_test.numpy(),
         flush=True)
-    print('r2_global_test %s ' % r2_global_test
+    print('r2_global_test %s ' % r2_global_test,
         flush=True)
 
     return mse_test
