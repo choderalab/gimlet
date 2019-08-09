@@ -5,6 +5,7 @@ import numpy as np
 import numpy.testing as npt
 import tensorflow as tf
 import pandas as pd
+import os
 
 
 
@@ -280,7 +281,8 @@ def test_consistency_ds():
 
     ds = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 
-    ds_batched = gin.probabilistic.gn.GraphNet.batch(ds, 256)
+    ds_batched = gin.probabilistic.gn.GraphNet.batch(ds, 256).cache(
+        str(os.getcwd()) + '/tmp')
 
     class f_r(tf.keras.Model):
         def __init__(self, config):
@@ -321,7 +323,7 @@ def test_consistency_ds():
 
         f_u=(lambda atoms, adjacency_map, batched_attr_in_mol: \
             tf.tile(
-                tf.zeros((1, 32)),
+                tf.zeros((1, 128)),
                 [
                     tf.math.count_nonzero(
                         batched_attr_in_mol),
@@ -379,7 +381,12 @@ def test_consistency_ds():
 
         y_hat_debatched = y_hat_debatched[1:]
 
+        print(y_hat_batched)
+        print(y_hat_debatched)
+
         npt.assert_almost_equal(
             y_hat_batched.numpy(),
             y_hat_debatched.numpy(),
             decimal=2)
+
+test_consistency_ds()

@@ -566,12 +566,12 @@ def smiles_to_organic_topological_molecule(smiles):
                     tf.expand_dims(
                         left_bracket_idxs,
                         0),
-                    [right_bracket_idxs.shape[0], 1]),
+                    [tf.shape(right_bracket_idxs)[0], 1]),
                 tf.tile(
                     tf.expand_dims(
                         right_bracket_idxs,
                         1),
-                    [1, right_bracket_idxs.shape[0]])),
+                    [1, tf.shape(right_bracket_idxs)[0]])),
             tf.constant(0, dtype=tf.int64)))
 
     def process_right_left_overlap(
@@ -1306,8 +1306,7 @@ def to_mols(
     ds = ds_smiles.map(lambda x: tf.py_function(
         to_mol,
         [x],
-        [tf.int64, tf.float32]),
-    num_parallel_calls=4*N_CPUS)
+        [tf.int64, tf.float32]))
 
     return ds
 
@@ -1326,7 +1325,6 @@ def to_mols_with_attributes(
     ds = ds.map(lambda x, y: tf.py_function(
         lambda x,y: (to_mol(x)[0], to_mol(x)[1], y),
         [x, y],
-        [tf.int64, tf.float32, tf.float32]),
-    num_parallel_calls=4*N_CPUS)
+        [tf.int64, tf.float32, tf.float32]))
 
     return ds
