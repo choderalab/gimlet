@@ -72,9 +72,7 @@ def file_to_oemols(filename):
     Parameters
     ----------
     filename: str
-        absolute path to
-    title: str, title
-        title for molecule. If None, IUPAC name will be given as title.
+        absolute path to oeb file
 
     Returns
     -------
