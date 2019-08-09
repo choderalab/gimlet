@@ -66,7 +66,7 @@ def oemol_to_dict(oemol):
 
     return mol_dict
 
-def file_to_oemols(filename, title=True, verbose=False):
+def file_to_oemols(filename):
     """Create OEMol from file. If more than one mol in file, return list of OEMols.
 
     Parameters
