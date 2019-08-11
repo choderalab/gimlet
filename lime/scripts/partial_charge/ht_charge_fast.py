@@ -557,6 +557,14 @@ def obj_fn(point):
                 ],
                 axis=0)
 
+        mse_test.append(tf.losses.mean_squared_error(
+            y_true_test[1:],
+            y_pred_test[1:]).numpy())
+
+        r2_test.append(metrics.r2_score(
+            y_true_test[1:],
+            y_pred_test[1:]))
+
         for atoms, adjacency_map, \
             atom_in_mol, bond_in_mol, q_i, attr_in_mol \
             in ds_tr:
@@ -602,7 +610,13 @@ def obj_fn(point):
                 ],
                 axis=0)
 
+        mse_train.append(tf.losses.mean_squared_error(
+            y_true_train[1:],
+            y_pred_train[1:]).numpy())
 
+        r2_train.append(metrics.r2_score(
+            y_true_train[1:],
+            y_pred_train[1:]))
 
     y_true_global_test = tf.constant([-1], dtype=tf.float32)
     y_pred_global_test = tf.constant([-1], dtype=tf.float32)
@@ -741,4 +755,3 @@ if __name__ == '__main__':
         'a': a}
 
     obj_fn(point)
-    
