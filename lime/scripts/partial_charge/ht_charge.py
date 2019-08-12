@@ -262,12 +262,13 @@ ds_all = gin.probabilistic.gn.GraphNet.batch(
     ds_all, 256, per_atom_attr=True).cache(
         str(os.getcwd()) + '/temp')
 
+ds_all = ds_all.take(48)
+
 
 # get the number of samples
 # NOTE: there is no way to get the number of samples in a dataset
 # except loop through one time, unfortunately
-# n_batches = gin.probabilistic.gn.GraphNet.get_number_batches(ds_all)
-n_batches = 5000
+n_batches = gin.probabilistic.gn.GraphNet.get_number_batches(ds_all)
 
 n_batches = int(n_batches)
 n_global_te = int(0.2 * n_batches)
@@ -582,7 +583,8 @@ def obj_fn(point):
         r2_test.append(metrics.r2_score(
             y_true_test[1:].numpy(),
             y_pred_test[1:].numpy()))
-
+        
+        print(r2_test, flush=True)
         for atoms, adjacency_map, \
             atom_in_mol, bond_in_mol, q_i, attr_in_mol \
             in ds_tr:
@@ -636,6 +638,8 @@ def obj_fn(point):
         r2_train.append(metrics.r2_score(
             y_true_train[1:].numpy(),
             y_pred_train[1:].numpy()))
+
+        print(r2_train, flush=True)
 
     y_true_global_test = tf.constant([-1], dtype=tf.float32)
     y_pred_global_test = tf.constant([-1], dtype=tf.float32)
