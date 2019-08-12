@@ -262,9 +262,6 @@ ds_all = gin.probabilistic.gn.GraphNet.batch(
     ds_all, 256, per_atom_attr=True).cache(
         str(os.getcwd()) + '/temp')
 
-ds_all = ds_all.take(48)
-
-
 # get the number of samples
 # NOTE: there is no way to get the number of samples in a dataset
 # except loop through one time, unfortunately
