@@ -257,10 +257,16 @@ ds_all = ds_all.map(lambda atoms, adjacency_map, coordinates, charges:\
     (atoms, adjacency_map, charges))
 
 
-# put them in batches
+# for the purpose of blind test set,
+# and for good luck,
+# we fix the random seed to be the title of
+# the single greatest piece of literary work
+# of human race.
 ds_all = gin.probabilistic.gn.GraphNet.batch(
     ds_all, 256, per_atom_attr=True).cache(
-        str(os.getcwd()) + '/temp')
+        str(os.getcwd()) + '/temp').shuffle(
+            buffer_size=4000,
+            seed=2666)
 
 # get the number of samples
 # NOTE: there is no way to get the number of samples in a dataset
