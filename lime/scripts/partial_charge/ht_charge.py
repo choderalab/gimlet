@@ -580,8 +580,8 @@ def obj_fn(point):
             y_pred_test[1:]).numpy())
 
         r2_test.append(metrics.r2_score(
-            y_true_test[1:],
-            y_pred_test[1:]))
+            y_true_test[1:].numpy(),
+            y_pred_test[1:].numpy()))
 
         for atoms, adjacency_map, \
             atom_in_mol, bond_in_mol, q_i, attr_in_mol \
@@ -634,8 +634,8 @@ def obj_fn(point):
             y_pred_train[1:]).numpy())
 
         r2_train.append(metrics.r2_score(
-            y_true_train[1:],
-            y_pred_train[1:]))
+            y_true_train[1:].numpy(),
+            y_pred_train[1:].numpy()))
 
     y_true_global_test = tf.constant([-1], dtype=tf.float32)
     y_pred_global_test = tf.constant([-1], dtype=tf.float32)
@@ -739,8 +739,8 @@ def obj_fn(point):
 
     mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
         y_pred_global_test)
-    r2_global_test = metrics.r2_score(y_true_global_test,
-        y_pred_global_test)
+    r2_global_test = metrics.r2_score(y_true_global_test.numpy(),
+        y_pred_global_test.numpy())
 
     print(point, flush=True)
     print('training time %s ' % (time1 - time0), flush=True)
