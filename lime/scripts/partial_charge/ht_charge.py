@@ -586,7 +586,7 @@ def obj_fn(point):
         r2_test.append(metrics.r2_score(
             y_true_test[1:].numpy(),
             y_pred_test[1:].numpy()))
-        
+
         print(r2_test, flush=True)
         for atoms, adjacency_map, \
             atom_in_mol, bond_in_mol, q_i, attr_in_mol \
@@ -755,7 +755,7 @@ def obj_fn(point):
         flush=True)
     print('r2_train %s +- %s' % (np.mean(r2_train), np.std(r2_train)),
         flush=True)
-    print('mse_test %s +- %s' % (np.mean(mse_train), np.std(mse_train)),
+    print('mse_test %s +- %s' % (np.mean(mse_test), np.std(mse_test)),
         flush=True)
     print('r2_test %s +- %s' % (np.mean(r2_test), np.std(r2_test)),
         flush=True)
