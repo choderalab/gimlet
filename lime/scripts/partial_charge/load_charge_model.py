@@ -473,9 +473,22 @@ gn.load_weights('partial_charge_weights')
 y_true_global_test = tf.constant([-1], dtype=tf.float32)
 y_pred_global_test = tf.constant([-1], dtype=tf.float32)
 
+atoms_all = tf.constant([-1], dtype=tf.int64)
+
 for atoms, adjacency_map, \
     atom_in_mol, bond_in_mol, q_i, attr_in_mol \
     in ds_global_te:
+
+    atoms_all = tf.concat(
+        [
+                atoms_all,
+                tf.boolean_mask(
+                    atoms,
+                    tf.reduce_any(
+                        atom_in_mol,
+                        axis=1)),
+        ],
+        axis=0)
 
     Qs = get_q_total_per_mol(q_i, attr_in_mol)
 
@@ -520,14 +533,22 @@ for atoms, adjacency_map, \
 
 y_true_global_test = y_true_global_test[1:]
 y_pred_global_test = y_pred_global_test[1:]
+atoms_all = atoms_all[1:]
+np.save('atoms', atoms_all.numpy())
+
 
 mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
     y_pred_global_test)
 r2_global_test = metrics.r2_score(y_true_global_test.numpy(),
     y_pred_global_test.numpy())
 
+np.save('y_true_te', y_true_global_test.numpy())
+np.save('y_pred_te', y_pred_global_test.numpy())
+
 
 from matplotlib import pyplot as plt
+
+plt.switch_backend('agg')
 
 plt.style.use('ggplot')
 plt.rc('font', family='serif')
@@ -535,8 +556,8 @@ plt.figure(figsize=(40, 40))
 fig, ax = plt.subplots()
 
 ax.scatter(
-    y_true_tr.numpy(),
-    y_pred_tr.numpy(),
+    y_true_global_test.numpy(),
+    y_pred_global_test.numpy(),
     alpha=0.5,
     s=4,
     label='$R^2$ = %.4f; MSE = %.4f' % (
