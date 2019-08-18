@@ -469,3 +469,91 @@ def init(point):
 init(point)
 
 gn.load_weights('partial_charge_weights')
+
+y_true_global_test = tf.constant([-1], dtype=tf.float32)
+y_pred_global_test = tf.constant([-1], dtype=tf.float32)
+
+for atoms, adjacency_map, \
+    atom_in_mol, bond_in_mol, q_i, attr_in_mol \
+    in ds_global_te:
+
+    Qs = get_q_total_per_mol(q_i, attr_in_mol)
+
+    e, s = gn(
+        atoms, adjacency_map,
+        atom_in_mol, bond_in_mol, attr_in_mol)
+
+    e = tf.boolean_mask(
+        e,
+        tf.reduce_any(
+            attr_in_mol,
+            axis=1))
+
+    s = tf.boolean_mask(
+        s,
+        tf.reduce_any(
+            attr_in_mol,
+            axis=1))
+
+    q_i_hat = get_q_i_hat_total_per_mol(
+                        e, s, Qs, attr_in_mol)
+
+    q_i = tf.boolean_mask(
+        q_i,
+        tf.reduce_any(
+            attr_in_mol,
+            axis=1))
+
+    y_true_global_test = tf.concat(
+        [
+            y_true_global_test,
+            tf.reshape(q_i, [-1])
+        ],
+        axis=0)
+
+    y_pred_global_test = tf.concat(
+        [
+            y_pred_global_test,
+            tf.reshape(q_i_hat, [-1])
+        ],
+        axis=0)
+
+y_true_global_test = y_true_global_test[1:]
+y_pred_global_test = y_pred_global_test[1:]
+
+mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
+    y_pred_global_test)
+r2_global_test = metrics.r2_score(y_true_global_test.numpy(),
+    y_pred_global_test.numpy())
+
+
+from matplotlib import pyplot as plt
+
+plt.style.use('ggplot')
+plt.rc('font', family='serif')
+plt.figure(figsize=(40, 40))
+fig, ax = plt.subplots()
+
+ax.scatter(
+    y_true_tr.numpy(),
+    y_pred_tr.numpy(),
+    alpha=0.5,
+    s=4,
+    label='$R^2$ = %.4f; MSE = %.4f' % (
+        metrics.r2_score(
+            y_true_global_test, y_pred_global_test),
+        tf.losses.mean_squared_error(
+            y_true_global_test, y_pred_global_test)))
+
+ax.legend(loc='upper left', frameon=False, markerscale=0)
+
+ax.tick_params(labelsize=10)
+ax.set_xlabel('$q_\mathtt{true}$', fontsize=14)
+ax.set_ylabel('$q_\mathtt{pred}$', fontsize=14)
+
+plt.savefig('chembl_charge_test.jpeg', bbox_inches='tight', dpi=500)
+
+print('mse_global_test %s' % mse_global_test.numpy(),
+    flush=True)
+print('r2_global_test %s ' % r2_global_test,
+    flush=True)
