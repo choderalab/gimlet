@@ -51,24 +51,40 @@ TRANSLATION = {
     b'H': 9
 }
 
-oe_mols = gin.i_o.utils.file_to_oemols('/home/chodera/charges/ZINC-AM1BCCELF10.oeb')
+oe_mols = gin.i_o.utils.file_to_oemols('/home/chodera/charge-datasets/datasets/riniker/ChEMBL_AM1BCC.oeb')
 oe_mol_dicts = [gin.i_o.utils.oemol_to_dict(oe_mol) for oe_mol in oe_mols]
 n_samples = len(oe_mol_dicts)
-ds_idxs = tf.data.Dataset.from_tensor_slices(range(n_samples))
+ds_idxs = tf.data.Dataset.from_tensor_slices(
+    tf.expand_dims(
+        tf.convert_to_tensor(
+            list(range(n_samples))),
+        1))
+
+print(oe_mol_dicts[0])
+print(oe_mol_dicts[0]['atomic_symbols'])
+print(oe_mol_dicts[0]['connectivity'])
 
 def read_one_mol(idx):
-    atoms = oe_mol_dicts[idx]['atomic_symbols']
+    atoms = oe_mol_dicts[int(idx.numpy())]['atomic_symbols']
+    atoms = tf.expand_dims(tf.convert_to_tensor(
+            atoms,
+            tf.string),
+        1)
     atoms = tf.cast(
         tf.map_fn(
-            lambda x: TRANSLATION[x],
+            lambda x: TRANSLATION[x.numpy()[0]],
             atoms,
             tf.int32),
         tf.int64)
 
+    atoms = tf.reshape(
+        atoms,
+        [-1])
+
     n_atoms = tf.shape(atoms, tf.int64)[0]
 
     bonds = tf.convert_to_tensor(
-        oe_mol_dicts[idx]['connectivity'],
+        oe_mol_dicts[int(idx.numpy())]['connectivity'],
         dtype=tf.float32)
 
     adjacency_map = tf.zeros(
@@ -84,6 +100,8 @@ def read_one_mol(idx):
 
         bonds[:, 2])
 
+    adjacency_map = tf.i_o.utils.conjugate_average(atoms, adjacency_map)
+
     charges = tf.convert_to_tensor(
         oe_mol_dicts[idx]['partial_charges'],
         tf.float32)
@@ -93,7 +111,7 @@ def read_one_mol(idx):
 ds_mols = ds_idxs.map(
     lambda idx: tf.py_function(
         read_one_mol,
-        [x],
+        [idx],
         [tf.int64, tf.float32, tf.float32])).shuffle(
         n_samples,
         seed=2666)
