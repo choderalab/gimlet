@@ -44,8 +44,7 @@ import multiprocessing
 N_CPUS = multiprocessing.cpu_count()
 
 # packages
-from gin import molecule
-
+import gin
 # =============================================================================
 # CONSTANTS
 # =============================================================================
