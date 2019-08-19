@@ -29,6 +29,7 @@ SOFTWARE.
 """
 
 import os
+import tensorflow as tf
 
 def oemol_to_dict(oemol, wbo=False):
     """
@@ -61,7 +62,8 @@ def oemol_to_dict(oemol, wbo=False):
             wbo = bond.GetData('WibergBondOrder')
             connectivity.append([a1, a2, wbo])
         else:
-            bond_order = GetOrder()
+            bond_order = bond.GetOrder()
+            connectivity.append([a1, a2, bond_order])
 
     mol_dict = {'atomic_symbols': atomic_symbols,
                 'partial_charges': partial_charges,

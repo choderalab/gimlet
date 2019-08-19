@@ -60,10 +60,6 @@ ds_idxs = tf.data.Dataset.from_tensor_slices(
             list(range(n_samples))),
         1))
 
-print(oe_mol_dicts[0])
-print(oe_mol_dicts[0]['atomic_symbols'])
-print(oe_mol_dicts[0]['connectivity'])
-
 def read_one_mol(idx):
     atoms = oe_mol_dicts[int(idx.numpy())]['atomic_symbols']
     atoms = tf.expand_dims(tf.convert_to_tensor(
@@ -100,10 +96,10 @@ def read_one_mol(idx):
 
         bonds[:, 2])
 
-    adjacency_map = tf.i_o.utils.conjugate_average(atoms, adjacency_map)
+    adjacency_map = gin.i_o.utils.conjugate_average(atoms, adjacency_map)
 
     charges = tf.convert_to_tensor(
-        oe_mol_dicts[idx]['partial_charges'],
+        oe_mol_dicts[int(idx.numpy())]['partial_charges'],
         tf.float32)
 
     return atoms, adjacency_map, charges
