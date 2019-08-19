@@ -36,3 +36,47 @@ def test_oemol_to_dict():
                                           [3, 12, 0.9424725770950317],
                                           [4, 13, 0.9428789019584656],
                                           [8, 14, 0.9101700186729431]]
+
+
+    atoms = oemol_dict['atomic_symbols']
+    atoms = tf.expand_dims(tf.convert_to_tensor(
+            atoms,
+            tf.string),
+        1)
+    atoms = tf.cast(
+        tf.map_fn(
+            lambda x: TRANSLATION[x.numpy()[0]],
+            atoms,
+            tf.int32),
+        tf.int64)
+
+    atoms = tf.reshape(
+        atoms,
+        [-1])
+
+    n_atoms = tf.shape(atoms, tf.int64)[0]
+
+    bonds = tf.convert_to_tensor(
+        oemol_dict['connectivity'],
+        dtype=tf.float32)
+
+    adjacency_map = tf.zeros(
+        (n_atoms, n_atoms),
+        tf.float32)
+
+    adjacency_map = tf.tensor_scatter_nd_update(
+        adjacency_map,
+
+        tf.cast(
+            bonds[:, :2],
+            tf.int64),
+
+        bonds[:, 2])
+
+    adjacency_map = gin.i_o.utils.conjugate_average(atoms, adjacency_map)
+
+    charges = tf.convert_to_tensor(
+        oemol_dict['partial_charges'],
+        tf.float32)
+
+test_oemol_to_dict()        
