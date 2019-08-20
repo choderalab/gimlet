@@ -289,9 +289,6 @@ point = {
     'phi_e_units': 32,
     'phi_e_activation': 'leaky_relu',
 
-    'phi_u_units': 32,
-    'phi_u_activation': 'tanh',
-
     'f_r_units': 64,
 
     'learning_rate': 1e-3
@@ -316,6 +313,22 @@ def init(point):
             # set shape because Dense doesn't like variation
             x.set_shape([None, 8])
             return self.d(x)
+
+    class f_e(tf.keras.Model):
+        """ Featurization of edges.
+        Here we split the $\sigma$ and $\pi$ component of bonds
+        into two channels, and featurize them seperately.
+
+        """
+        def __init__():
+            super(f_e, self).__init__()
+
+        @tf.function
+        def call(self, x):
+
+            return tf.tile(
+                tf.ones_like(x),
+                [1, 16])
 
     f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
         tf.tile(
@@ -346,20 +359,6 @@ def init(point):
             point['D_E']
         ))
 
-    class phi_u(tf.keras.Model):
-        def __init__(self, config=(
-                    point['phi_u_units'],
-                    point['phi_u_activation'],
-                    point['phi_u_units'],
-                    point['D_U']
-                )):
-            super(phi_u, self).__init__()
-            self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
-
-        @tf.function
-        def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
-            return self.d(h_u, h_u_0, h_e_bar, h_v_bar)
-
 
     class f_r(tf.keras.Model):
         """ Readout function.
@@ -386,9 +385,8 @@ def init(point):
             return e, s
 
     gn = gin.probabilistic.gn.GraphNet(
-        f_e=tf.keras.layers.Dense(16),
+        f_e=tf.keras.layers.Dense(64),
         f_v=f_v(),
-        f_u=f_u,
         phi_e=phi_e,
         phi_v=phi_v,
         phi_u=phi_u(),
