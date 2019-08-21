@@ -320,7 +320,7 @@ def init(point):
         into two channels, and featurize them seperately.
 
         """
-        def __init__():
+        def __init__(self):
             super(f_e, self).__init__()
 
         @tf.function
@@ -328,7 +328,7 @@ def init(point):
 
             return tf.tile(
                 tf.ones_like(x),
-                [1, 16])
+                [1, 32])
 
     f_u=(lambda atoms, adjacency_map, batched_attr_mask: \
         tf.tile(
@@ -385,11 +385,12 @@ def init(point):
             return e, s
 
     gn = gin.probabilistic.gn.GraphNet(
-        f_e=tf.keras.layers.Dense(64),
+        f_e=f_e(),
         f_v=f_v(),
+        f_u=f_u,
+        phi_u=lambda h_u, _0, _1, _2: h_u,
         phi_e=phi_e,
         phi_v=phi_v,
-        phi_u=phi_u(),
         f_r=f_r(),
         repeat=5)
 
@@ -497,6 +498,6 @@ r2_global_test = metrics.r2_score(y_true_global_test.numpy(),
     y_pred_global_test.numpy())
 
 
-print(mse_global_test)
-print(r2_global_test)
-print(gn.count_params())
+print(mse_global_test, flush=True)
+print(r2_global_test, flush=True)
+print(gn.count_params(), flush=True)
