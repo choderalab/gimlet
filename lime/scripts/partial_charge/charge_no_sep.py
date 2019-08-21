@@ -386,7 +386,7 @@ def init(point):
             return e, s
 
     gn = gin.probabilistic.gn.GraphNet(
-        f_e=tf.keras.layers.Dense(16),
+        f_e=tf.keras.layers.Dense(32),
         f_v=f_v(),
         f_u=f_u,
         phi_e=phi_e,
@@ -499,6 +499,6 @@ r2_global_test = metrics.r2_score(y_true_global_test.numpy(),
     y_pred_global_test.numpy())
 
 
-print(mse_global_test)
-print(r2_global_test)
-print(gn.count_params())
+print(mse_global_test, flush=True)
+print(r2_global_test, flush=True)
+print(gn.count_params(), flush=True)
