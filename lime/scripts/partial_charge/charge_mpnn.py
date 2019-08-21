@@ -342,6 +342,15 @@ def init(point):
             ]
         ))
 
+
+    class phi_u(tf.keras.Model):
+        def __init__(self):
+            super(phi_u, self).__init__()
+
+        @tf.function
+        def call(self, h_u, h_u_0, h_e_bar, h_v_bar):
+            return h_u
+
     phi_v = lime.nets.for_gn.ConcatenateThenFullyConnect(
         (
             point['phi_v_units'],
