@@ -495,6 +495,53 @@ for dummy_idx in range(N_EPOCHS):
         optimizer.apply_gradients(
             zip(grad, variables))
 
+
+
+y_true_global_test = tf.constant([-1], dtype=tf.float32)
+y_pred_global_test = tf.constant([-1], dtype=tf.float32)
+
+
+for atoms, adjacency_map, \
+    atom_in_mol, bond_in_mol, q_i, attr_in_mol \
+    in ds_global_te:
+        q_i_hat = gn(
+            atoms, adjacency_map,
+            atom_in_mol, bond_in_mol, attr_in_mol)
+
+        q_i_hat = tf.boolean_mask(
+            q_i_hat,
+            tf.reduce_any(
+                attr_in_mol,
+                axis=1))
+
+        q_i = tf.boolean_mask(
+            q_i,
+            tf.reduce_any(
+                attr_in_mol,
+                axis=1))
+
+        y_true_global_test = tf.concat(
+            [
+                y_true_global_test,
+                tf.reshape(q_i, [-1])
+            ],
+            axis=0)
+
+        y_pred_global_test = tf.concat(
+            [
+                y_pred_global_test,
+                tf.reshape(q_i_hat, [-1])
+            ],
+            axis=0)
+
+y_true_global_test = y_true_global_test[1:]
+y_pred_global_test = y_pred_global_test[1:]
+
+mse_global_test = tf.losses.mean_squared_error(y_true_global_test,
+    y_pred_global_test)
+r2_global_test = metrics.r2_score(y_true_global_test.numpy(),
+    y_pred_global_test.numpy())
+
 print(mse_global_test, flush=True)
 print(r2_global_test, flush=True)
 print(gn.count_params(), flush=True)
