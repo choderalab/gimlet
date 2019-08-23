@@ -58,9 +58,11 @@ def get_distance_matrix(coordinates):
         [-1, 1])
 
     return tf.math.sqrt(
-        X_2 - 2 * tf.matmul(coordinates, tf.transpose(coordinates)) \
-            + tf.transpose(X_2))
+        tf.nn.relu(
+            X_2 - 2 * tf.matmul(coordinates, tf.transpose(coordinates)) \
+                + tf.transpose(X_2)))
 
+@tf.function
 def get_angles(coordinates, angle_idxs):
     """ Calculate the angles from coordinates and angle indices.
 
@@ -84,18 +86,22 @@ def get_angles(coordinates, angle_idxs):
         - angle_coordinates[:, 2, :]
 
     # (n_angles, )
-    angles = tf.math.acos(
-        tf.clip_by_value(
-            tf.math.divide(
-                tf.reduce_sum(
-                    angle_left * angle_right,
-                    axis=1),
-                tf.norm(angle_left, axis=1) \
-                    * tf.norm(angle_right, axis=1)),
-            -1, 1))
-
+    angles = tf.math.atan2(
+        tf.norm(
+            tf.linalg.cross(
+                angle_left,
+                angle_right),
+            axis=1),
+        tf.reduce_sum(
+            tf.multiply(
+                angle_left,
+                angle_right),
+            axis=1))
     return angles
 
+
+
+@tf.function
 def get_dihedrals(coordinates, torsion_idxs):
     """ Calculate the dihedrals based on coordinates and the indices of
     the torsions.
@@ -120,13 +126,17 @@ def get_dihedrals(coordinates, torsion_idxs):
         torsion_idxs[:, 2] - torsion_idxs[:, 1])
 
     # (n_torsions, )
-    dihedrals = tf.math.acos(
-        tf.math.divide(
-            tf.reduce_sum(
-                normal_left * normal_right,
-                axis=1),
-            tf.norm(normal_left, axis=1) \
-                * tf.norm(normal_right, axis=1)))
+    dihedrals = tf.math.atan2(
+        tf.norm(
+            tf.linalg.cross(
+                normal_left,
+                normal_right),
+            axis=1),
+        tf.reduce_sum(
+            tf.multiply(
+                normal_left,
+                normal_right),
+            axis=1))
 
     return dihedrals
 
@@ -435,7 +445,6 @@ class SingleMoleculeMechanicsSystem:
 
         # (n_bonds, )
         self.bond_k = bond_specs[:, 1]
-
 
 
     def get_angle_params(self):
