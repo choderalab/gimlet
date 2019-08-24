@@ -12,8 +12,11 @@ import numpy as np
 
 mols_ds = gin.i_o.from_sdf.to_ds('gdb9.sdf', has_charge=False)
 
-attr_ds = tf.data.Dataset.from_tensor_slices(
-    pd.read_csv('gdb9.sdf.csv').values[:, 1:].astype(np.float32))
+attr_ds = pd.read_csv('gdb9.sdf.csv').values[:, 1:].astype(np.float32)
+
+attr_ds = attr_ds / np.linalg.norm(attr_ds)
+
+attr_ds = tf.data.Dataset.from_tensor_slices(attr_ds)
 
 ds = tf.data.Dataset.zip((mols_ds, attr_ds))
 
@@ -26,7 +29,7 @@ ds = gin.probabilistic.gn_hyper.HyperGraphNet.batch(
     attr_dimension=19).cache(
         str(os.getcwd()) + 'temp')
 
-n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds_all))
+n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds))
 n_te = n_batches // 10
 
 ds_te = ds.take(n_te)
@@ -42,33 +45,40 @@ config_space = {
 
 
     'phi_e_0': [32, 64, 128],
-    'phi_e_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_e_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
+    'phi_e_a_0': ['elu', 'relu', 'tanh', 'sigmoid'],
+    'phi_e_a_1': ['elu', 'relu', 'tanh', 'sigmoid'],
 
     'phi_v_0': [32, 64, 128],
-    'phi_v_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_v_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
+    'phi_v_a_0': ['elu', 'relu', 'tanh', 'sigmoid'],
+    'phi_v_a_1': ['elu', 'relu', 'tanh', 'sigmoid'],
 
     'phi_a_0': [32, 64, 128],
-    'phi_a_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_a_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
+    'phi_a_a_0': ['elu', 'relu', 'tanh', 'sigmoid'],
+    'phi_a_a_1': ['elu', 'relu', 'tanh', 'sigmoid'],
 
     'phi_t_0': [32, 64, 128],
-    'phi_t_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_t_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
+    'phi_t_a_0': ['elu', 'relu', 'tanh', 'sigmoid'],
+    'phi_t_a_1': ['elu', 'relu', 'tanh', 'sigmoid'],
 
     'phi_u_0': [32, 64, 128],
-    'phi_u_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_u_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
+    'phi_u_a_0': ['elu', 'relu', 'tanh', 'sigmoid'],
+    'phi_u_a_1': ['elu', 'relu', 'tanh', 'sigmoid'],
+
+    'f_e_0': [32, 64, 128],
+    'f_e_a_0': ['elu', 'relu', 'tanh', 'sigmoid'],
+    'f_e_a_1': ['elu', 'relu', 'tanh', 'sigmoid'],
 
     'f_r': [32, 64, 128],
-    'f_r_a': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
+    'f_r_a': ['elu', 'relu', 'tanh', 'sigmoid'],
 
     'learning_rate': [1e-5, 1e-4, 1e-3]
 
 }
 
 def init(point):
+    global gn
+    global optimizer
+
     class f_v(tf.keras.Model):
         """ Featurization of nodes.
         Here we simply featurize atoms using one-hot encoding.
@@ -103,6 +113,11 @@ def init(point):
             self.d = lime.nets.for_gn.ConcatenateThenFullyConnect((units, f_r_a, units, 19))
 
             self.units = units
+            self.d_v = point['D_V']
+            self.d_e = point['D_E']
+            self.d_a = point['D_A']
+            self.d_t = point['D_T']
+            self.d_u = point['D_U']
 
         @tf.function
         def call(self, h_v, h_e, h_a, h_t, h_u,
@@ -137,7 +152,7 @@ def init(point):
                     tf.expand_dims(
                         per_mol_mask,
                         2),
-                    [1, 1, 32]),
+                    [1, 1, self.units]),
                 self.d_v_1(self.d_v_0(distance)))
 
             # (n_atoms, n_atoms, units)
@@ -146,7 +161,7 @@ def init(point):
                     tf.expand_dims(
                         per_mol_mask,
                         2),
-                    [1, 1, 32]),
+                    [1, 1, self.units]),
                 tf.tile(
                     tf.expand_dims(
                         self.d_k(h_v),
@@ -159,7 +174,7 @@ def init(point):
                     tf.expand_dims(
                         per_mol_mask,
                         2),
-                    [1, 1, 32]),
+                    [1, 1, self.units]),
                 tf.tile(
                     tf.expand_dims(
                         self.d_q(h_v),
@@ -186,11 +201,11 @@ def init(point):
                         tf.zeros_like(atom_in_mol, dtype=tf.float32))),
                 h_pair)
 
-            h_e_history.set_shape([None, 6, self.units])
-            h_u_history.set_shape([None, 6, self.units])
-            h_v_history.set_shape([None, 6, self.units])
-            h_t_history.set_shape([None, 6, self.units])
-            h_a_history.set_shape([None, 6, self.units])
+            h_e_history.set_shape([None, 6, self.d_e])
+            h_u_history.set_shape([None, 6, self.d_u])
+            h_v_history.set_shape([None, 6, self.d_v])
+            h_t_history.set_shape([None, 6, self.d_t])
+            h_a_history.set_shape([None, 6, self.d_a])
 
             h_e_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
                             tf.multiply(
@@ -347,19 +362,19 @@ def init(point):
             y = self.d(
                 tf.reshape(
                     h_v_bar_history,
-                    [-1, 6 * self.units]),
+                    [-1, 6 * self.d_v]),
                 tf.reshape(
                     h_e_bar_history,
-                    [-1, 6 * self.units]),
+                    [-1, 6 * self.d_e]),
                 tf.reshape(
                     h_u_history,
-                    [-1, 6 * self.units]),
+                    [-1, 6 * self.d_u]),
                 tf.reshape(
                     h_a_bar_history,
-                    [-1, 6 * self.units]),
+                    [-1, 6 * self.d_a]),
                 tf.reshape(
                     h_a_bar_history,
-                    [-1, 6 * self.units]))
+                    [-1, 6 * self.d_a]))
 
             y = y + h_pair
 
@@ -380,15 +395,15 @@ def init(point):
                 ]
             )),
         phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_e'], point['phi_e_a_0'], point['D_E'], point['phi_e_a_1'])),
+            (point['phi_e_0'], point['phi_e_a_0'], point['D_E'], point['phi_e_a_1'])),
         phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_u'], point['phi_u_a_0'], point['D_U'], point['phi_u_a_1'])),
+            (point['phi_u_0'], point['phi_u_a_0'], point['D_U'], point['phi_u_a_1'])),
         phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_e'], point['phi_v_a_0'], point['D_V'], point['phi_v_a_1'])),
+            (point['phi_v_0'], point['phi_v_a_0'], point['D_V'], point['phi_v_a_1'])),
         phi_a=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_e'], point['phi_a_a_0'], point['D_A'], point['phi_a_a_1'])),
+            (point['phi_a_0'], point['phi_a_a_0'], point['D_A'], point['phi_a_a_1'])),
         phi_t=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_e'], point['phi_t_a_0'], point['D_T'], point['phi_t_a_1'])),
+            (point['phi_t_0'], point['phi_t_a_0'], point['D_T'], point['phi_t_a_1'])),
         f_r=f_r(),
         repeat=5)
 
@@ -399,6 +414,7 @@ def obj_fn(point):
     init(point)
 
     for dummy_idx in range(10):
+        print(dummy_idx)
         for atoms, adjacency_map, coordinates, attr, atom_in_mol, attr_in_mol in ds_tr:
             with tf.GradientTape() as tape:
                 y_hat = gn(atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
@@ -407,9 +423,9 @@ def obj_fn(point):
                     attr,
                     attr_in_mol)
 
-                loss = tf.losses.mean_squared_error(
+                loss = tf.reduce_sum(tf.losses.mean_squared_error(
                     y,
-                    y_hat)
+                    y_hat))
 
             variables = gn.variables
             grad = tape.gradient(loss, variables)
@@ -467,13 +483,13 @@ def obj_fn(point):
     r2_te = metrics.r2_score(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
     rmse_te = metrics.mean_squared_error(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
 
-
-    print(r2_tr)
-    print(rmse_tr)
-    print(r2_vl)
-    print(rmse_vl)
-    print(r2_te)
-    print(rmse_te)
+    print(point, flush=True)
+    print(r2_tr, flush=True)
+    print(rmse_tr, flush=True)
+    print(r2_vl, flush=True)
+    print(rmse_vl, flush=True)
+    print(r2_te, flush=True)
+    print(rmse_te, flush=True)
 
     return rmse_vl
 
