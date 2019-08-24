@@ -44,7 +44,7 @@ ds = gin.probabilistic.gn.GraphNet.batch(
     str(os.getcwd()) + '/temp')
 
 
-n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds_all))
+n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds))
 n_te = n_batches // 10
 
 ds_te = ds.take(n_te)
@@ -59,22 +59,19 @@ config_space = {
 
     'phi_e_0': [32, 64, 128],
     'phi_e_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_e_1': [32, 64, 128],
     'phi_e_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
     'phi_v_0': [32, 64, 128],
     'phi_v_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_v_1': [32, 64, 128],
     'phi_v_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
     'phi_u_0': [32, 64, 128],
     'phi_u_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
-    'phi_u_1': [32, 64, 128],
     'phi_u_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
     'f_r_0': [32, 64, 128],
-    'f_r_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'f_r_1': [32, 64, 128],
+    'f_r_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'f_r_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
     'learning_rate': [1e-5, 1e-4, 1e-3]
@@ -116,26 +113,49 @@ def init(point):
             ]
         )
 
-    phi_v = lime.nets.for_gn.ConcatenateThenFullyConnect(('phi_v_0', 'phi_v_a_0', 'phi_v_1', 'phi_v_a_1'))
+    phi_v = lime.nets.for_gn.ConcatenateThenFullyConnect(
+        (point['phi_v_0'], 
+         point['phi_v_a_0'], 
+         point['D_V'], 
+         point['phi_v_a_1']))
 
-    phi_e = lime.nets.for_gn.ConcatenateThenFullyConnect(('phi_e_0', 'phi_e_a_0', 'phi_e_1', 'phi_e_a_1'))
+    phi_e = lime.nets.for_gn.ConcatenateThenFullyConnect(
+        (point['phi_e_0'], 
+         point['phi_e_a_0'], 
+         point['D_E'], 
+         point['phi_e_a_1']))
 
-    phi_u = lime.nets.for_gn.ConcatenateThenFullyConnect(('phi_u_0', 'phi_u_a_0', 'phi_u_1', 'phi_u_a_1'))
+    phi_u = lime.nets.for_gn.ConcatenateThenFullyConnect(
+        (point['phi_u_0'], 
+         point['phi_u_a_0'], 
+         point['D_U'], 
+         point['phi_u_a_1']))
 
     class f_r(tf.keras.Model):
-        def __init__(self, config=['f_r_0', 'f_r_a_0', 'f_r_1', 'f_r_a_1' 19]):
+        def __init__(self, config=[
+          point['f_r_0'], 
+          point['f_r_a_0'], 
+          point['f_r_1'], 
+          point['f_r_a_1'], 19],
+          
+          d_e=point['D_E'],
+          d_u=point['D_U'],
+          d_v=point['D_V']):
             super(f_r, self).__init__()
             self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
             self.f_r_1 = config[2]
+            self.d_e = d_e
+            self.d_u = d_u
+            self.d_v = d_v
 
         # @tf.function
         def call(self, h_e, h_v, h_u,
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
 
-            h_e_history.set_shape([None, 6, self.f_r_1])
-            h_u_history.set_shape([None, 6, self.f_r_1])
-            h_v_history.set_shape([None, 6, self.f_r_1])
+            h_e_history.set_shape([None, 6, self.d_e])
+            h_u_history.set_shape([None, 6, self.d_u])
+            h_v_history.set_shape([None, 6, self.d_v])
 
             h_e_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
                             tf.multiply(
@@ -209,13 +229,13 @@ def init(point):
             y = self.d(
                 tf.reshape(
                     h_v_bar_history,
-                    [-1, 6 * self.f_r_1]),
+                    [-1, 6 * self.d_v]),
                 tf.reshape(
                     h_e_bar_history,
-                    [-1, 6 * self.f_r_1]),
+                    [-1, 6 * self.d_e]),
                 tf.reshape(
                     h_u_history,
-                    [-1, 6 * self.f_r_1]))
+                    [-1, 6 * self.d_u]))
 
             # y = tf.reshape(y, [-1])
 
@@ -342,12 +362,13 @@ def obj_fn(point):
     rmse_te = metrics.mean_squared_error(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
 
 
-    print(r2_tr)
-    print(rmse_tr)
-    print(r2_vl)
-    print(rmse_vl)
-    print(r2_te)
-    print(rmse_te)
+    print(point, flush=True)
+    print(r2_tr, flush=True)
+    print(rmse_tr, flush=True)
+    print(r2_vl, flush=True)
+    print(rmse_vl, flush=True)
+    print(r2_te, flush=True)
+    print(rmse_te, flush=True)
 
     return rmse_vl
 
