@@ -31,7 +31,7 @@ SOFTWARE.
 import os
 import tensorflow as tf
 
-def oemol_to_dict(oemol, wbo=False):
+def oemol_to_dict(oemol, read_wbo=False):
     """
     Return list of elements, partial charges and connectivity with WBOs for the bonds
 
@@ -56,7 +56,7 @@ def oemol_to_dict(oemol, wbo=False):
     for bond in oemol.GetBonds():
         a1 = bond.GetBgn().GetIdx()
         a2 = bond.GetEnd().GetIdx()
-        if wbo==True:
+        if read_wbo==True:
             if not 'WibergBondOrder' in bond.GetData():
                 raise RuntimeError('Molecule does not have Wiberg Bond Orders')
             wbo = bond.GetData('WibergBondOrder')
