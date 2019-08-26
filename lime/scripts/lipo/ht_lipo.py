@@ -13,9 +13,7 @@ import numpy as np
 
 
 
-
-
-df = pd.read_csv('delaney-processed.csv')
+df = pd.read_csv('Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('\%')]
 df = df[~df['smiles'].str.contains('\.')]
 df = df[~df['smiles'].str.contains('Se')]
@@ -28,11 +26,22 @@ df = df[~df['smiles'].str.contains('9')]
 df = df[~df['smiles'].str.contains('\+')]
 df = df[~df['smiles'].str.contains('\-')]
 df = df[df['smiles'].str.len() > 1]
+
+
+df = pd.concat(
+    [
+        df[~df['smiles'].str.contains('B')],
+        df[df['smiles'].str.contains('r')]
+    ])
+
 x_array = df[['smiles']].values.flatten()
-y_array = df[['measured log solubility in mols per litre']].values.flatten()
+y_array = df[['exp']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 
 n_samples = y_array.shape[0]
+print(n_samples)
+#
+
 
 # ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds = gin.i_o.from_smiles.to_mols(x_array)
@@ -284,7 +293,8 @@ def obj_fn(point):
                     y_mask)
 
                 loss = tf.losses.mean_squared_error(y, y_hat)
-
+                
+            print(loss)
             variables = gn.variables
             grad = tape.gradient(loss, variables)
             optimizer.apply_gradients(
