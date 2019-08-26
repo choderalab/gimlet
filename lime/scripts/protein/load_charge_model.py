@@ -248,35 +248,6 @@ def get_q_total_per_mol(q_i, attr_in_mol):
 
     return q_per_mol
 
-# read molecules into a tf.data.Dataset
-ds_all = gin.i_o.from_sdf.to_ds('data/mols.sdf', has_charge=True)
-
-# by default, there is coordinates in dataset created from sdf
-# now we get rid of it
-ds_all = ds_all.map(lambda atoms, adjacency_map, coordinates, charges:\
-    (atoms, adjacency_map, charges))
-
-
-# for the purpose of blind test set,
-# and for good luck,
-# we fix the random seed to be the title of
-# the single greatest piece of literary work
-# of human race.
-ds_all = gin.probabilistic.gn.GraphNet.batch(
-    ds_all, 256, per_atom_attr=True).cache(
-        str(os.getcwd()) + '/temp').shuffle(
-            buffer_size=4000,
-            seed=2666)
-
-# get the number of samples
-# NOTE: there is no way to get the number of samples in a dataset
-# except loop through one time, unfortunately
-n_batches = gin.probabilistic.gn.GraphNet.get_number_batches(ds_all)
-
-n_batches = int(n_batches)
-n_global_te = int(0.2 * n_batches)
-ds_global_tr = ds_all.skip(n_global_te)
-ds_global_te = ds_all.take(n_global_te)
 
 point = {
     'D_V': 32,
@@ -468,8 +439,16 @@ def init(point):
 
 init(point)
 
+TRANSLATION={
+    b'C': 0,
+    b'N': 1,
+    b'O': 2,
+    b'S': 3,
+    b'P': 4,
+    b'H': 9}
 gn.load_weights('partial_charge_weights')
-mol_dict = gin.i_o.utils.oemol_to_dict(oemol[0])
+oemol=gin.i_o.utils.file_to_oemols('1L2Y.oeb')
+oe_mol_dict = gin.i_o.utils.oemol_to_dict(oemol[0])
 
 atoms = oe_mol_dict['atomic_symbols']
 atoms = tf.expand_dims(tf.convert_to_tensor(
@@ -512,4 +491,4 @@ charges = tf.convert_to_tensor(
     oe_mol_dict['partial_charges'],
     tf.float32)
 
-print(charges)
+
