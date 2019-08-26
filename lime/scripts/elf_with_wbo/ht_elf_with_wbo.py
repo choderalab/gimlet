@@ -52,7 +52,16 @@ TRANSLATION = {
 }
 
 oe_mols = gin.i_o.utils.file_to_oemols('/home/chodera/charge-datasets/datasets/riniker/ChEMBL_AM1BCC.oeb')
-oe_mol_dicts = [gin.i_o.utils.oemol_to_dict(oe_mol) for oe_mol in oe_mols]
+oe_mol_dicts = []
+for oe_mol in oe_mols:
+    try:
+        oe_mol_dict =\
+            gin.i_o.utils.oemol_to_dict(oe_mol, read_wbo=True)
+        oe_mol_dicts.append(oe_mol_dict)
+    except:
+        continue
+
+# oe_mol_dicts = [gin.i_o.utils.oemol_to_dict(oe_mol, wbo=True) for oe_mol in oe_mols]
 n_samples = len(oe_mol_dicts)
 ds_idxs = tf.data.Dataset.from_tensor_slices(
     tf.expand_dims(
@@ -112,14 +121,17 @@ ds_mols = ds_idxs.map(
         n_samples,
         seed=2666)
 
-ds_all = gin.probabilistic.gn.GraphNet.batch(ds_mols, 256).cache(
+
+ds_all = gin.probabilistic.gn.GraphNet.batch(
+    ds_mols, 256, per_atom_attr=True).cache(
     str(os.getcwd()) + '/temp')
 
 
 # get the number of samples
 # NOTE: there is no way to get the number of samples in a dataset
 # except loop through one time, unfortunately
-n_batches = gin.probabilistic.gn.GraphNet.get_number_batches(ds_all)
+n_batches = gin.probabilistic.gn.GraphNet.get_number_batches(
+    ds_all)
 
 n_batches = int(n_batches)
 n_global_te = int(0.2 * n_batches)
@@ -449,7 +461,7 @@ def init(point):
             return e, s
 
     gn = gin.probabilistic.gn.GraphNet(
-        f_e=f_e(),
+        f_e=f_e,
         f_v=f_v(),
         f_u=f_u,
         phi_e=phi_e,
@@ -461,6 +473,7 @@ def init(point):
     optimizer = tf.keras.optimizers.Adam(point['learning_rate'])
 
 def obj_fn(point):
+    N_EPOCHS = 30
     point = dict(zip(config_space.keys(), point))
     n_te = int(0.2 * 0.8 * n_batches)
     ds = ds_global_tr.shuffle(int(0.8 * n_batches))

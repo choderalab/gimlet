@@ -13,9 +13,7 @@ import numpy as np
 
 
 
-
-
-df = pd.read_csv('delaney-processed.csv')
+df = pd.read_csv('Lipophilicity.csv')
 df = df[~df['smiles'].str.contains('\%')]
 df = df[~df['smiles'].str.contains('\.')]
 df = df[~df['smiles'].str.contains('Se')]
@@ -28,11 +26,24 @@ df = df[~df['smiles'].str.contains('9')]
 df = df[~df['smiles'].str.contains('\+')]
 df = df[~df['smiles'].str.contains('\-')]
 df = df[df['smiles'].str.len() > 1]
+
+
+df = pd.concat(
+    [
+        df[~df['smiles'].str.contains('B')],
+        df[df['smiles'].str.contains('r')]
+    ])
+
 x_array = df[['smiles']].values.flatten()
-y_array = df[['measured log solubility in mols per litre']].values.flatten()
+y_array = df[['exp']].values.flatten()
 y_array = (y_array - np.mean(y_array) / np.std(y_array))
 
 n_samples = y_array.shape[0]
+print(n_samples)
+#
+
+
+
 
 # ds_all = gin.i_o.from_smiles.to_mols_with_attributes(x_array, y_array)
 ds = gin.i_o.from_smiles.to_mols(x_array)
@@ -212,7 +223,7 @@ def init(point):
                                 tf.float32),
                             1),
                         2),
-                    [1, tf.shape(h_e_bar_history)[1], tf.shape(h_e)[1]])))
+                    [1, tf.shape(h_e_bar_history)[1], tf.shape(h_e)[1]]))
 
             h_v_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
                     tf.multiply(
@@ -249,7 +260,7 @@ def init(point):
                                 tf.float32),
                             1),
                         2),
-                    [1, tf.shape(h_v_bar_history)[1], tf.shape(h_v)[1]])))
+                    [1, tf.shape(h_v_bar_history)[1], tf.shape(h_v)[1]]))
 
             y = self.d(
                 tf.reshape(

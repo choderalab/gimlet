@@ -158,14 +158,18 @@ def init(point):
             self.d_e = d_e
             self.d_u = d_u
             self.d_v = d_v
-            self.attention_v = lime.nets.attention.Attention(attention_units,
-                4)
-            self.attention_e = lime.nets.attention.Attention(attention_units,
-                4)
+             
+            self.d_k_e = tf.keras.layers.Dense(attention_units)
+            self.d_q_e = tf.keras.layers.Dense(attention_units)
+            self.d_v_e = tf.keras.layers.Dense(attention_units)
+
+            self.d_k_v = tf.keras.layers.Dense(attention_units)
+            self.d_q_v = tf.keras.layers.Dense(attention_units)
+            self.d_v_v = tf.keras.layers.Dense(attention_units)
+            
             self.attention_units = attention_units
 
-
-        @tf.function
+        # @tf.function
         def call(self, h_e, h_v, h_u,
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
@@ -174,27 +178,107 @@ def init(point):
             h_u_history.set_shape([None, 6, self.d_u])
             h_v_history.set_shape([None, 6, self.d_v])
 
-            
-            h_e_history_t = tf.transpose(
-                h_e_history,
-                [1, 0, 2])
+            atom_mask = tf.where(
+                atom_in_mol,
+                tf.ones_like(
+                    atom_in_mol,
+                    dtype=tf.float32),
+                tf.zeros_like(
+                    atom_in_mol,
+                    dtype=tf.float32))
+
+            atom_mask = tf.matmul(
+                atom_mask,
+                tf.transpose(atom_mask))
+
+            bond_mask = tf.where(
+                bond_in_mol,
+                tf.ones_like(
+                    bond_in_mol,
+                    dtype=tf.float32),
+                tf.zeros_like(
+                    bond_in_mol,
+                    dtype=tf.float32))
+
+            bond_mask = tf.matmul(
+                bond_mask,
+                tf.transpose(
+                    bond_mask))
 
             h_v_history_t = tf.transpose(
                 h_v_history,
                 [1, 0, 2])
 
-            h_e_history = tf.transpose(
-                self.attention_e(
-                    h_e_history_t,
-                    h_e_history_t),
+            h_e_history_t = tf.transpose(
+                h_e_history,
                 [1, 0, 2])
 
-            h_v_history = tf.transpose(
-                self.attention_v(
-                    h_v_history_t,
-                    h_v_history_t),
-                [1, 0, 2])
+            q_v = self.d_q_v(h_v_history_t)
+            q_e = self.d_q_e(h_e_history_t)
+
+            k_v = self.d_k_v(h_v_history_t)
+            k_e = self.d_k_e(h_e_history_t)
+
+            v_v = self.d_v_v(h_v_history_t)
+            v_e = self.d_v_e(h_e_history_t)
             
+            weights_e = tf.multiply(
+                tf.matmul(
+                    q_e,
+                    k_e,
+                    transpose_b=True),
+                tf.tile(
+                    tf.expand_dims(
+                        bond_mask,
+                        0),
+                    [tf.shape(q_e)[0], 1, 1]))
+
+            weights_v = tf.multiply(
+                tf.matmul(
+                    q_v,
+                    k_v,
+                    transpose_b=True),
+                tf.tile(
+                    tf.expand_dims(
+                        atom_mask,
+                        0),
+                    [tf.shape(q_v)[0], 1, 1]))
+
+
+            weights_v = tf.math.divide_no_nan(
+                tf.math.exp(weights_v),
+                tf.tile(
+                    tf.reduce_sum(
+                        tf.multiply(
+                            atom_mask,
+                            tf.math.exp(weights_v)),
+                        axis=2,
+                        keepdims=True),
+                    [1, 1, tf.shape(weights_v)[1]]))
+
+            weights_e = tf.math.divide_no_nan(
+                tf.math.exp(weights_e),
+                tf.tile(
+                    tf.reduce_sum(
+                        tf.multiply(
+                            bond_mask,
+                            tf.math.exp(weights_e)),
+                        axis=2,
+                        keepdims=True),
+                    [1, 1, tf.shape(weights_e)[1]]))
+
+            h_v_history = tf.transpose(
+                tf.matmul(
+                    weights_v,
+                    v_v),
+                [1, 0, 2])
+
+            h_e_history = tf.transpose(
+                tf.matmul(
+                    weights_e,
+                    v_e),
+                [1, 0, 2])
+
             h_e_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
                             tf.multiply(
                                 tf.tile(
@@ -229,7 +313,7 @@ def init(point):
                                         1,
                                         1,
                                         tf.shape(h_e_history)[1],
-                                        tf.shape(h_e)[1]
+                                        tf.shape(h_e_history)[2]
                                     ]),
                                 tf.tile( # (n_bonds, n_mols, t, d_e)
                                     tf.expand_dims(
@@ -253,17 +337,15 @@ def init(point):
                                             dtype=tf.float32)),
                                     2),
                                 3),
-                            [1, 1, tf.shape(h_v_history)[1], tf.shape(h_v)[1]]),
+                            [1, 1, tf.shape(h_v_history)[1],
+                              tf.shape(h_v_history)[2]]),
                         tf.tile( # (n_atoms, n_mols, t, d_e)
                             tf.expand_dims(
                                 h_v_history, # (n_atoms, t, d_e)
                                 1),
                             [1, tf.shape(atom_in_mol)[1], 1, 1])),
                     axis=0)
-
-
-
-
+            
             y = self.d(
                 tf.reshape(
                     h_v_bar_history,
@@ -323,6 +405,7 @@ def obj_fn(point):
 
                 loss = tf.losses.mean_squared_error(y, y_hat)
 
+            print(loss)
             variables = gn.variables
             grad = tape.gradient(loss, variables)
             optimizer.apply_gradients(
