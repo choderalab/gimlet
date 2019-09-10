@@ -10,7 +10,7 @@ Graph Inference on MoLEcular Topology. A package for modelling, learning, and in
 `gimlet` doesn't depend on _any_ packages except `TensorFlow 2.0 `, and `pandas` and `pytest`, if you must.
 
 ## Examples
-Minimal working example: https://github.com/choderalab/gin/blob/master/lime/scripts/mini_example_ESOL.ipynb
+https://github.com/choderalab/gimlet/blob/master/lime/scripts/notebooks/190728_yuanqing_gn_with_gru_on_sereina_riniker_dataset.ipynb
 
 ## Authors
 - yuanqing wang `<yuanqing.wang@choderalab.org><wangyq@wangyq.net>` (while at Chodera Lab at Memorial Sloan Kettering Cancer Center, Weill Cornell Medicine, and the City College of the City University of New York.)
