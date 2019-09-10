@@ -759,34 +759,26 @@ class SingleMoleculeMechanicsSystem:
         # property of adjacency_map:
         # raise to the n'th power, entries greater than zero
         # indicates that two atoms could be connected by n bonds
-        self.is_nonbonded = tf.reduce_all(
-            [
-                tf.equal(
-                    full_adjacency_map,
-                    tf.constant(0, dtype=tf.float32)),
-                tf.equal(
-                    tf.matmul(
+        self.is_nonbonded = tf.logical_not(
+            tf.reduce_all(
+                [
+                    tf.equal(
                         full_adjacency_map,
-                        full_adjacency_map),
-                    tf.constant(0, dtype=tf.float32)),
-                tf.equal(
-                    tf.matmul(
-                        full_adjacency_map,
+                        tf.constant(0, dtype=tf.float32)),
+                    tf.equal(
                         tf.matmul(
                             full_adjacency_map,
-                            full_adjacency_map)),
-                    tf.constant(0, dtype=tf.float32)),
-                tf.equal(
-                    tf.matmul(
-                        full_adjacency_map,
+                            full_adjacency_map),
+                        tf.constant(0, dtype=tf.float32)),
+                    tf.equal(
                         tf.matmul(
                             full_adjacency_map,
                             tf.matmul(
                                 full_adjacency_map,
-                                full_adjacency_map))),
-                    tf.constant(0, dtype=tf.float32))
-            ],
-            axis=0)
+                                full_adjacency_map)),
+                        tf.constant(0, dtype=tf.float32))
+                ],
+                axis=0))
 
         self.is_onefour = tf.greater(
             tf.matmul(
