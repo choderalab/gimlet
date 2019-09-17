@@ -779,13 +779,23 @@ class SingleMoleculeMechanicsSystem:
                 ],
                 axis=0)
 
-        self.is_onefour = tf.greater(
-            tf.matmul(
-                full_adjacency_map,
+        self.is_onefour = tf.logical_and(
+            tf.greater(
                 tf.matmul(
                     full_adjacency_map,
-                    full_adjacency_map)),
-            tf.constant(0, dtype=tf.float32))
+                    tf.matmul(
+                        full_adjacency_map,
+                        full_adjacency_map)),
+                tf.constant(0, dtype=tf.float32)),
+            tf.logical_and(
+                tf.equal(
+                    full_adjacency_map,
+                    tf.constant(0, dtype=tf.float32)),
+                tf.equal(
+                    tf.matmul(
+                        full_adjacency_map,
+                        full_adjacency_map),
+                    tf.constant(0, dtype=tf.float32))))
 
 
         self.onefour_scaling = self.forcefield.get_onefour_scaling()
