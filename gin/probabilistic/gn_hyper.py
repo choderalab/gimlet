@@ -36,6 +36,7 @@ import gin
 # =============================================================================
 # utility functions
 # =============================================================================
+@tf.function
 def get_geometric_idxs(atoms, adjacency_map):
     """ Find the bond, angles, and torsion indices in a molecular graph or
     graphs.
@@ -527,7 +528,7 @@ class HyperGraphNet(tf.keras.Model):
         self.f_all = f_all
         self.repeat = repeat
 
-    # @tf.function
+    @tf.function
     def _call(
             self,
             atoms, # NOTE: here there could be more than one mol
