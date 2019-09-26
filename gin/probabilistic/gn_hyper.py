@@ -1006,7 +1006,7 @@ class HyperGraphNet(tf.keras.Model):
                     h_v,
                     torsion_idxs[:, 2]))
 
-            h_t = self.phi_a(
+            h_t = self.phi_t(
                 h_t,
                 h_t_0,
                 h_v_center,
