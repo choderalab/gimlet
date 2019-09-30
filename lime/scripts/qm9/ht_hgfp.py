@@ -3,7 +3,9 @@
 # =============================================================================
 from sklearn import metrics
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 import sys
+sys.stderr=open(os.devnull, 'w')
 import tensorflow as tf
 import gin
 import lime
@@ -14,7 +16,7 @@ mols_ds = gin.i_o.from_sdf.to_ds('gdb9.sdf', has_charge=False)
 
 attr_ds = pd.read_csv('gdb9.sdf.csv').values[:, 1:].astype(np.float32)
 
-attr_ds = attr_ds / np.linalg.norm(attr_ds, axis=0) \\
+attr_ds = attr_ds / np.linalg.norm(attr_ds, axis=0) \
     - np.std(attr_ds, axis=0)
 
 attr_ds = tf.data.Dataset.from_tensor_slices(attr_ds)
@@ -77,10 +79,8 @@ config_space = {
 }
 
 @tf.function
-def flow(y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol):
-    u = tf.boolean_mask(
-        attr[:, 11],
-        attr_in_mol)
+def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
+    bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol):
 
     per_mol_mask = tf.matmul(
         tf.where(
@@ -162,7 +162,7 @@ def flow(y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol):
                                         distance_matrix,
                                         tf.constant(0, dtype=tf.float32))),
                                 tf.pow(
-                                    distance_matrix + 1e-3,
+                                    distance_matrix + 1e-2,
                                     -1),
                                 distance_matrix),
 
@@ -398,9 +398,9 @@ def init(point):
 
     gn = gin.probabilistic.gn_hyper.HyperGraphNet(
         f_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['f_e_0'], point['f_e_a_0'], point['D_E'], point['f_e_a_1'])),
-        f_a=tf.keras.layers.Dense(point['D_A'], activation='elu'),
-        f_t=tf.keras.layers.Dense(point['D_T'], activation='elu'),
+            (point['f_e_0'], 'elu', point['D_E'], 'tanh')),
+        f_a=tf.keras.layers.Dense(point['D_A'], activation='tanh'),
+        f_t=tf.keras.layers.Dense(point['D_T'], activation='tanh'),
         f_v=f_v(),
         f_u=(lambda atoms, adjacency_map, batched_attr_in_mol: \
             tf.tile(
@@ -411,19 +411,24 @@ def init(point):
                 ]
             )),
         phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_e_0'], 'elu', point['D_E'], 'tanh')),
+            (point['phi_e_0'], point['phi_e_a_0'], point['D_E'],
+            point['phi_e_a_1'])),
         phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_u_0'], 'elu', point['D_U'], 'tanh')),
+            (point['phi_u_0'], point['phi_u_a_0'], point['D_U'],
+            point['phi_u_a_1'])),
         phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_v_0'], 'elu', point['D_V'], 'tanh')),
+            (point['phi_v_0'], point['phi_v_a_0'], point['D_V'],
+            point['phi_v_a_1'])),
         phi_a=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_a_0'], 'elu', point['D_A'], 'tanh')),
+            (point['phi_a_0'], point['phi_a_a_0'], point['D_A'],
+            point['phi_a_a_1'])),
         phi_t=lime.nets.for_gn.ConcatenateThenFullyConnect(
-            (point['phi_t_0'], 'elu', point['D_T'], 'tanh')),
+            (point['phi_t_0'], point['phi_t_a_0'], point['D_T'],
+            point['phi_t_a_1'])),
         f_r=f_r(),
         repeat=5)
 
-    optimizer = tf.keras.optimizers.Adam(1e-5)
+    optimizer = tf.keras.optimizers.Ftrl(1e-4)
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
@@ -435,14 +440,15 @@ def obj_fn(point):
                 y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                     atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-                u_tot = flow(y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol)
+                u_tot = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+                    coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+                    torsion_in_mol, attr_in_mol)
 
                 u = tf.boolean_mask(
                     attr[:, 11],
                     attr_in_mol)
 
                 loss = tf.keras.losses.MSE(u, u_tot)
-
 
             variables = gn.variables
             grad = tape.gradient(loss, variables)
@@ -466,7 +472,8 @@ def obj_fn(point):
         y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
             atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-        u_tot = flow(y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol)
+        u_tot = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates,
+            atom_in_mol, bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol)
 
         u = tf.boolean_mask(
             attr[:, 11],
@@ -479,7 +486,8 @@ def obj_fn(point):
         y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
             atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-        u_tot = flow(y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol)
+        u_tot = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates,
+            atom_in_mol, bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol)
 
         u = tf.boolean_mask(
             attr[:, 11],
@@ -492,7 +500,8 @@ def obj_fn(point):
         y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
             atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-        u_tot = flow(y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol)
+        u_tot = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates,
+            atom_in_mol, bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol)
 
         u = tf.boolean_mask(
             attr[:, 11],
