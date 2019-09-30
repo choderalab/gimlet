@@ -42,7 +42,8 @@ def featurize_atoms(
         adjacency_map,
         element=True,
         hybridization=True,
-        aromaticity=True):
+        aromaticity=True,
+        ring=True):
     """ Featurize a small molecule to be fed into training.
 
     """
@@ -183,6 +184,19 @@ def featurize_atoms(
                 tf.expand_dims(
                     tf.where(
                         typing.is_aromatic,
+                        tf.ones_like(atoms, dtype=tf.float32),
+                        tf.zeros_like(atoms, dtype=tf.float32)),
+                    1)
+            ],
+            axis=1)
+
+    if ring == True:
+        feature = tf.concat(
+            [
+                feature,
+                tf.expand_dims(
+                    tf.where(
+                        typing.is_in_ring,
                         tf.ones_like(atoms, dtype=tf.float32),
                         tf.zeros_like(atoms, dtype=tf.float32)),
                     1)
