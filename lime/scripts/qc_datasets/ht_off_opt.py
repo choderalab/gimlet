@@ -81,9 +81,32 @@ def data_generator():
 
                     yield(atoms, adjacency_map, energy)
 
+def data_loader(idx):
+    atoms_path = 'data/atoms' + str(idx)
+    adjacency_map_path = 'data/adjacency_map' + str(idx)
+    energy_path = '/data/energy' + str(idx)
+
+    atoms = tf.convert_to_tensor(
+        np.load(atoms_path))
+
+    adjacency_map = tf.convert_to_tensor(
+        np.load(adjacency_map_path))
+
+    energy = tf.convert_to_tensor(
+        np.load(energy_path))
+
+    return atoms, adjacency_map, energy
+
+
+'''
 ds = tf.data.Dataset.from_generator(
     data_generator,
     (tf.float32, tf.float32, tf.float32))
+'''
+
+ds_path = tf.data.Dataset.from_tensor_slices(list(range(5000)))
+
+ds = ds_path.map(data_loader)
 
 ds = gin.probabilistic.gn.GraphNet.batch(
     ds, 256, feature_dimension=18, atom_dtype=tf.float32).shuffle(
