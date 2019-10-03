@@ -524,16 +524,12 @@ def obj_fn(point):
             atoms = atoms_[:, :12]
             coordinates = atoms_[:, 12:15]
             jacobian = atoms_[:, 15:]
-            
-            lamb = tf.math.divide_no_nan(
-                tf.convert_to_tensor(dummy_idx, dtype=tf.float32),
-                tf.constant(10, dtype=tf.float32))
 
             with tf.GradientTape(persistent=True) as tape:
                 tape.watch(coordinates)
                 y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                     atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
-               
+
                 u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
                     coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                     torsion_in_mol, attr_in_mol)
@@ -547,7 +543,7 @@ def obj_fn(point):
                     tf.reduce_any(
                         atom_in_mol,
                         axis=1))
-                
+
                 jacobian = tf.boolean_mask(
                     jacobian,
                     tf.reduce_any(
@@ -558,8 +554,7 @@ def obj_fn(point):
                     u,
                     attr_in_mol)
 
-                loss = tf.reduce_sum(tf.keras.losses.MSE(u, u_hat)) + \
-                       lamb * tf.reduce_sum(tf.keras.losses.MSE(
+                loss = tf.reduce_sum(tf.keras.losses.MSE(u, u_hat)) + tf.reduce_sum(tf.keras.losses.MSE(
                     jacobian, jacobian_hat))
 
                 print(loss)
@@ -571,5 +566,94 @@ def obj_fn(point):
 
                 optimizer.apply_gradients(
                     zip(grad, variables))
+
+
+    y_true_tr = -1. * tf.ones([1, ], dtype=tf.float32)
+    y_pred_tr = -1. * tf.ones([1, ], dtype=tf.float32)
+
+    y_true_vl = -1. * tf.ones([1, ], dtype=tf.float32)
+    y_pred_vl = -1. * tf.ones([1, ], dtype=tf.float32)
+
+    y_true_te = -1. * tf.ones([1, ], dtype=tf.float32)
+    y_pred_te = -1. * tf.ones([1, ], dtype=tf.float32)
+
+    for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_tr:
+        atoms = atoms_[:, :12]
+        coordinates = atoms_[:, 12:15]
+        jacobian = atoms_[:, 15:]
+
+        tape.watch(coordinates)
+        y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+            atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+
+        u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+            coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+            torsion_in_mol, attr_in_mol)
+
+        u = tf.boolean_mask(
+            u,
+            attr_in_mol)
+
+    y_true_tr = tf.concat([y_true_tr, u], axis=0)
+    y_pred_tr = tf.concat([y_pred_tr, u_hat], axis=0)
+
+    for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_te:
+        atoms = atoms_[:, :12]
+        coordinates = atoms_[:, 12:15]
+        jacobian = atoms_[:, 15:]
+
+        tape.watch(coordinates)
+        y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+            atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+
+        u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+            coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+            torsion_in_mol, attr_in_mol)
+
+        u = tf.boolean_mask(
+            u,
+            attr_in_mol)
+
+    y_true_te = tf.concat([y_true_te, u], axis=0)
+    y_pred_te = tf.concat([y_pred_te, u_hat], axis=0)
+
+    for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_vl:
+        atoms = atoms_[:, :12]
+        coordinates = atoms_[:, 12:15]
+        jacobian = atoms_[:, 15:]
+
+        tape.watch(coordinates)
+        y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+            atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+
+        u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+            coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+            torsion_in_mol, attr_in_mol)
+
+        u = tf.boolean_mask(
+            u,
+            attr_in_mol)
+
+    y_true_vl = tf.concat([y_true_vl, u], axis=0)
+    y_pred_vl = tf.concat([y_pred_vl, u_hat], axis=0)
+
+    r2_tr = metrics.r2_score(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
+    rmse_tr = metrics.mean_squared_error(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
+
+    r2_vl = metrics.r2_score(y_true_vl[1:].numpy(), y_pred_vl[1:].numpy())
+    rmse_vl = metrics.mean_squared_error(y_true_vl[1:].numpy(), y_pred_vl[1:].numpy())
+
+    r2_te = metrics.r2_score(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
+    rmse_te = metrics.mean_squared_error(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
+
+    print(point, flush=True)
+    print(r2_tr, flush=True)
+    print(rmse_tr, flush=True)
+    print(r2_vl, flush=True)
+    print(rmse_vl, flush=True)
+    print(r2_te, flush=True)
+    print(rmse_te, flush=True)
+
+    return rmse_vl
 
 lime.optimize.dummy.optimize(obj_fn, config_space.values(), 1000)
