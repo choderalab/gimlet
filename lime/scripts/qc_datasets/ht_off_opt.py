@@ -82,9 +82,9 @@ def data_generator():
                     yield(atoms, adjacency_map, energy)
 
 def data_loader(idx):
-    atoms_path = 'data/atoms' + str(idx)
-    adjacency_map_path = 'data/adjacency_map' + str(idx)
-    energy_path = '/data/energy' + str(idx)
+    atoms_path = 'data/atoms/' + str(idx.numpy()) + '.npy'
+    adjacency_map_path = 'data/adjacency_map/' + str(idx.numpy()) + '.npy'
+    energy_path = 'data/energy/' + str(idx.numpy()) + '.npy'
 
     atoms = tf.convert_to_tensor(
         np.load(atoms_path))
@@ -106,7 +106,13 @@ ds = tf.data.Dataset.from_generator(
 
 ds_path = tf.data.Dataset.from_tensor_slices(list(range(5000)))
 
-ds = ds_path.map(data_loader)
+ds = ds_path.map(
+    lambda idx: tf.py_function(
+        data_loader,
+        [idx],
+        [tf.float32, tf.float32, tf.float32]))
+
+ds = ds.shuffle(100000, seed=2666)
 
 ds = gin.probabilistic.gn.GraphNet.batch(
     ds, 256, feature_dimension=18, atom_dtype=tf.float32).shuffle(
@@ -114,6 +120,12 @@ ds = gin.probabilistic.gn.GraphNet.batch(
         seed=2666).cache(
             str(os.getcwd()) + '/temp')
 
+n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds))
+n_te = n_batches // 10
+
+ds_te = ds.take(n_te)
+ds_vl = ds.skip(n_te).take(n_te)
+ds_tr = ds.skip(2 * n_te)
 
 config_space = {
     'D_V': [16, 32, 64, 128, 256],
@@ -326,9 +338,6 @@ def init(point):
 
         @tf.function
         def call(self, x):
-            x = tf.one_hot(x, 10)
-            # set shape because Dense doesn't like variation
-            x.set_shape([None, 10])
             return self.d(x)
 
     class f_r(tf.keras.Model):
@@ -511,29 +520,49 @@ def obj_fn(point):
     init(point)
 
     for dummy_idx in range(10):
-        for atoms_, adjacency_map, attr, atom_in_mol, attr_in_mol in ds_tr:
+        for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_tr:
             atoms = atoms_[:, :12]
-            coordinates = atoms[:, 12:25]
-            jacobian = atoms[:, 15:]
+            coordinates = atoms_[:, 12:15]
+            jacobian = atoms_[:, 15:]
+            
+            lamb = tf.math.divide_no_nan(
+                tf.convert_to_tensor(dummy_idx, dtype=tf.float32),
+                tf.constant(10, dtype=tf.float32))
 
-            with tf.GradientTape() as tape:
+            with tf.GradientTape(persistent=True) as tape:
+                tape.watch(coordinates)
                 y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                     atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
-
-                u_tot = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+               
+                u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
                     coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                     torsion_in_mol, attr_in_mol)
 
-                jaboian_hat = tape.gradient(
-                    u_tot,
-                    tf.boolean_mask(
-                        jacobian,
-                        tf.reduce_any(
-                            atom_in_mol,
-                            axis=1)))[0]
+                jacobian_hat = tape.gradient(
+                    u_hat,
+                    coordinates)
 
-                loss = tf.keras.losses.MSE(u, u_tot) + tf.keras.losses.MSE(
-                    jacobian, jacobian_hat)
+                jacobian_hat = tf.boolean_mask(
+                    jacobian_hat,
+                    tf.reduce_any(
+                        atom_in_mol,
+                        axis=1))
+                
+                jacobian = tf.boolean_mask(
+                    jacobian,
+                    tf.reduce_any(
+                        atom_in_mol,
+                        axis=1))
+
+                u = tf.boolean_mask(
+                    u,
+                    attr_in_mol)
+
+                loss = tf.reduce_sum(tf.keras.losses.MSE(u, u_hat)) + \
+                       lamb * tf.reduce_sum(tf.keras.losses.MSE(
+                    jacobian, jacobian_hat))
+
+                print(loss)
 
             variables = gn.variables
             grad = tape.gradient(loss, variables)
