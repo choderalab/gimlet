@@ -621,8 +621,6 @@ class SingleMoleculeMechanicsSystem:
         # discard the first row
         angle_idxs = angle_idxs[1:, ]
 
-        print(angle_idxs)
-
 
         # get the specs of the angle
         angle_specs = tf.map_fn(
