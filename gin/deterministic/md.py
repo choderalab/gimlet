@@ -518,7 +518,7 @@ class SingleMoleculeMechanicsSystem:
         # (n_bonds, )
         self.bond_k = bond_specs[:, 1]
 
-
+    # @tf.function
     def get_angle_params(self):
         """ Get all the angles in the system.
 
@@ -596,13 +596,13 @@ class SingleMoleculeMechanicsSystem:
         def process_one_atom(idx, angle_idxs,
                 full_adjacency_map=full_adjacency_map):
 
-
-            return tf.cond(
-                lambda: tf.less(
+            if tf.less(
                     tf.math.count_nonzero(full_adjacency_map[idx, :]),
-                    tf.constant(1, dtype=tf.int64)),
-                lambda: (idx+1, angle_idxs),
-                process_one_atom_if_there_is_angle(idx, angle_idxs))
+                    tf.constant(1, dtype=tf.int64)):
+                return idx+1, angle_idxs
+
+            else:
+                return process_one_atom_if_there_is_angle(idx, angle_idxs)
 
         idx = tf.constant(0, dtype=tf.int64)
         # use while loop to update the indices forming the angles
@@ -620,6 +620,9 @@ class SingleMoleculeMechanicsSystem:
 
         # discard the first row
         angle_idxs = angle_idxs[1:, ]
+
+        print(angle_idxs)
+
 
         # get the specs of the angle
         angle_specs = tf.map_fn(
