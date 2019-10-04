@@ -100,6 +100,41 @@ def get_angles(coordinates, angle_idxs):
     return angles
 
 
+@tf.function
+def get_angles_cos(coordinates, angle_idxs):
+    """ Calculate the angles from coordinates and angle indices.
+
+    Parameters
+    ----------
+    coordinates: tf.Tensor, shape=(n_atoms, 3)
+    angle_idxs : TODO: describe
+
+    """
+
+    # get the coordinates of the atoms forming the angle
+    # (n_angles, 3, 3)
+    angle_coordinates = tf.gather(coordinates, angle_idxs)
+
+    # (n_angles, 3)
+    angle_left = angle_coordinates[:, 1, :] \
+        - angle_coordinates[:, 0, :]
+
+    # (n_angles, 3)
+    angle_right = angle_coordinates[:, 1, :] \
+        - angle_coordinates[:, 2, :]
+
+    # (n_angles, )
+    angles = tf.math.divide_no_nan(
+        tf.math.reduce_sum(
+            tf.math.multiply(
+                angle_left,
+                angle_right),
+            axis=1),
+        tf.math.multiply(
+            tf.norm(angle_left),
+            tf.norm(angle_right)))
+
+    return angles
 
 @tf.function
 def get_dihedrals(coordinates, torsion_idxs):
@@ -137,6 +172,43 @@ def get_dihedrals(coordinates, torsion_idxs):
                 normal_left,
                 normal_right),
             axis=1))
+
+    return dihedrals
+
+@tf.function
+def get_dihedrals_cos(coordinates, torsion_idxs):
+    """ Calculate the dihedrals based on coordinates and the indices of
+    the torsions.
+
+    Parameters
+    ----------
+    coordinates: tf.Tensor, shape=(n_atoms, 3)
+    torsion_idxs: # TODO: describe
+    """
+    # get the coordinates of the atoms forming the dihedral
+    # (n_torsions, 4, 3)
+    torsion_idxs = tf.gather(coordinates, torsion_idxs)
+
+    # (n_torsions, 3)
+    normal_left = tf.linalg.cross(
+        torsion_idxs[:, 1] - torsion_idxs[:, 0],
+        torsion_idxs[:, 1] - torsion_idxs[:, 2])
+
+    # (n_torsions, 3)
+    normal_right = tf.linalg.cross(
+        torsion_idxs[:, 2] - torsion_idxs[:, 3],
+        torsion_idxs[:, 2] - torsion_idxs[:, 1])
+
+    # (n_angles, )
+    dihedrals = tf.math.divide_no_nan(
+        tf.math.reduce_sum(
+            tf.math.multiply(
+                normal_left,
+                normal_right),
+            axis=1),
+        tf.math.multiply(
+            tf.norm(normal_left),
+            tf.norm(normal_right)))
 
     return dihedrals
 
