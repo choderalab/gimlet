@@ -602,7 +602,7 @@ class SingleMoleculeMechanicsSystem:
                     tf.math.count_nonzero(full_adjacency_map[idx, :]),
                     tf.constant(1, dtype=tf.int64)),
                 lambda: (idx+1, angle_idxs),
-                lambda: process_one_atom_if_there_is_angle(idx, angle_idxs))
+                process_one_atom_if_there_is_angle(idx, angle_idxs))
 
         idx = tf.constant(0, dtype=tf.int64)
         # use while loop to update the indices forming the angles
