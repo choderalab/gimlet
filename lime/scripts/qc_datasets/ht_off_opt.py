@@ -169,7 +169,7 @@ config_space = {
 # @tf.function
 def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
     bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol):
-    
+
     with tf.GradientTape() as tape:
         tape.watch(coordinates)
         per_mol_mask = tf.matmul(
@@ -380,7 +380,87 @@ def init(point):
             atom_in_mol, bond_in_mol, angle_in_mol, torsion_in_mol,
             adjacency_map, coordinates):
 
-            e0 = self.d_e0_1(self.d_e0_0(h_u))
+
+            h_e_history.set_shape([None, 6, self.d_e])
+            h_u_history.set_shape([None, 6, self.d_u])
+            h_v_history.set_shape([None, 6, self.d_v])
+
+            h_e_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
+                            tf.multiply(
+                                tf.tile(
+                                    tf.expand_dims(
+                                        tf.expand_dims(
+                                            tf.where( # (n_bonds, n_mols)
+                                                tf.boolean_mask(
+                                                    bond_in_mol,
+                                                    tf.reduce_any(
+                                                        bond_in_mol,
+                                                        axis=1),
+                                                    axis=0),
+                                                tf.ones_like(
+                                                    tf.boolean_mask(
+                                                        bond_in_mol,
+                                                        tf.reduce_any(
+                                                            bond_in_mol,
+                                                            axis=1),
+                                                        axis=0),
+                                                    dtype=tf.float32),
+                                                tf.zeros_like(
+                                                    tf.boolean_mask(
+                                                        bond_in_mol,
+                                                        tf.reduce_any(
+                                                            bond_in_mol,
+                                                            axis=1),
+                                                        axis=0),
+                                                    dtype=tf.float32)),
+                                            2),
+                                        3),
+                                    [
+                                        1,
+                                        1,
+                                        tf.shape(h_e_history)[1],
+                                        tf.shape(h_e)[1]
+                                    ]),
+                                tf.tile( # (n_bonds, n_mols, t, d_e)
+                                    tf.expand_dims(
+                                        h_e_history, # (n_bonds, t, d_e)
+                                        1),
+                                    [1, tf.shape(bond_in_mol)[1], 1, 1])),
+                            axis=0)
+
+            h_v_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
+                    tf.multiply(
+                        tf.tile(
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.where( # (n_atoms, n_mols)
+                                        atom_in_mol,
+                                        tf.ones_like(
+                                            atom_in_mol,
+                                            dtype=tf.float32),
+                                        tf.zeros_like(
+                                            atom_in_mol,
+                                            dtype=tf.float32)),
+                                    2),
+                                3),
+                            [1, 1, tf.shape(h_v_history)[1], tf.shape(h_v)[1]]),
+                        tf.tile( # (n_atoms, n_mols, t, d_e)
+                            tf.expand_dims(
+                                h_v_history, # (n_atoms, t, d_e)
+                                1),
+                            [1, tf.shape(atom_in_mol)[1], 1, 1])),
+                    axis=0)
+
+            e0 = tf.squeeze(self.d_e0_1(self.d_e0_0(
+                tf.reshape(
+                    h_v_bar_history,
+                    [-1, 6 * self.d_v]),
+                tf.reshape(
+                    h_e_bar_history,
+                    [-1, 6 * self.d_e]),
+                tf.reshape(
+                    h_u_history,
+                    [-1, 6 * self.d_u]))))
 
             adjacency_map_full = tf.math.add(
                 tf.transpose(
@@ -542,7 +622,7 @@ def obj_fn(point):
                 u_hat, jacobian_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
                     coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                     torsion_in_mol, attr_in_mol)
-                
+
                 u_hat = u_hat + e0
 
                 jacobian_hat = tf.boolean_mask(
@@ -556,16 +636,16 @@ def obj_fn(point):
                     tf.reduce_any(
                         atom_in_mol,
                         axis=1))
-                  
+
                 u = tf.boolean_mask(
                     u,
                     attr_in_mol)
 
                 loss = tf.reduce_sum(tf.keras.losses.MSE(u, u_hat)) + tf.reduce_sum(tf.keras.losses.MSE(jacobian, jacobian_hat))
-                
+
                 # loss = tf.reduce_sum(tf.keras.losses.MSE(jacobian,
                   # jacobian_hat))
-                
+
             print(loss)
             variables = gn.variables
             grad = tape.gradient(loss, variables)
