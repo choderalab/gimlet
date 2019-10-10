@@ -207,32 +207,42 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
 
         u_bond = tf.math.reduce_sum(
             tf.math.multiply(
-                y_e,
+                y_e[:, 1:],
                 tf.math.pow(
                     tf.expand_dims(
-                        bond_distances,
+                        tf.math.subtract(
+                            bond_distances,
+                            tf.pow(
+                                y_e[:, 0],
+                                tf.constant(2, dtype=tf.float32))),
                         1),
-                    tf.range(4, dtype=tf.float32))),
+                    tf.range(2, dtype=tf.float32))),
             axis=1)
 
         u_angle = tf.math.reduce_sum(
             tf.math.multiply(
-                y_a,
+                y_a[:, 1:],
                 tf.math.pow(
                     tf.expand_dims(
-                        angle_angles,
+                        tf.math.subtract(
+                            angle_angles,
+                            tf.tanh(
+                                y_a[:, 0])),
                         1),
-                    tf.range(4, dtype=tf.float32))),
+                    tf.range(2, dtype=tf.float32))),
             axis=1)
 
         u_dihedral = tf.math.reduce_sum(
             tf.math.multiply(
-                y_t,
+                y_t[:, 1:],
                 tf.math.pow(
                     tf.expand_dims(
-                        torsion_dihedrals,
+                        tf.math.subtract(
+                            torsion_dihedrals,
+                            tf.tanh(
+                                y_t[:, 0])),
                         1),
-                    tf.range(4, dtype=tf.float32))),
+                    tf.range(2, dtype=tf.float32))),
             axis=1)
 
         u_pair = tf.reduce_sum(
@@ -257,7 +267,9 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                                     distance_matrix),
 
                             axis=2),
-                        tf.range(1, 4, dtype=tf.float32))),
+                        tf.constant(
+                            [2, 6, 12],
+                            tf.float32))),
                 axis=2)
 
         u_pair_mask = tf.linalg.band_part(
@@ -351,15 +363,15 @@ def init(point):
             self.d_pair_1 = tf.keras.layers.Dense(3,
                 kernel_initializer='random_uniform', activity_regularizer=tf.keras.regularizers.l2(0.1))
 
-            self.d_e_1 = tf.keras.layers.Dense(4,
+            self.d_e_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform', activity_regularizer=tf.keras.regularizers.l2(0.1))
             self.d_e_0 = tf.keras.layers.Dense(units, activation='tanh')
 
-            self.d_a_1 = tf.keras.layers.Dense(4,
+            self.d_a_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform', activity_regularizer=tf.keras.regularizers.l2(0.1))
             self.d_a_0 = tf.keras.layers.Dense(units, activation='tanh')
 
-            self.d_t_1 = tf.keras.layers.Dense(4,
+            self.d_t_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform', activity_regularizer=tf.keras.regularizers.l2(0.1))
             self.d_t_0 = tf.keras.layers.Dense(units, activation='tanh')
 
