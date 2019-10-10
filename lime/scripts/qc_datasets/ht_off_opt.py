@@ -363,7 +363,9 @@ def init(point):
                 kernel_initializer='random_uniform', activity_regularizer=tf.keras.regularizers.l2(0.1))
             self.d_t_0 = tf.keras.layers.Dense(units, activation='tanh')
 
-            self.d_e0_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_e0_0 = lime.nets.for_gn.ConcatenateThenFullyConnect((units,
+              'tanh', units, 'tanh'))
+
             self.d_e0_1 = tf.keras.layers.Dense(1)
 
             self.units = units
