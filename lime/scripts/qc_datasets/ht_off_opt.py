@@ -25,7 +25,6 @@ TRANSLATION = {
     1: 9
 }
 
-
 # ds_qc = client.get_collection("OptimizationDataset", "OpenFF Full Optimization Benchmark 1")
 # ds_name = tf.data.Dataset.from_tensor_slices(list(ds_qc.data.records))
 
@@ -170,169 +169,167 @@ config_space = {
 def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
     bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol):
 
-    with tf.GradientTape() as tape:
-        tape.watch(coordinates)
-        per_mol_mask = tf.matmul(
+    per_mol_mask = tf.matmul(
+        tf.where(
+            atom_in_mol,
+            tf.ones_like(atom_in_mol, dtype=tf.float32),
+            tf.zeros_like(atom_in_mol, dtype=tf.float32)),
+        tf.transpose(
             tf.where(
                 atom_in_mol,
                 tf.ones_like(atom_in_mol, dtype=tf.float32),
-                tf.zeros_like(atom_in_mol, dtype=tf.float32)),
+                tf.zeros_like(atom_in_mol, dtype=tf.float32))))
+
+    bond_idxs, angle_idxs, torsion_idxs = gin.probabilistic.gn_hyper\
+        .get_geometric_idxs(atoms, adjacency_map)
+
+    is_bond = tf.stop_gradient(tf.greater(
+        adjacency_map,
+        tf.constant(0, dtype=tf.float32)))
+
+    distance_matrix = gin.deterministic.md.get_distance_matrix(
+        coordinates)
+
+    bond_distances = tf.boolean_mask(
+        distance_matrix,
+        is_bond)
+
+    angle_angles = gin.deterministic.md.get_angles_cos(
+        coordinates,
+        angle_idxs)
+
+    torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
+        coordinates,
+        torsion_idxs)
+
+    u_bond = tf.math.reduce_sum(
+        tf.math.multiply(
+            y_e[:, 1:],
+            tf.math.pow(
+                tf.expand_dims(
+                    tf.math.subtract(
+                        bond_distances,
+                        tf.pow(
+                            y_e[:, 0],
+                            tf.constant(2, dtype=tf.float32))),
+                    1),
+                tf.range(2, dtype=tf.float32))),
+        axis=1)
+
+    u_angle = tf.math.reduce_sum(
+        tf.math.multiply(
+            y_a[:, 1:],
+            tf.math.pow(
+                tf.expand_dims(
+                    tf.math.subtract(
+                        angle_angles,
+                        tf.tanh(
+                            y_a[:, 0])),
+                    1),
+                tf.range(2, dtype=tf.float32))),
+        axis=1)
+
+    u_dihedral = tf.math.reduce_sum(
+        tf.math.multiply(
+            y_t[:, 1:],
+            tf.math.pow(
+                tf.expand_dims(
+                    tf.math.subtract(
+                        torsion_dihedrals,
+                        tf.tanh(
+                            y_t[:, 0])),
+                    1),
+                tf.range(2, dtype=tf.float32))),
+        axis=1)
+
+    u_pair = tf.reduce_sum(
+            tf.multiply(
+                y_pair,
+                tf.math.pow(
+                    tf.expand_dims(
+                            tf.where(
+                                tf.logical_and(
+                                    tf.equal(
+                                        tf.eye(
+                                            tf.shape(
+                                                distance_matrix)[0],
+                                            dtype=tf.float32),
+                                        tf.constant(0, dtype=tf.float32)),
+                                    tf.greater(
+                                        distance_matrix,
+                                        tf.constant(0, dtype=tf.float32))),
+                                tf.pow(
+                                    distance_matrix + 1e-2,
+                                    -1),
+                                distance_matrix),
+
+                        axis=2),
+                    tf.constant(
+                        [2, 6, 12],
+                        tf.float32))),
+            axis=2)
+
+    u_pair_mask = tf.linalg.band_part(
+        tf.nn.relu(
+            tf.subtract(
+                tf.subtract(
+                    per_mol_mask,
+                    adjacency_map),
+                tf.eye(
+                    tf.shape(per_mol_mask)[0]))),
+        0, -1)
+
+    u_pair = tf.multiply(
+        u_pair_mask,
+        u_pair)
+
+    u_bond_tot = tf.matmul(
+        tf.transpose(
+            tf.where(
+                bond_in_mol,
+                tf.ones_like(bond_in_mol, dtype=tf.float32),
+                tf.zeros_like(bond_in_mol, dtype=tf.float32))),
+        tf.expand_dims(
+            u_bond,
+            axis=1))
+
+    u_angle_tot = tf.matmul(
+        tf.transpose(
+            tf.where(
+                angle_in_mol,
+                tf.ones_like(angle_in_mol, dtype=tf.float32),
+                tf.zeros_like(angle_in_mol, dtype=tf.float32))),
+        tf.expand_dims(
+            u_angle,
+            axis=1))
+
+    u_dihedral_tot = tf.matmul(
+        tf.transpose(
+            tf.where(
+                torsion_in_mol,
+                tf.ones_like(torsion_in_mol, dtype=tf.float32),
+                tf.zeros_like(torsion_in_mol, dtype=tf.float32))),
+        tf.expand_dims(
+            u_dihedral,
+            axis=1))
+
+    u_pair_tot = tf.boolean_mask(
+        tf.matmul(
             tf.transpose(
                 tf.where(
                     atom_in_mol,
                     tf.ones_like(atom_in_mol, dtype=tf.float32),
-                    tf.zeros_like(atom_in_mol, dtype=tf.float32))))
+                    tf.zeros_like(atom_in_mol, dtype=tf.float32))),
+            tf.reduce_sum(
+                u_pair,
+                axis=1,
+                keepdims=True)),
+        attr_in_mol)
 
-        bond_idxs, angle_idxs, torsion_idxs = gin.probabilistic.gn_hyper\
-            .get_geometric_idxs(atoms, adjacency_map)
+    u_tot = tf.squeeze(
+        u_bond_tot + u_angle_tot + u_dihedral_tot + u_pair_tot)
 
-        is_bond = tf.stop_gradient(tf.greater(
-            adjacency_map,
-            tf.constant(0, dtype=tf.float32)))
-
-        distance_matrix = gin.deterministic.md.get_distance_matrix(
-            coordinates)
-
-        bond_distances = tf.boolean_mask(
-            distance_matrix,
-            is_bond)
-
-        angle_angles = gin.deterministic.md.get_angles_cos(
-            coordinates,
-            angle_idxs)
-
-        torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
-            coordinates,
-            torsion_idxs)
-
-        u_bond = tf.math.reduce_sum(
-            tf.math.multiply(
-                y_e[:, 1:],
-                tf.math.pow(
-                    tf.expand_dims(
-                        tf.math.subtract(
-                            bond_distances,
-                            tf.pow(
-                                y_e[:, 0],
-                                tf.constant(2, dtype=tf.float32))),
-                        1),
-                    tf.range(2, dtype=tf.float32))),
-            axis=1)
-
-        u_angle = tf.math.reduce_sum(
-            tf.math.multiply(
-                y_a[:, 1:],
-                tf.math.pow(
-                    tf.expand_dims(
-                        tf.math.subtract(
-                            angle_angles,
-                            tf.tanh(
-                                y_a[:, 0])),
-                        1),
-                    tf.range(2, dtype=tf.float32))),
-            axis=1)
-
-        u_dihedral = tf.math.reduce_sum(
-            tf.math.multiply(
-                y_t[:, 1:],
-                tf.math.pow(
-                    tf.expand_dims(
-                        tf.math.subtract(
-                            torsion_dihedrals,
-                            tf.tanh(
-                                y_t[:, 0])),
-                        1),
-                    tf.range(2, dtype=tf.float32))),
-            axis=1)
-
-        u_pair = tf.reduce_sum(
-                tf.multiply(
-                    y_pair,
-                    tf.math.pow(
-                        tf.expand_dims(
-                                tf.where(
-                                    tf.logical_and(
-                                        tf.equal(
-                                            tf.eye(
-                                                tf.shape(
-                                                    distance_matrix)[0],
-                                                dtype=tf.float32),
-                                            tf.constant(0, dtype=tf.float32)),
-                                        tf.greater(
-                                            distance_matrix,
-                                            tf.constant(0, dtype=tf.float32))),
-                                    tf.pow(
-                                        distance_matrix + 1e-2,
-                                        -1),
-                                    distance_matrix),
-
-                            axis=2),
-                        tf.constant(
-                            [2, 6, 12],
-                            tf.float32))),
-                axis=2)
-
-        u_pair_mask = tf.linalg.band_part(
-            tf.nn.relu(
-                tf.subtract(
-                    tf.subtract(
-                        per_mol_mask,
-                        adjacency_map),
-                    tf.eye(
-                        tf.shape(per_mol_mask)[0]))),
-            0, -1)
-
-        u_pair = tf.multiply(
-            u_pair_mask,
-            u_pair)
-
-        u_bond_tot = tf.matmul(
-            tf.transpose(
-                tf.where(
-                    bond_in_mol,
-                    tf.ones_like(bond_in_mol, dtype=tf.float32),
-                    tf.zeros_like(bond_in_mol, dtype=tf.float32))),
-            tf.expand_dims(
-                u_bond,
-                axis=1))
-
-        u_angle_tot = tf.matmul(
-            tf.transpose(
-                tf.where(
-                    angle_in_mol,
-                    tf.ones_like(angle_in_mol, dtype=tf.float32),
-                    tf.zeros_like(angle_in_mol, dtype=tf.float32))),
-            tf.expand_dims(
-                u_angle,
-                axis=1))
-
-        u_dihedral_tot = tf.matmul(
-            tf.transpose(
-                tf.where(
-                    torsion_in_mol,
-                    tf.ones_like(torsion_in_mol, dtype=tf.float32),
-                    tf.zeros_like(torsion_in_mol, dtype=tf.float32))),
-            tf.expand_dims(
-                u_dihedral,
-                axis=1))
-
-        u_pair_tot = tf.boolean_mask(
-            tf.matmul(
-                tf.transpose(
-                    tf.where(
-                        atom_in_mol,
-                        tf.ones_like(atom_in_mol, dtype=tf.float32),
-                        tf.zeros_like(atom_in_mol, dtype=tf.float32))),
-                tf.reduce_sum(
-                    u_pair,
-                    axis=1,
-                    keepdims=True)),
-            attr_in_mol)
-
-        u_tot = tf.squeeze(
-            u_bond_tot + u_angle_tot + u_dihedral_tot + u_pair_tot)
-
-    return u_tot, tape.gradient(u_tot, coordinates)
+    return u_tot
 
 
 def init(point):
@@ -630,13 +627,18 @@ def obj_fn(point):
             with tf.GradientTape() as tape:
                 tape.watch(gn.variables)
                 tape.watch(coordinates)
-                e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                    atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-                u_hat, jacobian_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
-                    coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
-                    torsion_in_mol, attr_in_mol)
+                with tf.GradientTape() as tape1:
 
+                    e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+
+                    u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+                        coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+                        torsion_in_mol, attr_in_mol)
+
+                jacobian_hat = tape1.gradient(u_hat)
+                
                 u_hat = u_hat + e0
 
                 jacobian_hat = tf.boolean_mask(
