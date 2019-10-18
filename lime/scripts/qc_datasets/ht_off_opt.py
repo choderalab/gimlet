@@ -166,7 +166,7 @@ config_space = {
 
 }
 
-@tf.function
+# @tf.function
 def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
     bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol):
 
@@ -233,58 +233,68 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                     y_a_1)),
             tf.constant(2, dtype=tf.float32)))
 
+    y_t_0, y_t_1 = tf.split(y_t, 2, 1)
+    y_t_0 = tf.squeeze(y_t_0)
+    y_t_1 = tf.squeeze(y_t_1)
+    u_dihedral = tf.math.multiply(
+        y_t_1,
+        tf.math.pow(
+            tf.math.subtract(
+                torsion_dihedrals,
+                tf.tanh(
+                    y_t_0)),
+            tf.constant(2, dtype=tf.float32)))
+    
+    u_pair_mask = tf.linalg.band_part(
+            tf.nn.relu(
+                tf.subtract(
+                    tf.subtract(
+                        per_mol_mask,
+                        adjacency_map),
+                    tf.eye(
+                        tf.shape(per_mol_mask)[0]))),
+                0, -1)
+      
+    _distance_matrix = tf.where(
+        tf.greater(
+            u_pair_mask,
+            tf.constant(0, dtype=tf.float32)),
+        distance_matrix,
+        tf.ones_like(distance_matrix))
 
-    u_dihedral = tf.math.reduce_sum(
-        tf.math.multiply(
-            y_t[:, 1:],
-            tf.math.pow(
-                tf.expand_dims(
-                    tf.math.subtract(
-                        torsion_dihedrals,
-                        tf.tanh(
-                            y_t[:, 0])),
-                    1),
-                tf.range(2, dtype=tf.float32))),
-        axis=1)
+    _distance_matrix_inverse = tf.multiply(
+        u_pair_mask,
+        tf.pow(
+            tf.math.add(
+                _distance_matrix,
+                tf.constant(1e-2, dtype=tf.float32)),
+            tf.constant(-1, dtype=tf.float32)))
+
+    y_pair_0, y_pair_1, y_pair_2 = tf.split(y_pair, 3, 2)
+    y_pair_0 = tf.squeeze(y_pair_0)
+    y_pair_1 = tf.squeeze(y_pair_1)
+    y_pair_2 = tf.squeeze(y_pair_2)
 
     u_pair = tf.reduce_sum(
+        [
             tf.multiply(
-                y_pair,
-                tf.math.pow(
-                    tf.expand_dims(
-                            tf.where(
-                                tf.logical_and(
-                                tf.equal(
-                                    tf.eye(
-                                        tf.shape(
-                                            distance_matrix)[0],
-                                        dtype=tf.float32),
-                                    tf.constant(0, dtype=tf.float32)),
-                                tf.greater(
-                                    distance_matrix,
-                                    tf.constant(0, dtype=tf.float32))),
-                            tf.pow(
-                                distance_matrix + 1e-2,
-                                -1),
-                            distance_matrix),
-
-                    axis=2),
-                tf.constant(
-                    [2, 6, 12],
-                    tf.float32))),
-        axis=2)
-
-    u_pair_mask = tf.linalg.band_part(
-        tf.nn.relu(
-            tf.subtract(
-                tf.subtract(
-                    per_mol_mask,
-                    adjacency_map),
-                tf.eye(
-                    tf.shape(per_mol_mask)[0]))),
-            0, -1)
-
-
+                y_pair_0,
+                tf.pow(
+                    _distance_matrix_inverse,
+                    tf.constant(2, dtype=tf.float32))),
+            tf.multiply(
+                y_pair_1,
+                tf.pow(
+                    _distance_matrix_inverse,
+                    tf.constant(6, dtype=tf.float32))),
+            tf.multiply(
+                y_pair_2,
+                tf.pow(
+                    _distance_matrix_inverse,
+                    tf.constant(12, dtype=tf.float32)))
+        ],
+        axis=0)
+    
     u_bond_tot = tf.matmul(
         tf.transpose(
             tf.where(
@@ -329,9 +339,9 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
         attr_in_mol)
 
     u_tot = tf.squeeze(
-        u_pair_tot)
+        u_bond_tot + u_angle_tot + u_dihedral_tot + u_pair_tot)
 
-    return y_pair
+    return u_tot
 
 def init(point):
     global gn
@@ -629,17 +639,19 @@ def obj_fn(point):
             coordinates = tf.Variable(atoms_[:, 12:15])
             jacobian = atoms_[:, 15:]
             with tf.GradientTape() as tape:
-                # tape.watch(gn.variables)
-
                 e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)           
+
 
                 with tf.GradientTape() as tape1:
+
                     u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
                             coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                             torsion_in_mol, attr_in_mol)
 
                 jacobian_hat = tape1.gradient(u_hat, coordinates)
+                
+                print(jacobian_hat)
 
                 print(tape.gradient(jacobian_hat, gn.variables))
                 # u_hat = u_hat + e0
