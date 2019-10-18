@@ -166,8 +166,8 @@ config_space = {
 
 }
 
-# @tf.function
-def flow(y_e_0, y_e_1, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
+@tf.function
+def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
     bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol):
     
 
@@ -193,20 +193,24 @@ def flow(y_e_0, y_e_1, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom
 
     distance_matrix = gin.deterministic.md.get_distance_matrix(
         coordinates)
+    
+    with tf.device('/CPU:0'):
+        bond_distances = tf.boolean_mask(
+            distance_matrix,
+            is_bond,
+            name='bond_mask')
 
-    bond_distances = tf.boolean_mask(
-        distance_matrix,
-        is_bond,
-        name='bond_mask')
+        angle_angles = gin.deterministic.md.get_angles_cos(
+            coordinates,
+            angle_idxs)
 
-    angle_angles = gin.deterministic.md.get_angles_cos(
-        coordinates,
-        angle_idxs)
+        torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
+            coordinates,
+            torsion_idxs)
 
-    torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
-        coordinates,
-        torsion_idxs)
-
+    y_e_0, y_e_1 = tf.split(y_e, 2, 1)
+    y_e_0 = tf.squeeze(y_e_0)
+    y_e_1 = tf.squeeze(y_e_1)
     u_bond = tf.math.multiply(
             y_e_1,
             tf.math.pow(
@@ -216,19 +220,20 @@ def flow(y_e_0, y_e_1, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom
                         y_e_0,
                         tf.constant(2, dtype=tf.float32))),
                 tf.constant(2, dtype=tf.float32)))
-    
-    u_angle = tf.math.reduce_sum(
-        tf.math.multiply(
-            y_a[:, 1:],
-            tf.math.pow(
-                tf.expand_dims(
-                    tf.math.subtract(
-                        angle_angles,
-                        tf.tanh(
-                            y_a[:, 0])),
-                    1),
-                tf.range(2, dtype=tf.float32))),
-        axis=1)
+   
+
+    y_a_0, y_a_1 = tf.split(y_a, 2, 1)
+    y_a_0 = tf.squeeze(y_a_0)
+    y_a_1 = tf.squeeze(y_a_1)
+    u_angle = tf.math.multiply(
+        y_a_1,
+        tf.math.pow(
+            tf.math.subtract(
+                angle_angles,
+                tf.tanh(
+                    y_a_1)),
+            tf.constant(2, dtype=tf.float32)))
+
 
     u_dihedral = tf.math.reduce_sum(
         tf.math.multiply(
@@ -328,9 +333,9 @@ def flow(y_e_0, y_e_1, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom
         attr_in_mol)
 
     u_tot = tf.squeeze(
-        u_angle_tot)
+        u_pair_tot)
 
-    return u_tot
+    return y_pair
 
 def init(point):
     global gn
@@ -361,9 +366,7 @@ def init(point):
                 kernel_initializer='random_uniform',
                 activity_regularizer=tf.keras.regularizers.l2(1e-5))
 
-            self.d_e_1_0 = tf.keras.layers.Dense(1,
-                kernel_initializer='random_uniform')
-            self.d_e_1_1 = tf.keras.layers.Dense(1,
+            self.d_e_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform')
 
             self.d_e_0 = tf.keras.layers.Dense(units, activation='tanh')
@@ -564,7 +567,7 @@ def init(point):
                             6 * self.d_a
                         ])))
 
-            y_e_0 = self.d_e_1_0(
+            y_e = self.d_e_1(
                 self.d_e_0(
                     tf.reshape(
                         h_e_history,
@@ -573,18 +576,6 @@ def init(point):
                             6 * self.d_e
                         ])))
     
-            y_e_1 = self.d_e_1_1(
-                self.d_e_0(
-                    tf.reshape(
-                        h_e_history,
-                        [
-                            tf.shape(h_e_history)[0],
-                            6 * self.d_e
-                        ])))
-            
-            y_e_0 = tf.squeeze(y_e_0)
-
-            y_e_1 = tf.squeeze(y_e_1)
 
             y_t = self.d_t_1(
                 self.d_t_0(
@@ -595,7 +586,7 @@ def init(point):
                             6 * self.d_t
                         ])))
 
-            return e0, y_e_0, y_e_1, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol
+            return e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol
 
 
     gn = gin.probabilistic.gn_hyper.HyperGraphNet(
@@ -644,11 +635,11 @@ def obj_fn(point):
             with tf.GradientTape() as tape:
                 # tape.watch(gn.variables)
                 
-                e0, y_e_0, y_e_1, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+                e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                         atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol) 
 
                 with tf.GradientTape() as tape1:
-                    u_hat = flow(y_e_0, y_e_1, y_a, y_t, y_pair, atoms, adjacency_map,
+                    u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
                             coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                             torsion_in_mol, attr_in_mol)
 
