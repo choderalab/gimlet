@@ -169,7 +169,7 @@ config_space = {
 @tf.function
 def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
     bond_in_mol, angle_in_mol, torsion_in_mol, attr_in_mol):
-    
+
 
     per_mol_mask = tf.stop_gradient(tf.matmul(
         tf.where(
@@ -193,20 +193,19 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
 
     distance_matrix = gin.deterministic.md.get_distance_matrix(
         coordinates)
-    
-    with tf.device('/CPU:0'):
-        bond_distances = tf.boolean_mask(
-            distance_matrix,
-            is_bond,
-            name='bond_mask')
 
-        angle_angles = gin.deterministic.md.get_angles_cos(
-            coordinates,
-            angle_idxs)
+    bond_distances = tf.boolean_mask(
+        distance_matrix,
+        is_bond,
+        name='bond_mask')
 
-        torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
-            coordinates,
-            torsion_idxs)
+    angle_angles = gin.deterministic.md.get_angles_cos(
+        coordinates,
+        angle_idxs)
+
+    torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
+        coordinates,
+        torsion_idxs)
 
     y_e_0, y_e_1 = tf.split(y_e, 2, 1)
     y_e_0 = tf.squeeze(y_e_0)
@@ -220,7 +219,7 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                         y_e_0,
                         tf.constant(2, dtype=tf.float32))),
                 tf.constant(2, dtype=tf.float32)))
-   
+
 
     y_a_0, y_a_1 = tf.split(y_a, 2, 1)
     y_a_0 = tf.squeeze(y_a_0)
@@ -285,9 +284,6 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                     tf.shape(per_mol_mask)[0]))),
             0, -1)
 
-    u_pair = tf.multiply(
-        u_pair_mask,
-        u_pair)
 
     u_bond_tot = tf.matmul(
         tf.transpose(
@@ -575,7 +571,7 @@ def init(point):
                             tf.shape(h_e_history)[0],
                             6 * self.d_e
                         ])))
-    
+
 
             y_t = self.d_t_1(
                 self.d_t_0(
@@ -634,9 +630,9 @@ def obj_fn(point):
             jacobian = atoms_[:, 15:]
             with tf.GradientTape() as tape:
                 # tape.watch(gn.variables)
-                
+
                 e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol) 
+                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
                 with tf.GradientTape() as tape1:
                     u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
