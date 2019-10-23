@@ -62,7 +62,7 @@ def get_distance_matrix(coordinates):
             X_2 - 2 * tf.matmul(coordinates, tf.transpose(coordinates)) \
                 + tf.transpose(X_2)))
 
-@tf.function
+# @tf.function
 def get_angles(coordinates, angle_idxs):
     """ Calculate the angles from coordinates and angle indices.
 
@@ -100,7 +100,7 @@ def get_angles(coordinates, angle_idxs):
     return angles
 
 
-@tf.function
+# @tf.function
 def get_angles_cos(coordinates, angle_idxs):
     """ Calculate the angles from coordinates and angle indices.
 
@@ -136,7 +136,7 @@ def get_angles_cos(coordinates, angle_idxs):
 
     return angles
 
-@tf.function
+# @tf.function
 def get_dihedrals(coordinates, torsion_idxs):
     """ Calculate the dihedrals based on coordinates and the indices of
     the torsions.
@@ -175,7 +175,7 @@ def get_dihedrals(coordinates, torsion_idxs):
 
     return dihedrals
 
-@tf.function
+# @tf.function
 def get_dihedrals_cos(coordinates, torsion_idxs):
     """ Calculate the dihedrals based on coordinates and the indices of
     the torsions.
