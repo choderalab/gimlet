@@ -249,7 +249,7 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                 tf.tanh(
                     y_t_0)),
             tf.constant(2, dtype=tf.float32)))
-    
+
     u_pair_mask = tf.linalg.band_part(
             tf.nn.relu(
                 tf.subtract(
@@ -259,7 +259,7 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                     tf.eye(
                         tf.shape(per_mol_mask)[0]))),
                 0, -1)
-      
+
     _distance_matrix = tf.where(
         tf.greater(
             u_pair_mask,
@@ -299,7 +299,7 @@ def flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map, coordinates, atom_in_mol,
                     tf.constant(12, dtype=tf.float32)))
         ],
         axis=0)
-    
+
     u_bond_tot = tf.matmul(
         tf.transpose(
             tf.where(
@@ -645,7 +645,7 @@ def obj_fn(point):
             jacobian = atoms_[:, 15:]
             with tf.GradientTape() as tape:
                 e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)           
+                        atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
 
                 with tf.GradientTape() as tape1:
@@ -655,7 +655,7 @@ def obj_fn(point):
                             torsion_in_mol, attr_in_mol)
 
                 jacobian_hat = tape1.gradient(u_hat, coordinates)
-                
+
                 jacobian_hat = tf.boolean_mask(
                     jacobian_hat,
                     tf.reduce_any(
@@ -675,7 +675,7 @@ def obj_fn(point):
                 loss = tf.reduce_sum(tf.losses.mean_squared_error(jacobian,
                   jacobian_hat))
 
-            print(loss)
+            # print(loss)
             variables = gn.variables
             grad = tape.gradient(loss, variables)
 
@@ -700,105 +700,99 @@ def obj_fn(point):
 
     for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_tr:
         atoms = atoms_[:, :12]
-        coordinates = atoms_[:, 12:15]
+        coordinates = tf.Variable(atoms_[:, 12:15])
         jacobian = atoms_[:, 15:]
-        e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+        with tf.GradientTape() as tape:
+            e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+                    atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-        u_hat, jacobian_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
-            coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
-            torsion_in_mol, attr_in_mol)
 
-        u_hat = u_hat + e0
+            with tf.GradientTape() as tape1:
 
-        jacobian_hat = tf.boolean_mask(
-            jacobian_hat,
-            tf.reduce_any(
-                atom_in_mol,
-                axis=1))
+                u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+                        coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+                        torsion_in_mol, attr_in_mol)
 
-        jacobian = tf.boolean_mask(
-            jacobian,
-            tf.reduce_any(
-                atom_in_mol,
-                axis=1))
+            jacobian_hat = tape1.gradient(u_hat, coordinates)
 
-        u = tf.boolean_mask(
-            u,
-            attr_in_mol)
+            jacobian_hat = tf.boolean_mask(
+                jacobian_hat,
+                tf.reduce_any(
+                    atom_in_mol,
+                    axis=1))
 
-        if tf.reduce_any(tf.math.is_nan(jacobian_hat)).numpy() == False:
+            jacobian = tf.boolean_mask(
+                jacobian,
+                tf.reduce_any(
+                    atom_in_mol,
+                    axis=1))
 
-            y_true_tr = tf.concat([y_true_tr, tf.reshape(jacobian, [-1])], axis=0)
-            y_pred_tr = tf.concat([y_pred_tr, tf.reshape(jacobian_hat, [-1])], axis=0)
+        y_true_tr = tf.concat([y_true_tr, tf.reshape(jacobian, [-1])], axis=0)
+        y_pred_tr = tf.concat([y_pred_tr, tf.reshape(jacobian_hat, [-1])], axis=0)
 
     for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_te:
         atoms = atoms_[:, :12]
-        coordinates = atoms_[:, 12:15]
+        coordinates = tf.Variable(atoms_[:, 12:15])
         jacobian = atoms_[:, 15:]
-
-        e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
-
-        u_hat, jacobian_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
-            coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
-            torsion_in_mol, attr_in_mol)
-
-        u_hat = u_hat + e0
-
-        jacobian_hat = tf.boolean_mask(
-            jacobian_hat,
-            tf.reduce_any(
-                atom_in_mol,
-                axis=1))
-
-        jacobian = tf.boolean_mask(
-            jacobian,
-            tf.reduce_any(
-                atom_in_mol,
-                axis=1))
-
-        u = tf.boolean_mask(
-            u,
-            attr_in_mol)
+        with tf.GradientTape() as tape:
+            e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+                    atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
 
-        if tf.reduce_any(tf.math.is_nan(jacobian_hat)).numpy() == False:
-            y_true_te = tf.concat([y_true_te, tf.reshape(jacobian, [-1])], axis=0)
-            y_pred_te = tf.concat([y_pred_te, tf.reshape(jacobian_hat, [-1])], axis=0)
+            with tf.GradientTape() as tape1:
+
+                u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+                        coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+                        torsion_in_mol, attr_in_mol)
+
+            jacobian_hat = tape1.gradient(u_hat, coordinates)
+
+            jacobian_hat = tf.boolean_mask(
+                jacobian_hat,
+                tf.reduce_any(
+                    atom_in_mol,
+                    axis=1))
+
+            jacobian = tf.boolean_mask(
+                jacobian,
+                tf.reduce_any(
+                    atom_in_mol,
+                    axis=1))
+
+        y_true_te = tf.concat([y_true_tr, tf.reshape(jacobian, [-1])], axis=0)
+        y_pred_te = tf.concat([y_pred_tr, tf.reshape(jacobian_hat, [-1])], axis=0)
 
     for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_vl:
         atoms = atoms_[:, :12]
-        coordinates = atoms_[:, 12:15]
+        coordinates = tf.Variable(atoms_[:, 12:15])
         jacobian = atoms_[:, 15:]
-        e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
-                atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
+        with tf.GradientTape() as tape:
+            e0, y_e, y_a, y_t, y_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+                    atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
-        u_hat, jacobian_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
-            coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
-            torsion_in_mol, attr_in_mol)
 
-        u_hat = u_hat + e0
+            with tf.GradientTape() as tape1:
 
-        jacobian_hat = tf.boolean_mask(
-            jacobian_hat,
-            tf.reduce_any(
-                atom_in_mol,
-                axis=1))
+                u_hat = flow(y_e, y_a, y_t, y_pair, atoms, adjacency_map,
+                        coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
+                        torsion_in_mol, attr_in_mol)
 
-        jacobian = tf.boolean_mask(
-            jacobian,
-            tf.reduce_any(
-                atom_in_mol,
-                axis=1))
+            jacobian_hat = tape1.gradient(u_hat, coordinates)
 
-        u = tf.boolean_mask(
-            u,
-            attr_in_mol)
+            jacobian_hat = tf.boolean_mask(
+                jacobian_hat,
+                tf.reduce_any(
+                    atom_in_mol,
+                    axis=1))
 
-        if tf.reduce_any(tf.math.is_nan(jacobian_hat)).numpy() == False:
-            y_true_vl = tf.concat([y_true_vl, tf.reshape(jacobian, [-1])], axis=0)
-            y_pred_vl = tf.concat([y_pred_vl, tf.reshape(jacobian_hat, [-1])], axis=0)
+            jacobian = tf.boolean_mask(
+                jacobian,
+                tf.reduce_any(
+                    atom_in_mol,
+                    axis=1))
+
+        y_true_vl = tf.concat([y_true_vl, tf.reshape(jacobian, [-1])], axis=0)
+        y_pred_vl = tf.concat([y_pred_vl, tf.reshape(jacobian_hat, [-1])], axis=0)
 
 
     r2_tr = metrics.r2_score(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
