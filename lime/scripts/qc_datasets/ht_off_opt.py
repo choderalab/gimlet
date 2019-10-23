@@ -1,16 +1,20 @@
 # =============================================================================
 # imports
 # =============================================================================
-from sklearn import metrics
 import os
 import sys
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+tf.autograph.set_verbosity(3)
+from sklearn import metrics
 import gin
 import lime
 import pandas as pd
 import numpy as np
 # import qcportal as ptl
 # client = ptl.FractalClient()
+
 
 TRANSLATION = {
     6: 0,
@@ -81,6 +85,7 @@ def data_generator():
 
                     yield(atoms, adjacency_map, energy)
 
+
 def data_loader(idx):
     atoms_path = 'data/atoms/' + str(idx.numpy()) + '.npy'
     adjacency_map_path = 'data/adjacency_map/' + str(idx.numpy()) + '.npy'
@@ -112,12 +117,12 @@ ds = ds_path.map(
         [idx],
         [tf.float32, tf.float32, tf.float32]))
 
+
 ds = ds.shuffle(100000, seed=2666)
 
+
 ds = gin.probabilistic.gn.GraphNet.batch(
-    ds, 256, feature_dimension=18, atom_dtype=tf.float32).shuffle(
-        100000,
-        seed=2666).cache(
+    ds, 128, feature_dimension=18, atom_dtype=tf.float32).cache(
             str(os.getcwd()) + '/temp')
 
 n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds))
@@ -356,7 +361,7 @@ def init(point):
             super(f_v, self).__init__()
             self.d = tf.keras.layers.Dense(units)
 
-        @tf.function
+        # @tf.function
         def call(self, x):
             return self.d(x)
 
@@ -397,7 +402,7 @@ def init(point):
             self.d_t = point['D_T']
             self.d_u = point['D_U']
 
-        @tf.function
+        # @tf.function
         def call(self, h_v, h_e, h_a, h_t, h_u,
             h_v_history, h_e_history, h_a_history,
             h_t_history, h_u_history,
@@ -651,11 +656,6 @@ def obj_fn(point):
 
                 jacobian_hat = tape1.gradient(u_hat, coordinates)
                 
-                print(jacobian_hat)
-
-                print(tape.gradient(jacobian_hat, gn.variables))
-                # u_hat = u_hat + e0
-
                 jacobian_hat = tf.boolean_mask(
                     jacobian_hat,
                     tf.reduce_any(
@@ -672,22 +672,22 @@ def obj_fn(point):
                     u,
                     attr_in_mol)
 
-                # loss = tf.reduce_sum(tf.keras.losses.MSE(u, u_hat)) + tf.reduce_sum(tf.keras.losses.MSE(jacobian, jacobian_hat))
-
-                loss = tf.reduce_sum(tf.keras.losses.MSE(jacobian,
+                loss = tf.reduce_sum(tf.losses.mean_squared_error(jacobian,
                   jacobian_hat))
 
+            print(loss)
             variables = gn.variables
             grad = tape.gradient(loss, variables)
-            print(grad)
-            a=b
-            break
 
             # if not tf.reduce_any([tf.reduce_any(tf.math.is_nan(_grad)) for _grad in grad]).numpy():
 
             optimizer.apply_gradients(
                     zip(grad, variables))
 
+            del loss
+            del coordinates
+            del tape
+            del tape1
 
     y_true_tr = -1. * tf.ones([1, ], dtype=tf.float32)
     y_pred_tr = -1. * tf.ones([1, ], dtype=tf.float32)
