@@ -258,7 +258,7 @@ class SingleMoleculeMechanicsSystem:
         self.get_torsion_params()
         self.get_nonbonded_params()
 
-    def energy(self, coordinates=None):
+    def energy(self, coordinates=None, return_terms=False):
         """ Compute the total energy of a small molecule.
 
         $$
@@ -383,6 +383,14 @@ class SingleMoleculeMechanicsSystem:
             tf.pow(
                 coordinates,
                 2))
+
+        if return_terms == True:
+            return (
+                bond_energy,
+                angle_energy,
+                proper_torsion_energy,
+                improper_torsion_energy,
+                lj_energy)
 
         energy_tot = bond_energy \
             + angle_energy \
