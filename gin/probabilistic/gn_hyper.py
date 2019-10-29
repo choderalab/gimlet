@@ -528,18 +528,26 @@ class HyperGraphNet(tf.keras.Model):
         self.f_all = f_all
         self.repeat = repeat
 
-    @tf.function
+    # @tf.function
     def _call(
             self,
             atoms, # NOTE: here there could be more than one mol
             adjacency_map,
-            coordinates,
+            coordinates=None,
             atom_in_mol=False, # (n_atoms, )
             batched_attr_in_mol=False,
             repeat=3):
         """ More general __call__ method.
 
         """
+
+        if type(coordinates) == type(None):
+            coordinates = tf.zeros(
+                [
+                    tf.shape(atoms)[0],
+                    3
+                ],
+                dtype=tf.float32)
 
         # get the attributes of the molecule
         # adjacency_map = mol[1]
@@ -1225,7 +1233,7 @@ class HyperGraphNet(tf.keras.Model):
             return state, output_element
 
         # define the key func: grab the last element in an entry
-        key_func = lambda atom, adjacency_map,coordinates, attr, key: key
+        key_func = lambda atom, adjacency_map, coordinates, attr, key: key
 
         @tf.function
         def init_func(key):
