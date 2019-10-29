@@ -638,7 +638,7 @@ def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
     init(point)
 
-    for dummy_idx in range(10):
+    for dummy_idx in range(30):
         for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_tr:
             atoms = atoms_[:, :12]
             coordinates = tf.Variable(atoms_[:, 12:15])
@@ -759,8 +759,8 @@ def obj_fn(point):
                     atom_in_mol,
                     axis=1))
 
-        y_true_te = tf.concat([y_true_tr, tf.reshape(jacobian, [-1])], axis=0)
-        y_pred_te = tf.concat([y_pred_tr, tf.reshape(jacobian_hat, [-1])], axis=0)
+        y_true_te = tf.concat([y_true_te, tf.reshape(jacobian, [-1])], axis=0)
+        y_pred_te = tf.concat([y_pred_te, tf.reshape(jacobian_hat, [-1])], axis=0)
 
     for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_vl:
         atoms = atoms_[:, :12]

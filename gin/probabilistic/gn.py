@@ -181,7 +181,7 @@ class GraphNet(tf.keras.Model):
         self.f_u = f_u
         self.repeat = repeat
 
-    @tf.function
+    # @tf.function
     def _call(
             self,
             atoms, # NOTE: here there could be more than one mol
@@ -503,7 +503,6 @@ class GraphNet(tf.keras.Model):
 
     # TODO: need testing
     @staticmethod
-    @tf.function
     def batch(
             mols_with_attributes,
             inner_batch_size=128,
