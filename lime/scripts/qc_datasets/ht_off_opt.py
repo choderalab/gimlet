@@ -370,9 +370,9 @@ def init(point):
         """
         def __init__(self, units=point['f_r'], f_r_a=point['f_r_a']):
             super(f_r, self).__init__()
-            self.d_k = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_q = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_pair_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_k = tf.keras.layers.Dense(units, activation='relu')
+            self.d_q = tf.keras.layers.Dense(units, activation='relu')
+            self.d_pair_0 = tf.keras.layers.Dense(units, activation='relu')
             self.d_pair_1 = tf.keras.layers.Dense(3,
                 kernel_initializer='random_uniform',
                 activity_regularizer=tf.keras.regularizers.l2(1e-5))
@@ -380,18 +380,18 @@ def init(point):
             self.d_e_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform')
 
-            self.d_e_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_e_0 = tf.keras.layers.Dense(units, activation='relu')
 
             self.d_a_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform')
-            self.d_a_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_a_0 = tf.keras.layers.Dense(units, activation='relu')
 
             self.d_t_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform')
-            self.d_t_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_t_0 = tf.keras.layers.Dense(units, activation='relu')
 
             self.d_e0_0 = lime.nets.for_gn.ConcatenateThenFullyConnect((units,
-              'tanh', units, 'tanh'))
+              'relu', units, 'relu'))
 
             self.d_e0_1 = tf.keras.layers.Dense(1)
 
@@ -638,7 +638,7 @@ def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
     init(point)
 
-    for dummy_idx in range(30):
+    for dummy_idx in range(10):
         for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_tr:
             atoms = atoms_[:, :12]
             coordinates = tf.Variable(atoms_[:, 12:15])
@@ -672,10 +672,24 @@ def obj_fn(point):
                     u,
                     attr_in_mol)
 
-                loss = tf.reduce_sum(tf.losses.mean_squared_error(jacobian,
-                  jacobian_hat))
+                loss = tf.math.add(
+                    tf.reduce_sum(
+                        tf.keras.losses.MSE(
+                            tf.math.log(
+                                tf.norm(
+                                    jacobian,
+                                    axis=1)),
+                            tf.math.log(
+                                tf.norm(
+                                    jacobian_hat,
+                                    axis=1)))),
+                    tf.reduce_sum(
+                        tf.losses.cosine_similarity(
+                            jacobian,
+                            jacobian_hat,
+                            axis=1)))
 
-            # print(loss)
+
             variables = gn.variables
             grad = tape.gradient(loss, variables)
 
@@ -794,26 +808,40 @@ def obj_fn(point):
         y_true_vl = tf.concat([y_true_vl, tf.reshape(jacobian, [-1])], axis=0)
         y_pred_vl = tf.concat([y_pred_vl, tf.reshape(jacobian_hat, [-1])], axis=0)
 
+    try:
+        r2_tr = metrics.r2_score(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
+        rmse_tr = metrics.mean_squared_error(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
 
-    r2_tr = metrics.r2_score(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
-    rmse_tr = metrics.mean_squared_error(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
+        r2_vl = metrics.r2_score(y_true_vl[1:].numpy(), y_pred_vl[1:].numpy())
+        rmse_vl = metrics.mean_squared_error(y_true_vl[1:].numpy(), y_pred_vl[1:].numpy())
 
-    r2_vl = metrics.r2_score(y_true_vl[1:].numpy(), y_pred_vl[1:].numpy())
-    rmse_vl = metrics.mean_squared_error(y_true_vl[1:].numpy(), y_pred_vl[1:].numpy())
+        r2_te = metrics.r2_score(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
+        rmse_te = metrics.mean_squared_error(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
 
-    r2_te = metrics.r2_score(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
-    rmse_te = metrics.mean_squared_error(y_true_te[1:].numpy(), y_pred_te[1:].numpy())
 
-    print(tf.stack([y_true_tr, y_pred_tr], axis=1))
+        np.save('y_true_tr', y_true_tr[1:].numpy())
+        np.save('y_pred_tr', y_pred_tr[1:].numpy())
+        np.save('y_true_te', y_true_te[1:].numpy())
+        np.save('y_pred_te', y_pred_te[1:].numpy())
+        np.save('y_true_vl', y_true_vl[1:].numpy())
+        np.save('y_pred_vl', y_pred_vl[1:].numpy())
 
-    print(point, flush=True)
-    print(r2_tr, flush=True)
-    print(rmse_tr, flush=True)
-    print(r2_vl, flush=True)
-    print(rmse_vl, flush=True)
-    print(r2_te, flush=True)
-    print(rmse_te, flush=True)
+        print(tf.stack([y_true_tr, y_pred_tr], axis=1))
 
-    return rmse_vl
+        print(point, flush=True)
+        print(r2_tr, flush=True)
+        print(rmse_tr, flush=True)
+        print(r2_vl, flush=True)
+        print(rmse_vl, flush=True)
+        print(r2_te, flush=True)
+        print(rmse_te, flush=True)
+
+        gn.save_weights('gn.h5')
+
+        return rmse_vl
+
+    except:
+        print('nan')
+        return None
 
 lime.optimize.dummy.optimize(obj_fn, config_space.values(), 1000)
