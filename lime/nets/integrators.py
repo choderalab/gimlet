@@ -40,18 +40,21 @@ class BAOAB(tf.keras.optimizers.Optimizer):
 
     A : linear kick
         $$
-        p = p + \gamma t
+        p = p + h \gamma t
         $$
 
     B : linear drift
         $$
-
+        \theta = \theta + h G(\theta)
         $$
 
     O : Ornstein-Uhlenbeck
         $$
+        \alpha p + \sqrt{\tao (1 - \alpha ^ 2)} R_n,
 
         $$
+
+        where $\alpha = e^{-\gamma * h}$ and $R_n \sim \mathcal{N}(0, 1).
 
     """
     def __init__(
@@ -174,5 +177,3 @@ class BAOAB(tf.keras.optimizers.Optimizer):
                 var,
                 'p').assign(
             p)
-
-    
