@@ -144,17 +144,6 @@ class BAOAB(tf.keras.optimizers.Optimizer):
                     tf.random.normal(
                         shape=tf.shape(var))))
 
-        # B
-        # $$ p = p + \frac{h}{2}G(\theta_n) $$
-        p = tf.math.add(
-            p,
-            tf.math.multiply(
-                tf.multiply(
-                    tf.constant(0.5, var.dtype.base_dtype),
-                    tf.cast(
-                        self.h,
-                        var.dtype.base_dtype)),
-                -grad))
 
         # A
         # $$ \theta = \theta + \frac{h}{2} p $$
@@ -167,6 +156,18 @@ class BAOAB(tf.keras.optimizers.Optimizer):
                         self.h,
                         var.dtype.base_dtype)),
                 p))
+
+        # B
+        # $$ p = p + \frac{h}{2}G(\theta_n) $$
+        p = tf.math.add(
+            p,
+            tf.math.multiply(
+                tf.multiply(
+                    tf.constant(0.5, var.dtype.base_dtype),
+                    tf.cast(
+                        self.h,
+                        var.dtype.base_dtype)),
+                -grad))
 
 
         var.assign(
