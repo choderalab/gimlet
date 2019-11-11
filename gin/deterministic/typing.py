@@ -276,13 +276,13 @@ class TypingBase(object):
         return self.__is_connected_to_oxygen
 
     def _is_connected_to_sulfur(self):
-        is_oxygen = self.is_oxygen
-        oxygen_connection_idxs = tf.boolean_mask(
+        is_sulfur = self.is_sulfur
+        sulfur_connection_idxs = tf.boolean_mask(
             self.adjacency_map_full,
-            is_oxygen)
+            is_sulfur)
         return tf.reduce_any(
             tf.greater(
-                oxygen_connection_idxs,
+                sulfur_connection_idxs,
                 tf.constant(0, dtype=tf.float32)),
             axis=0)
 
