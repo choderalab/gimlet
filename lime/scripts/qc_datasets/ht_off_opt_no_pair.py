@@ -215,21 +215,18 @@ def flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map, 
     y_e_0 = tf.squeeze(y_e_0)
     y_e_1 = tf.squeeze(y_e_1)
     u_bond = tf.math.multiply(
-            y_e_1,
+            tf.math.exp(y_e_1),
             tf.math.pow(
                 tf.math.subtract(
                     bond_distances,
-                    tf.pow(
-                        y_e_0,
-                        tf.constant(2, dtype=tf.float32))),
+                    tf.math.exp(y_e_0)),
                 tf.constant(2, dtype=tf.float32)))
-
 
     y_a_0, y_a_1 = tf.split(y_a, 2, 1)
     y_a_0 = tf.squeeze(y_a_0)
     y_a_1 = tf.squeeze(y_a_1)
     u_angle = tf.math.multiply(
-        y_a_1,
+        tf.math.exp(y_a_1),
         tf.math.pow(
             tf.math.subtract(
                 angle_angles,
@@ -241,7 +238,7 @@ def flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map, 
     y_t_0 = tf.squeeze(y_t_0)
     y_t_1 = tf.squeeze(y_t_1)
     u_dihedral = tf.math.multiply(
-        y_t_1,
+        tf.math.exp(y_t_1),
         tf.math.pow(
             tf.math.subtract(
                 torsion_dihedrals,
@@ -275,8 +272,9 @@ def flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map, 
             tf.constant(-1, dtype=tf.float32)))
 
     sigma_over_r = tf.multiply(
-        sigma,
-        _distance_matrix)
+        sigma_pair,
+        _distance_matrix_inverse)
+
 
     u_pair = tf.reduce_sum(
         [
@@ -286,7 +284,7 @@ def flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map, 
                     tf.constant(2, dtype=tf.float32)),
                 q_pair),
             tf.multiply(
-                epsilon,
+                epsilon_pair,
                 tf.math.subtract(
                     tf.pow(
                         sigma_over_r,
@@ -370,13 +368,13 @@ def init(point):
             super(f_r, self).__init__()
 
             self.d_q_0 = tf.keras.layers.Dense(units, activation='relu')
-            self.d_q_1 = tf.keras.layers.Dense(1, activation='relu')
+            self.d_q_1 = tf.keras.layers.Dense(1)
 
             self.d_sigma_0 = tf.keras.layers.Dense(units, activation='relu')
-            self.d_sigma_1 = tf.keras.layers.Dense(units, activation='relu')
+            self.d_sigma_1 = tf.keras.layers.Dense(1, activation='relu')
 
             self.d_epislon_0 = tf.keras.layers.Dense(units, activation='relu')
-            self.d_epsilon_1 = tf.keras.layers.Dense(units, activation='relu')
+            self.d_epsilon_1 = tf.keras.layers.Dense(1, activation='relu')
 
             self.d_e_1 = tf.keras.layers.Dense(2,
                 kernel_initializer='random_uniform')
@@ -629,13 +627,14 @@ def obj_fn(point):
             coordinates = tf.Variable(atoms_[:, 12:15])
             jacobian = atoms_[:, 15:]
             with tf.GradientTape() as tape:
-                e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+                e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                         atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
 
                 with tf.GradientTape() as tape1:
 
-                    u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, atoms, adjacency_map,
+                    u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair,
+                        epsilon_pair, atoms, adjacency_map,
                             coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                             torsion_in_mol, attr_in_mol)
 
@@ -656,7 +655,8 @@ def obj_fn(point):
                 u = tf.boolean_mask(
                     u,
                     attr_in_mol)
-
+                
+                '''
                 loss = tf.math.add(
                     tf.reduce_sum(
                         tf.keras.losses.MSE(
@@ -673,8 +673,12 @@ def obj_fn(point):
                             jacobian,
                             jacobian_hat,
                             axis=1)))
+                '''
 
-
+                loss = tf.reduce_sum(tf.keras.losses.MAPE(
+                    jacobian,
+                    jacobian_hat))
+            
             variables = gn.variables
             grad = tape.gradient(loss, variables)
 
@@ -682,6 +686,8 @@ def obj_fn(point):
 
             optimizer.apply_gradients(
                     zip(grad, variables))
+
+            print(loss)
 
             del loss
             del coordinates
@@ -702,13 +708,13 @@ def obj_fn(point):
         coordinates = tf.Variable(atoms_[:, 12:15])
         jacobian = atoms_[:, 15:]
         with tf.GradientTape() as tape:
-            e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+            e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                     atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
 
             with tf.GradientTape() as tape1:
 
-                u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, atoms, adjacency_map,
+                u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map,
                         coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                         torsion_in_mol, attr_in_mol)
 
@@ -734,12 +740,12 @@ def obj_fn(point):
         coordinates = tf.Variable(atoms_[:, 12:15])
         jacobian = atoms_[:, 15:]
         with tf.GradientTape() as tape:
-            e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+            e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                     atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
             with tf.GradientTape() as tape1:
 
-                u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, atoms, adjacency_map,
+                u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map,
                         coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                         torsion_in_mol, attr_in_mol)
 
@@ -765,13 +771,13 @@ def obj_fn(point):
         coordinates = tf.Variable(atoms_[:, 12:15])
         jacobian = atoms_[:, 15:]
         with tf.GradientTape() as tape:
-            e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
+            e0, y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, bond_in_mol, angle_in_mol, torsion_in_mol = gn(
                     atoms, adjacency_map, coordinates, atom_in_mol, attr_in_mol)
 
 
             with tf.GradientTape() as tape1:
 
-                u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair,, atoms, adjacency_map,
+                u_hat = flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map,
                         coordinates, atom_in_mol, bond_in_mol, angle_in_mol,
                         torsion_in_mol, attr_in_mol)
 
