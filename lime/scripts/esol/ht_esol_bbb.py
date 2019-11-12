@@ -9,10 +9,7 @@ import gin
 import lime
 import pandas as pd
 import numpy as np
-
-
-
-
+import math
 
 
 df = pd.read_csv('delaney-processed.csv')
@@ -52,9 +49,9 @@ ds_all = ds_all.shuffle(n_samples, seed=2666)
 n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds_all))
 n_te = n_batches // 10
 
-ds_te = ds.take(n_te)
-ds_vl = ds.skip(n_te).take(n_te)
-ds_tr = ds.skip(2 * n_te)
+ds_te = ds_all.take(n_te)
+ds_vl = ds_all.skip(n_te).take(n_te)
+ds_tr = ds_all.skip(2 * n_te)
 
 config_space = {
     'D_V': [16, 32, 64, 128, 256],
@@ -97,12 +94,9 @@ def init(point):
 
         @tf.function
         def call(self, x):
-            atom_type = x[:, 0]
-            coordinates = x[:, 1:]
-
             x = tf.one_hot(
                 tf.cast(
-                    atom_type,
+                    x,
                     tf.int64),
                 8)
 
@@ -230,9 +224,6 @@ def init(point):
                             [1, tf.shape(atom_in_mol)[1], 1, 1])),
                     axis=0)
 
-
-
-
             y = self.d(
                 tf.reshape(
                     h_v_bar_history,
@@ -247,7 +238,6 @@ def init(point):
             # y = tf.reshape(y, [-1])
 
             return y
-
 
     gn_theta = gin.probabilistic.gn.GraphNet(
         f_e=f_e,
@@ -315,6 +305,16 @@ def obj_fn(point):
         gn_theta(x[0], x[1])
         break
 
+    gn_sigma.set_weights(
+        [
+            tf.cond(
+                lambda: tf.reduce_all(tf.equal(weight, tf.constan(0,
+                  dtype=tf.float32))),
+                lambda: tf.random.normal(shape=tf.shape(weight), stddev=1e03),
+                lambda: weight)\
+            for weight in gn_sigma.get_weights()
+        ])
+
     for dummy_idx in range(30):
         for atoms, adjacency_map, atom_in_mol, bond_in_mol, y, y_mask \
                 in ds_tr:
@@ -377,7 +377,7 @@ def obj_fn(point):
             gn_theta.set_weights(theta)
 
             with tf.GradientTape() as tape:
-                y_hat = gn(
+                y_hat = gn_mu(
                     atoms,
                     adjacency_map,
                     atom_in_mol=atom_in_mol,
@@ -390,6 +390,8 @@ def obj_fn(point):
 
                 loss = tf.losses.mean_squared_error(y_, y_hat)
 
+            print(loss)
+
             g = tape.gradient(loss, gn_theta.variables)
 
             g_mu_ = [g[idx] + g_theta[idx] + g_mu[idx] for idx in range(len(g))]
@@ -397,7 +399,6 @@ def obj_fn(point):
 
             optimizer_mu.apply_gradients(zip(g_mu_, gn_mu.variables))
             optimizer_sigma.apply_gradients(zip(g_sigma_, gn_sigma.variables))
-
 
     y_true_tr = -1. * tf.ones([1, ], dtype=tf.float32)
     y_pred_tr = -1. * tf.ones([1, ], dtype=tf.float32)
