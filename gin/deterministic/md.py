@@ -245,10 +245,12 @@ class SingleMoleculeMechanicsSystem:
                 tf.constant(10, dtype=tf.float32))
 
         else:
-            self.coordinates = gin.deterministic.conformer.Conformers(
-                mol,
-                self.forcefield,
-                self.typing).get_conformers_from_distance_geometry(1)[0]
+
+            self.coordinates = tf.zeros(
+                shape=(
+                    tf.shape(self.atoms)[0],
+                    3),
+                dtype=tf.float32)
 
         # get the types
         self.typing_assignment = self.typing(self.mol).get_assignment()

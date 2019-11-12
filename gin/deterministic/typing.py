@@ -408,7 +408,7 @@ class TypingBase(object):
             self.__is_connected_to_phosphorus \
                 = self._is_connected_to_phosphorus()
 
-        return self.__is_connected_to_nitrogen
+        return self.__is_connected_to_phosphorus
 
     def _has_1_hydrogen(self):
         # calculate the number of hydrogens added to heavy atoms
