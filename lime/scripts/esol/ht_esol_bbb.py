@@ -103,35 +103,6 @@ def init(point):
             x.set_shape([None, 8])
             return self.d(x)
 
-    f_e = tf.keras.layers.Dense(point['D_E'])
-
-    f_u = lambda atoms, adjacency_map, batched_attr_in_mol: tf.tile(
-            tf.zeros((1, point['D_U'])),
-            [
-                 tf.math.count_nonzero(
-                     batched_attr_in_mol),
-                1
-            ]
-        )
-
-    phi_v = lime.nets.for_gn.ConcatenateThenFullyConnect(
-        (point['phi_v_0'],
-         point['phi_v_a_0'],
-         point['D_V'],
-         point['phi_v_a_1']))
-
-    phi_e = lime.nets.for_gn.ConcatenateThenFullyConnect(
-        (point['phi_e_0'],
-         point['phi_e_a_0'],
-         point['D_E'],
-         point['phi_e_a_1']))
-
-    phi_u = lime.nets.for_gn.ConcatenateThenFullyConnect(
-        (point['phi_u_0'],
-         point['phi_u_a_0'],
-         point['D_U'],
-         point['phi_u_a_1']))
-
     class f_r(tf.keras.Model):
         def __init__(self, config=[
           point['f_r_0'],
@@ -240,51 +211,110 @@ def init(point):
             return y
 
     gn_theta = gin.probabilistic.gn.GraphNet(
-        f_e=f_e,
+        f_e=tf.keras.layers.Dense(point['D_E']),
 
         f_v=f_v(),
 
-        f_u=f_u,
+        f_u=lambda atoms, adjacency_map, batched_attr_in_mol: tf.tile(
+                tf.zeros((1, point['D_U'])),
+                [
+                     tf.math.count_nonzero(
+                         batched_attr_in_mol),
+                    1
+                ]
+            ),
 
-        phi_e=phi_e,
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_e_0'],
+             point['phi_e_a_0'],
+             point['D_E'],
+             point['phi_e_a_1'])),
 
-        phi_v=phi_v,
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_v_0'],
+             point['phi_v_a_0'],
+             point['D_V'],
+             point['phi_v_a_1'])),
 
-        phi_u=phi_u,
+        phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_u_0'],
+             point['phi_u_a_0'],
+             point['D_U'],
+             point['phi_u_a_1'])),
 
         f_r=f_r(),
 
         repeat=5)
+
 
     gn_sigma = gin.probabilistic.gn.GraphNet(
-        f_e=f_e,
+        f_e=tf.keras.layers.Dense(point['D_E']),
 
         f_v=f_v(),
 
-        f_u=f_u,
+        f_u=lambda atoms, adjacency_map, batched_attr_in_mol: tf.tile(
+                tf.zeros((1, point['D_U'])),
+                [
+                     tf.math.count_nonzero(
+                         batched_attr_in_mol),
+                    1
+                ]
+            ),
 
-        phi_e=phi_e,
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_e_0'],
+             point['phi_e_a_0'],
+             point['D_E'],
+             point['phi_e_a_1'])),
 
-        phi_v=phi_v,
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_v_0'],
+             point['phi_v_a_0'],
+             point['D_V'],
+             point['phi_v_a_1'])),
 
-        phi_u=phi_u,
+        phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_u_0'],
+             point['phi_u_a_0'],
+             point['D_U'],
+             point['phi_u_a_1'])),
 
         f_r=f_r(),
 
         repeat=5)
 
+
     gn_mu = gin.probabilistic.gn.GraphNet(
-        f_e=f_e,
+        f_e=tf.keras.layers.Dense(point['D_E']),
 
         f_v=f_v(),
 
-        f_u=f_u,
+        f_u=lambda atoms, adjacency_map, batched_attr_in_mol: tf.tile(
+                tf.zeros((1, point['D_U'])),
+                [
+                     tf.math.count_nonzero(
+                         batched_attr_in_mol),
+                    1
+                ]
+            ),
 
-        phi_e=phi_e,
+        phi_e=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_e_0'],
+             point['phi_e_a_0'],
+             point['D_E'],
+             point['phi_e_a_1'])),
 
-        phi_v=phi_v,
+        phi_v=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_v_0'],
+             point['phi_v_a_0'],
+             point['D_V'],
+             point['phi_v_a_1'])),
 
-        phi_u=phi_u,
+        phi_u=lime.nets.for_gn.ConcatenateThenFullyConnect(
+            (point['phi_u_0'],
+             point['phi_u_a_0'],
+             point['D_U'],
+             point['phi_u_a_1'])),
 
         f_r=f_r(),
 
