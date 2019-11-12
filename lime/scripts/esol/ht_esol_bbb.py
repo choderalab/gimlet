@@ -116,99 +116,35 @@ def init(point):
             super(f_r, self).__init__()
             self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
             self.f_r_1 = config[2]
-            self.d_e = d_e
-            self.d_u = d_u
-            self.d_v = d_v
 
         # @tf.function
         def call(self, h_e, h_v, h_u,
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
 
-            h_e_history.set_shape([None, 6, self.d_e])
-            h_u_history.set_shape([None, 6, self.d_u])
-            h_v_history.set_shape([None, 6, self.d_v])
-
-            h_e_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
+            h_v_bar = tf.reduce_sum(
                             tf.multiply(
                                 tf.tile(
                                     tf.expand_dims(
-                                        tf.expand_dims(
-                                            tf.where( # (n_bonds, n_mols)
-                                                tf.boolean_mask(
-                                                    bond_in_mol,
-                                                    tf.reduce_any(
-                                                        bond_in_mol,
-                                                        axis=1),
-                                                    axis=0),
-                                                tf.ones_like(
-                                                    tf.boolean_mask(
-                                                        bond_in_mol,
-                                                        tf.reduce_any(
-                                                            bond_in_mol,
-                                                            axis=1),
-                                                        axis=0),
-                                                    dtype=tf.float32),
-                                                tf.zeros_like(
-                                                    tf.boolean_mask(
-                                                        bond_in_mol,
-                                                        tf.reduce_any(
-                                                            bond_in_mol,
-                                                            axis=1),
-                                                        axis=0),
-                                                    dtype=tf.float32)),
-                                            2),
-                                        3),
-                                    [
-                                        1,
-                                        1,
-                                        tf.shape(h_e_history)[1],
-                                        tf.shape(h_e)[1]
-                                    ]),
-                                tf.tile( # (n_bonds, n_mols, t, d_e)
+                                        tf.where( # (n_bonds, n_mols)
+                                            atom_in_mol,
+                                            tf.ones_like(
+                                                atom_in_mol,
+                                                dtype=tf.float32),
+                                            tf.zeros_like(
+                                                atom_in_mol,
+                                                dtype=tf.float32)),
+                                        2),
+                                    [1, 1, tf.shape(h_v)[1]]),
+                                tf.tile( # (n_bonds, n_mols, d_e)
                                     tf.expand_dims(
-                                        h_e_history, # (n_bonds, t, d_e)
+                                        h_v, # (n_bonds, d_e)
                                         1),
-                                    [1, tf.shape(bond_in_mol)[1], 1, 1])),
+                                    [1, tf.shape(atom_in_mol)[1], 1])),
                             axis=0)
 
-            h_v_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
-                    tf.multiply(
-                        tf.tile(
-                            tf.expand_dims(
-                                tf.expand_dims(
-                                    tf.where( # (n_atoms, n_mols)
-                                        atom_in_mol,
-                                        tf.ones_like(
-                                            atom_in_mol,
-                                            dtype=tf.float32),
-                                        tf.zeros_like(
-                                            atom_in_mol,
-                                            dtype=tf.float32)),
-                                    2),
-                                3),
-                            [1, 1, tf.shape(h_v_history)[1], tf.shape(h_v)[1]]),
-                        tf.tile( # (n_atoms, n_mols, t, d_e)
-                            tf.expand_dims(
-                                h_v_history, # (n_atoms, t, d_e)
-                                1),
-                            [1, tf.shape(atom_in_mol)[1], 1, 1])),
-                    axis=0)
+            return tf.reshape(self.d(h_v_bar), [-1])
 
-            y = self.d(
-                tf.reshape(
-                    h_v_bar_history,
-                    [-1, 6 * self.d_v]),
-                tf.reshape(
-                    h_e_bar_history,
-                    [-1, 6 * self.d_e]),
-                tf.reshape(
-                    h_u_history,
-                    [-1, 6 * self.d_u]))
-
-            # y = tf.reshape(y, [-1])
-
-            return y
 
     gn_theta = gin.probabilistic.gn.GraphNet(
         f_e=tf.keras.layers.Dense(point['D_E']),
@@ -351,9 +287,6 @@ def obj_fn(point):
 
             mu = [tf.convert_to_tensor(v) for v in gn_mu.get_weights()]
             sigma = [tf.convert_to_tensor(v) for v in gn_sigma.get_weights()]
-            
-            print(mu)
-            print(sigma)
 
             epsilon = [
                         tf.random.normal(
@@ -420,18 +353,18 @@ def obj_fn(point):
                 y_ = tf.boolean_mask(
                     y,
                     y_mask)
-                
+
 
                 loss = tf.losses.mean_squared_error(y_, y_hat)
 
             print(loss)
 
             g = tape.gradient(loss, gn_theta.variables)
-            
+
             g_mu_ = [g[idx] + g_theta[idx] + g_mu[idx] for idx in range(len(g))]
             g_sigma_ = [g[idx] * epsilon[idx] + g_theta[idx] * epsilon[idx] + g_sigma[idx] for idx in range(len(g))]
 
-            
+
             optimizer_mu.apply_gradients(zip(g_mu_, gn_mu.variables))
             optimizer_sigma.apply_gradients(zip(g_sigma_, gn_sigma.variables))
 
