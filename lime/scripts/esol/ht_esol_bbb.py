@@ -321,7 +321,7 @@ def init(point):
         repeat=5)
 
 
-    optimizer_mu = tf.keras.optimizers.Adam(1e-3)
+    optimizer_mu = tf.keras.optimizers.Adam(1e-5)
     optimizer_sigma = tf.keras.optimizers.Adam(1e-5)
 
 
@@ -351,6 +351,9 @@ def obj_fn(point):
 
             mu = [tf.convert_to_tensor(v) for v in gn_mu.get_weights()]
             sigma = [tf.convert_to_tensor(v) for v in gn_sigma.get_weights()]
+            
+            print(mu)
+            print(sigma)
 
             epsilon = [
                         tf.random.normal(
@@ -407,7 +410,7 @@ def obj_fn(point):
             gn_theta.set_weights(theta)
 
             with tf.GradientTape() as tape:
-                y_hat = gn_mu(
+                y_hat = gn_theta(
                     atoms,
                     adjacency_map,
                     atom_in_mol=atom_in_mol,
@@ -417,16 +420,18 @@ def obj_fn(point):
                 y_ = tf.boolean_mask(
                     y,
                     y_mask)
+                
 
                 loss = tf.losses.mean_squared_error(y_, y_hat)
 
             print(loss)
 
             g = tape.gradient(loss, gn_theta.variables)
-
+            
             g_mu_ = [g[idx] + g_theta[idx] + g_mu[idx] for idx in range(len(g))]
             g_sigma_ = [g[idx] * epsilon[idx] + g_theta[idx] * epsilon[idx] + g_sigma[idx] for idx in range(len(g))]
 
+            
             optimizer_mu.apply_gradients(zip(g_mu_, gn_mu.variables))
             optimizer_sigma.apply_gradients(zip(g_sigma_, gn_sigma.variables))
 
