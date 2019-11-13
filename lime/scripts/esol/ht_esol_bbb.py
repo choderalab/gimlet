@@ -108,7 +108,7 @@ def init(point):
           point['f_r_0'],
           point['f_r_a_0'],
           point['f_r_1'],
-          point['f_r_a_1'], 1],
+          'tanh', 1],
 
           d_e=point['D_E'],
           d_u=point['D_U'],
@@ -116,36 +116,42 @@ def init(point):
             super(f_r, self).__init__()
             self.d = lime.nets.for_gn.ConcatenateThenFullyConnect(config)
             self.f_r_1 = config[2]
+            self.d_e = d_e
+            self.d_u = d_u
+            self.d_v = d_v
 
-        # @tf.function
+        @tf.function
         def call(self, h_e, h_v, h_u,
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
 
-            h_v_bar = tf.reduce_sum(
+            h_e_history.set_shape([None, 6, self.d_e])
+            h_u_history.set_shape([None, 6, self.d_u])
+            h_v_history.set_shape([None, 6, self.d_v])
+
+            h_e_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
                             tf.multiply(
                                 tf.tile(
                                     tf.expand_dims(
-                                        tf.where( # (n_bonds, n_mols)
-                                            atom_in_mol,
-                                            tf.ones_like(
-                                                atom_in_mol,
-                                                dtype=tf.float32),
-                                            tf.zeros_like(
-                                                atom_in_mol,
-                                                dtype=tf.float32)),
-                                        2),
-                                    [1, 1, tf.shape(h_v)[1]]),
-                                tf.tile( # (n_bonds, n_mols, d_e)
-                                    tf.expand_dims(
-                                        h_v, # (n_bonds, d_e)
-                                        1),
-                                    [1, tf.shape(atom_in_mol)[1], 1])),
-                            axis=0)
-
-            return tf.reshape(self.d(h_v_bar), [-1])
-
-
+                                        tf.expand_dims(
+                                            tf.where( # (n_bonds, n_mols)
+                                                tf.boolean_mask(
+                                                    bond_in_mol,
+                                                    tf.reduce_any(
+                                                        bond_in_mol,
+                                                        axis=1),
+                                                    axis=0),
+                                                tf.ones_like(
+                                                    tf.boolean_mask(
+                                                        bond_in_mol,
+                                                        tf.reduce_any(
+                                                            bond_in_mol,
+                                                            axis=1),
+                                                        axis=0),
+                                                    dtype=tf.float32),
+                                                tf.zeros_like(
+                                                    tf.boolean_mask(
+                                                        bond_in_mol,
     gn_theta = gin.probabilistic.gn.GraphNet(
         f_e=tf.keras.layers.Dense(point['D_E']),
 
@@ -276,7 +282,7 @@ def obj_fn(point):
             tf.cond(
                 lambda: tf.reduce_all(tf.equal(weight, tf.constan(0,
                   dtype=tf.float32))),
-                lambda: tf.random.normal(shape=tf.shape(weight), stddev=1e03),
+                lambda: tf.random.normal(shape=tf.shape(weight), stddev=1e-3),
                 lambda: weight)\
             for weight in gn_sigma.get_weights()
         ])
