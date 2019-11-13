@@ -108,7 +108,7 @@ def init(point):
           point['f_r_0'],
           point['f_r_a_0'],
           point['f_r_1'],
-          'tanh', 1],
+          point['f_r_a_1'], 1],
 
           d_e=point['D_E'],
           d_u=point['D_U'],
@@ -120,7 +120,7 @@ def init(point):
             self.d_u = d_u
             self.d_v = d_v
 
-        @tf.function
+        # @tf.function
         def call(self, h_e, h_v, h_u,
                 h_e_history, h_v_history, h_u_history,
                 atom_in_mol, bond_in_mol):
@@ -152,6 +152,67 @@ def init(point):
                                                 tf.zeros_like(
                                                     tf.boolean_mask(
                                                         bond_in_mol,
+                                                        tf.reduce_any(
+                                                            bond_in_mol,
+                                                            axis=1),
+                                                        axis=0),
+                                                    dtype=tf.float32)),
+                                            2),
+                                        3),
+                                    [
+                                        1,
+                                        1,
+                                        tf.shape(h_e_history)[1],
+                                        tf.shape(h_e)[1]
+                                    ]),
+                                tf.tile( # (n_bonds, n_mols, t, d_e)
+                                    tf.expand_dims(
+                                        h_e_history, # (n_bonds, t, d_e)
+                                        1),
+                                    [1, tf.shape(bond_in_mol)[1], 1, 1])),
+                            axis=0)
+
+            h_v_bar_history = tf.reduce_sum( # (n_mols, t, d_e)
+                    tf.multiply(
+                        tf.tile(
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.where( # (n_atoms, n_mols)
+                                        atom_in_mol,
+                                        tf.ones_like(
+                                            atom_in_mol,
+                                            dtype=tf.float32),
+                                        tf.zeros_like(
+                                            atom_in_mol,
+                                            dtype=tf.float32)),
+                                    2),
+                                3),
+                            [1, 1, tf.shape(h_v_history)[1], tf.shape(h_v)[1]]),
+                        tf.tile( # (n_atoms, n_mols, t, d_e)
+                            tf.expand_dims(
+                                h_v_history, # (n_atoms, t, d_e)
+                                1),
+                            [1, tf.shape(atom_in_mol)[1], 1, 1])),
+                    axis=0)
+
+
+
+
+            y = self.d(
+                tf.reshape(
+                    h_v_bar_history,
+                    [-1, 6 * self.d_v]),
+                tf.reshape(
+                    h_e_bar_history,
+                    [-1, 6 * self.d_e]),
+                tf.reshape(
+                    h_u_history,
+                    [-1, 6 * self.d_u]))
+
+            # y = tf.reshape(y, [-1])
+
+            return y
+
     gn_theta = gin.probabilistic.gn.GraphNet(
         f_e=tf.keras.layers.Dense(point['D_E']),
 
