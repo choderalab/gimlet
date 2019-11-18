@@ -56,24 +56,24 @@ ds_vl = ds_all.skip(n_te).take(n_te)
 ds_tr = ds_all.skip(2 * n_te)
 
 config_space = {
-    'D_V': [16, 32, 64, 128, 256],
-    'D_E': [16, 32, 64, 128, 256],
-    'D_U': [16, 32, 64, 128, 256],
+    'D_V': [16, 32],
+    'D_E': [16, 32],
+    'D_U': [16, 32],
 
-    'phi_e_0': [32, 64, 128],
+    'phi_e_0': [16, 32],
     'phi_e_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_e_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'phi_v_0': [32, 64, 128],
+    'phi_v_0': [16, 32],
     'phi_v_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_v_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'phi_u_0': [32, 64, 128],
+    'phi_u_0': [16, 32],
     'phi_u_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_u_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'f_r_0': [32, 64, 128],
-    'f_r_1': [32, 64, 128],
+    'f_r_0': [16, 32],
+    'f_r_1': [16, 32],
     'f_r_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'f_r_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
@@ -86,8 +86,10 @@ def init(point):
     global gn_mu
     global gn_sigma
     global gn_theta
+    global gn_u
     global optimizer_mu
     global optimizer_sigma
+    global optimizer_u
 
     class f_v(tf.keras.Model):
         def __init__(self, units=point['D_V']):
@@ -374,6 +376,7 @@ def obj_fn(point):
         gn_mu(x[0], x[1])
         gn_sigma(x[0], x[1])
         gn_theta(x[0], x[1])
+        gn_u(x[0], x[1])
         break
 
     gn_sigma.set_weights(
@@ -391,7 +394,7 @@ def obj_fn(point):
             tf.random.normal(
                 shape=tf.shape(weight),
                 stddev=1e-3)\
-            for weight gn_u.get_weights()
+            for weight in gn_u.get_weights()
         ])
 
     for dummy_idx in range(60):
@@ -412,23 +415,22 @@ def obj_fn(point):
                 tape.watch(sigma)
                 tape.watch(mu)
                 tape.watch(u)
-
                 # $$
-                # w_k = L_k^{-1} v_k
+                # w_k = L_k^{-1} u
                 # $$
                 w = [
-                    tf.squeeze(
+                    tf.reshape(
                         tf.matmul(
-                            tf.diag(
+                            tf.linalg.diag(
                                 tf.pow(
                                     tf.reshape(
                                         sigma[idx],
                                         [-1]),
-                                    tf.constant(-1, dtype=tf.float32)),
-                                dtype=tf.float32),
+                                    tf.constant(-1, dtype=tf.float32))),
                             tf.reshape(
                                 u[idx],
-                                [-1, 1])))\
+                                [-1, 1])),
+                        [-1])\
                     for idx in range(len(sigma))
                     ]
 
@@ -446,25 +448,24 @@ def obj_fn(point):
                         tf.constant(1, dtype=tf.float32))\
                     for idx in range(len(w))
                     ]
-
+                
 
                 # $$
                 # L = L_k (I + \frac{ww^T}{||w||^2})
                 # $$
                 l = [
                         tf.matmul(
-                            tf.diag(
+                            tf.linalg.diag(
                                 tf.reshape(
                                     sigma[idx],
-                                    [-1]),
-                                dtype=tf.float32),
+                                    [-1])),
                             tf.math.add(
                                 tf.eye(
-                                    tf.shape(sigma[idx])),
+                                    tf.shape(w[idx])[0]),
                                 tf.math.multiply(
-                                    gamma,
+                                    gamma[idx],
                                     tf.math.divide_no_nan(
-                                        tf.math.matmul(
+                                        tf.matmul(
                                             tf.reshape(
                                                 w[idx],
                                                 [-1, 1]),
@@ -476,6 +477,7 @@ def obj_fn(point):
                                                 w[idx]))))))\
                     for idx in range(len(w))
                 ]
+                
 
                 # $$
                 # l^{-1} = (I - \frac{\gamma}{\gamma + 1}
@@ -485,13 +487,13 @@ def obj_fn(point):
                     tf.matmul(
                         tf.math.subtract(
                             tf.eye(
-                                tf.shape(l)[0]),
+                                tf.shape(l[idx])[0]),
                             tf.math.multiply(
                                 tf.math.divide_no_nan(
                                     gamma[idx],
                                     gamma[idx] + 1),
                                 tf.math.divide_no_nan(
-                                    tf.math.matmul(
+                                    tf.matmul(
                                         tf.reshape(
                                             w[idx],
                                             [-1, 1]),
@@ -501,23 +503,28 @@ def obj_fn(point):
                                     tf.reduce_sum(
                                         tf.square(
                                             w[idx]))))),
-                        tf.math.pow(
-                            sigma[idx],
-                            tf.constant(-1, dtype=tf.float32)))\
+                            tf.linalg.diag(
+                                tf.reshape(
+                                    tf.pow(
+                                        sigma[idx],
+                                        -1),
+                                    [-1])))\
                     for idx in range(len(l))
                 ]
 
-
                 # $$
-                # \theta = L \circ epsilon + \mu
+                # \theta = L  epsilon + \mu
                 # $$
                 theta = [
                     tf.math.add(
-                        tf.multiply(
-                            tf.reshape(
+                        tf.reshape(
+                            tf.matmul(
                                 l[idx],
-                                tf.shape(epsilon[idx])),
-                            epsilon[idx]),
+                                tf.reshape(
+                                    epsilon[idx],
+                                    [-1, 1])),
+                            tf.shape(epsilon[idx])),
+
                         mu[idx])\
                     for idx in range(len(l))
                 ]
@@ -533,6 +540,35 @@ def obj_fn(point):
                     for idx in range(len(l))
                 ]
 
+
+                k_inverse = [
+                    tf.matmul(
+                        l_inverse[idx],
+                        tf.transpose(
+                            l_inverse[idx]))\
+                    for idx in range(len(l_inverse))
+                ]
+                
+                det_k = [
+                    tf.multiply(
+                        tf.squeeze(tf.math.add(
+                            tf.eye(tf.shape(k[idx])[0]),
+                            tf.matmul(
+                                tf.matmul(
+                                    tf.reshape(
+                                        u[idx],
+                                        [1, -1]),
+                                    k_inverse[idx]),
+                                tf.reshape(
+                                    u[idx],
+                                    [-1 ,1])))),
+                        tf.math.log(
+                            tf.reduce_sum(
+                                tf.math.exp(
+                                    tf.math.square(
+                                        sigma[idx])))))\
+                  for idx in range(len(k))]
+
                 tape.watch(theta)
 
                 f = [
@@ -542,17 +578,17 @@ def obj_fn(point):
                                     tf.math.multiply(
                                         tf.math.multiply(
                                             tf.constant(-0.5, dtype=tf.float32),
-                                            tf.shape(
-                                                k[idx],
-                                                dtype=tf.float32)),
+                                            tf.cast(
+                                                tf.shape(
+                                                    k[idx])[0],
+                                                tf.float32)),
                                         tf.math.log(
                                             tf.constant(2, dtype=tf.float32),
                                             math.pi)),
                                     tf.math.multiply(
                                         tf.constant(-0.5, dtype=tf.float32),
                                         tf.math.log(
-                                            tf.linalg.det(
-                                                k[idx])))),
+                                            det_k[idx]))),
                                 tf.math.multiply(
                                     tf.constant(-0.5, dtype=tf.float32),
                                     tf.matmul(
@@ -561,18 +597,20 @@ def obj_fn(point):
                                                 tf.math.subtract(
                                                     theta[idx],
                                                     mu[idx]),
-                                                [-1, 1]),
+                                                [1, -1]),
                                             k_inverse[idx]),
                                         tf.reshape(
                                             tf.subtract(
                                                 theta[idx],
-                                                mu[idx])))),
+                                                mu[idx]),
+                                            [-1, 1])))),
 
                             tf.math.multiply(
                                 tf.constant(1e-10, dtype=tf.float32),
                                 tf.reduce_sum(tf.math.square(theta[idx]))))\
                             for idx in range(len(gn_theta.get_weights()))
                 ]
+            
 
             g_theta = tape.gradient(f, theta)
             g_mu = tape.gradient(f, mu)
@@ -581,6 +619,9 @@ def obj_fn(point):
 
             d_theta_d_sigma = tape.gradient(theta, sigma)
             d_theta_d_u = tape.gradient(theta, u)
+            
+            
+            print(f)
 
             gn_theta.set_weights(theta)
 
