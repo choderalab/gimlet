@@ -656,7 +656,6 @@ def obj_fn(point):
                     u,
                     attr_in_mol)
                 
-                '''
                 loss = tf.math.add(
                     tf.reduce_sum(
                         tf.keras.losses.MSE(
@@ -673,11 +672,7 @@ def obj_fn(point):
                             jacobian,
                             jacobian_hat,
                             axis=1)))
-                '''
 
-                loss = tf.reduce_sum(tf.keras.losses.MAPE(
-                    jacobian,
-                    jacobian_hat))
             
             variables = gn.variables
             grad = tape.gradient(loss, variables)
@@ -686,8 +681,6 @@ def obj_fn(point):
 
             optimizer.apply_gradients(
                     zip(grad, variables))
-
-            print(loss)
 
             del loss
             del coordinates
