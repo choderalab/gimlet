@@ -189,7 +189,8 @@ class GraphNet(tf.keras.Model):
             atom_in_mol=False, # (n_atoms, )
             bond_in_mol=False, # (n_bonds, )
             batched_attr_in_mol=False,
-            repeat=3):
+            repeat=3,
+            **kwargs):
         """ More general __call__ method.
 
         """
@@ -488,7 +489,8 @@ class GraphNet(tf.keras.Model):
         y_bar = self.f_r(
             h_e, h_v, h_u,
             h_e_history, h_v_history, h_u_history,
-            atom_in_mol, bond_in_mol)
+            atom_in_mol, bond_in_mol,
+            **kwargs)
 
         return y_bar
 
