@@ -109,8 +109,8 @@ def params_to_potential(
             [[True]],
             [n_bonds, 1])
 
-    if tf.logical_not(tf.reduce_any(batched_attr_in_mol)):
-        batched_attr_in_mol = tf.constant([[True]])
+    if tf.logical_not(tf.reduce_any(attr_in_mol)):
+        attr_in_mol = tf.constant([[True]])
 
     per_mol_mask = tf.stop_gradient(tf.matmul(
         tf.where(
@@ -162,30 +162,30 @@ def params_to_potential(
 
 
     u_bond = tf.math.multiply(
-            y_e_k,
+            e_k,
             tf.math.pow(
                 tf.math.subtract(
                     bond_distances,
-                    y_e_l),
+                    e_l),
                 tf.constant(2, dtype=tf.float32)))
 
     u_angle = tf.math.multiply(
-        y_a_k,
+        a_k,
         tf.math.pow(
             tf.math.subtract(
                 angle_angles,
-                y_a_l),
+                a_l),
             tf.constant(2, dtype=tf.float32)))
 
     u_dihedral = tf.math.multiply(
-        y_t_k,
+        t_k,
         tf.math.pow(
             tf.math.subtract(
                 torsion_dihedrals,
-                y_t_l),
+                t_l),
             tf.constant(2, dtype=tf.float32)))
 
-    n_atoms = tf.shape(h_v, tf.int64)[0]
+    n_atoms = tf.shape(q, tf.int64)[0]
     n_angles = tf.shape(angle_idxs, tf.int64)[0]
     n_torsions = tf.shape(torsion_idxs, tf.int64)[0]
 
@@ -756,7 +756,8 @@ def obj_fn(point):
 
                 loss = tf.reduce_sum(tf.keras.losses.MSE(jacobian,
                     jacobian_hat))
-
+            
+            print(loss)
             variables = gn.variables
             grad = tape.gradient(loss, variables)
             # if not tf.reduce_any([tf.reduce_any(tf.math.is_nan(_grad)) for _grad in grad]).numpy():
