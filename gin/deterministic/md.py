@@ -131,8 +131,8 @@ def get_angles_cos(coordinates, angle_idxs):
                 angle_right),
             axis=1),
         tf.math.multiply(
-            tf.norm(angle_left),
-            tf.norm(angle_right)))
+            tf.norm(angle_left, axis=1),
+            tf.norm(angle_right, axis=1)))
 
     return angles
 
