@@ -12,12 +12,18 @@ import gin
 import lime
 import pandas as pd
 import numpy as np
-# import qcportal as ptl
-# client = ptl.FractalClient()
+import qcportal as ptl
+client = ptl.FractalClient()
+from openforcefield.topology import Molecule
+from openforcefield.topology import Topology
+from openforcefield.typing.engines.smirnoff import ForceField
+FF = ForceField('test_forcefields/smirnoff99Frosst.offxml')
+import cmiles
+from simtk import openmm
 
 HARTREE_TO_KCAL_PER_MOL = 627.509
-BORN_TO_ANGSTROM = 0.529177
-HARTREE_PER_BORN_TO_KCAL_PER_MOL_PER_ANGSTROM = 1185.993
+BOHR_TO_NM = 0.0529177
+HARTREE_PER_BOHR_TO_KCAL_PER_MOL_PER_NM = 10587.30
 
 TRANSLATION = {
     6: 0,
@@ -32,9 +38,20 @@ TRANSLATION = {
     1: 9
 }
 
+TRANSLATION_TO_ELEMENT = {
+    0: 6,
+    1: 7,
+    2: 8,
+    3: 16,
+    4: 9,
+    5: 17,
+    6: 53,
+    7: 1}
 
-# ds_qc = client.get_collection("OptimizationDataset", "OpenFF Full Optimization Benchmark 1")
-# ds_name = tf.data.Dataset.from_tensor_slices(list(ds_qc.data.records))
+
+
+ds_qc = client.get_collection("OptimizationDataset", "OpenFF Full Optimization Benchmark 1")
+ds_name = tf.data.Dataset.from_tensor_slices(list(ds_qc.data.records))
 
 def data_generator():
     for record_name in list(ds_qc.data.records):
@@ -48,7 +65,8 @@ def data_generator():
                         dtype=tf.float32)
 
                     mol = snapshot.get_molecule()
-
+                    # mol = snapshot.get_molecule().dict(encoding='json')
+                    
                     atoms = tf.convert_to_tensor(
                         [TRANSLATION[atomic_number] for atomic_number in mol.atomic_numbers],
                         dtype=tf.int64)
@@ -67,27 +85,75 @@ def data_generator():
                             np.array(mol.connectivity)[:, 2],
                             dtype=tf.float32))
 
-                    features = gin.probabilistic.featurization.featurize_atoms(
-                        atoms, adjacency_map)
-
                     xyz = tf.convert_to_tensor(
-                        mol.geometry * BORN_TO_ANGSTROM,
+                        mol.geometry * BOHR_TO_NM,
                         dtype=tf.float32)
 
                     jacobian = tf.convert_to_tensor(
-                        snapshot.return_result * HARTREE_PER_BORN_TO_KCAL_PER_MOL_PER_ANGSTROM,
+                        snapshot.return_result\
+                        * HARTREE_PER_BOHR_TO_KCAL_PER_MOL_PER_NM,
                         dtype=tf.float32)
 
-                    atoms = tf.concat(
-                        [
-                            features,
-                            xyz,
-                            jacobian
-                        ],
-                    axis=1)
+                    mol = cmiles.utils.load_molecule(mol.dict(encoding='json'))
 
-                    yield(atoms, adjacency_map, energy)
+                    top = Topology.from_molecules(Molecule.from_openeye(mol))
+                    sys = FF.create_openmm_system(top)
 
+                    angles = tf.convert_to_tensor(
+                            [[x[0], x[1], x[2], 
+                                x[3]._value, 
+                                x[4]._value] for x in\
+                            [sys.getForces(
+                                )[0].getAngleParameters(idx)\
+                                for idx in range(sys.getForces(
+                                    )[0].getNumAngles())]],
+                            dtype=tf.float32)
+                    
+
+                    bonds = tf.convert_to_tensor([[x[0], x[1], 
+                                x[2]._value, 
+                                x[3]._value]  for x in\
+                            [sys.getForces(
+                                )[1].getBondParameters(idx)\
+                                for idx in range(sys.getForces(
+                                    )[1].getNumBonds())]],
+                            dtype=tf.float32)
+
+
+                    torsions = tf.convert_to_tensor([
+                        [x[0], x[1], x[2], x[3], x[4], x[5]._value, x[6]._value] for x in\
+                            [sys.getForces(
+                                )[3].getTorsionParameters(idx)\
+                                for idx in range(sys.getForces(
+                                    )[3].getNumTorsions())]],
+                            dtype=tf.float32)
+
+
+                    particle_params = tf.convert_to_tensor([[
+                            x[0]._value,
+                            x[1]._value,
+                            x[2]._value
+                            ] for x in\
+                            [sys.getForces(
+                                )[2].getParticleParameters(idx)\
+                                for idx in range(sys.getForces(
+                                    )[2].getNumParticles())]])
+
+                    
+                    yield(
+                        atoms,
+                        adjacency_map,
+                        energy,
+                        xyz,
+                        jacobian,
+                        angles,
+                        bonds,
+                        torsions,
+                        particle_params,
+                        sys)
+    
+
+# @tf.function
 def params_to_potential(
         q, sigma, epsilon,
         e_l, e_k,
@@ -95,10 +161,15 @@ def params_to_potential(
         t_l, t_k,
         bond_idxs, angle_idxs, torsion_idxs,
         coordinates,
-        atom_in_mol=False,
-        bond_in_mol=False,
-        attr_in_mol=False):
-
+        atom_in_mol=tf.constant(False),
+        bond_in_mol=tf.constant(False),
+        attr_in_mol=tf.constant(False)):
+    
+    n_atoms = tf.shape(q, tf.int64)[0]
+    n_angles = tf.shape(angle_idxs, tf.int64)[0]
+    n_torsions = tf.shape(torsion_idxs, tf.int64)[0]
+    n_bonds = tf.shape(bond_idxs, tf.int64)[0]
+    
     if tf.logical_not(tf.reduce_any(atom_in_mol)):
         atom_in_mol = tf.tile(
             [[True]],
@@ -111,6 +182,7 @@ def params_to_potential(
 
     if tf.logical_not(tf.reduce_any(attr_in_mol)):
         attr_in_mol = tf.constant([[True]])
+    
 
     per_mol_mask = tf.stop_gradient(tf.matmul(
         tf.where(
@@ -161,7 +233,7 @@ def params_to_potential(
             tf.transpose(epsilon)))
 
 
-    u_bond = tf.math.multiply(
+    u_bond = 0.5 * tf.math.multiply(
             e_k,
             tf.math.pow(
                 tf.math.subtract(
@@ -169,14 +241,14 @@ def params_to_potential(
                     e_l),
                 tf.constant(2, dtype=tf.float32)))
 
-    u_angle = tf.math.multiply(
+    u_angle = 0.5 * tf.math.multiply(
         a_k,
         tf.math.pow(
             tf.math.subtract(
-                angle_angles,
+                tf.math.acos(angle_angles),
                 a_l),
             tf.constant(2, dtype=tf.float32)))
-
+    
     u_dihedral = tf.math.multiply(
         t_k,
         tf.math.pow(
@@ -184,10 +256,6 @@ def params_to_potential(
                 torsion_dihedrals,
                 t_l),
             tf.constant(2, dtype=tf.float32)))
-
-    n_atoms = tf.shape(q, tf.int64)[0]
-    n_angles = tf.shape(angle_idxs, tf.int64)[0]
-    n_torsions = tf.shape(torsion_idxs, tf.int64)[0]
 
     # (n_angles, n_atoms)
     angle_is_connected_to_atoms = tf.reduce_any(
@@ -327,6 +395,20 @@ def params_to_potential(
                 tf.shape(bond_idxs, tf.int32)[0]),
             dtype=tf.float32))
 
+    u_pair_mask = tf.tensor_scatter_nd_update(
+        u_pair_mask,
+        tf.stack(
+            [
+                angle_idxs[:, 0],
+                angle_idxs[:, 2]
+            ],
+            axis=1),
+        tf.zeros(
+            shape=(
+                tf.shape(angle_idxs, tf.int32)[0]),
+            dtype=tf.float32))
+
+
     u_pair_mask = tf.linalg.set_diag(
         u_pair_mask,
         tf.zeros(
@@ -345,40 +427,68 @@ def params_to_potential(
         tf.pow(
             tf.math.add(
                 _distance_matrix,
-                tf.constant(1e-2, dtype=tf.float32)),
+                tf.constant(1e-5, dtype=tf.float32)),
             tf.constant(-1, dtype=tf.float32)))
 
     sigma_over_r = tf.multiply(
         sigma_pair,
         _distance_matrix_inverse)
 
-    '''
-    u_pair = tf.math.add(
-            tf.multiply(
+    u_coulomb = tf.multiply(
                 tf.pow(
                     _distance_matrix_inverse,
                     tf.constant(2, dtype=tf.float32)),
-                q_pair),
-            tf.multiply(
-                epsilon_pair,
+                tf.multiply(
+                    138.93 * q_pair,
+                    tf.tensor_scatter_nd_update(
+                        tf.ones_like(q_pair),
+                        tf.stack(
+                            [
+                                torsion_idxs[:, 0],
+                                torsion_idxs[:, 3]
+                            ],
+                            axis=1),
+                        tf.constant(
+                            0.833,
+                            shape=(
+                                tf.shape(torsion_idxs)[0],
+                            ),
+                            dtype=tf.float32))))
+    u_lj = tf.multiply(
+                tf.where(
+                    tf.less(
+                        _distance_matrix,
+                        0.1),
+                    tf.zeros_like(epsilon_pair),
+                    tf.multiply(
+                        epsilon_pair,
+                        tf.tensor_scatter_nd_update(
+                            tf.ones_like(epsilon_pair),
+                            tf.stack(
+                                [
+                                    torsion_idxs[:, 0],
+                                    torsion_idxs[:, 3]
+                                ],
+                                axis=1),
+                            tf.constant(
+                                0.5,
+                                shape=(
+                                    tf.shape(torsion_idxs)[0],
+                            ),
+                            dtype=tf.float32)))),
                 tf.math.subtract(
                     tf.pow(
                         sigma_over_r,
                         tf.constant(12, dtype=tf.float32)),
                     tf.pow(
                         sigma_over_r,
-                        tf.constant(6, dtype=tf.float32)))))
-    '''
+                        tf.constant(6, dtype=tf.float32))))
+    
+    print(q)
+    print(u_coulomb)
+    print(u_lj)
 
-    u_pair = tf.multiply(
-        epsilon_pair,
-        tf.math.subtract(
-            tf.pow(
-                sigma_over_r,
-                tf.constant(12, dtype=tf.float32)),
-            tf.pow(
-                sigma_over_r,
-                tf.constant(6, dtype=tf.float32))))
+    u_pair = u_coulomb + u_lj
 
     u_bond_tot = tf.matmul(
         tf.transpose(
@@ -421,9 +531,11 @@ def params_to_potential(
                 u_pair,
                 axis=1,
                 keepdims=True))
+    
     u_tot = tf.squeeze(
         u_pair_tot + u_bond_tot + u_angle_tot + u_dihedral_tot)
-
+    
+    print(u_angle_tot, u_bond_tot, u_pair_tot)
     return u_tot
 
 def data_loader(idx):
@@ -441,21 +553,69 @@ def data_loader(idx):
         np.load(energy_path))
 
     return atoms, adjacency_map, energy
+    
+
+for atoms, adjacency_map, energy, xyz, jacobian, angles, bonds, torsions,\
+        particle_params, sys\
+    in data_generator():
+
+    q, sigma, epsilon = tf.split(particle_params, 3, 1)
+    e_l = bonds[:, 2]
+    e_k = bonds[:, 3]
+    bond_idxs = tf.cast(bonds[:, :2], tf.int64)
+   
+    a_l = angles[:, 3]
+    a_k = angles[:, 4]
+    angle_idxs = tf.cast(angles[:, :3], tf.int64)
+ 
+    # xyz = tf.Variable(xyz * BOHR_TO_ANGSTROM)
+    # jacobian = jacobian * HARTREE_PER_BOHR_TO_KCAL_PER_MOL_PER_ANGSTROM
+    
+    xyz = tf.Variable(xyz)
+
+    with tf.GradientTape() as tape:
+        u = -params_to_potential(
+            q,
+            sigma,
+            epsilon,
+            e_l, e_k,
+            a_l, a_k,
+            tf.constant([0.0], dtype=tf.float32),
+            tf.constant([0.0], dtype=tf.float32),
+            bond_idxs, angle_idxs, tf.constant([[0, 0, 0, 0]], dtype=tf.int64),
+            xyz)
+
+    
+    jacobian_hat = tape.gradient(u, xyz)
+    
+    for idx in range(sys.getNumForces()):
+        force = sys.getForce(idx)
+        force.setForceGroup(idx)
+    
+    context = openmm.Context(sys, openmm.VerletIntegrator(0.001))
+    
+    context.setPositions(xyz * 1.0)
+    print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
+
+    force = sys.getForce(2)
+    force.setNonbondedMethod(openmm.NonbondedForce.NoCutoff)
+    for idx in range(force.getNumParticles()):
+        q, sigma, epsilon = force.getParticleParameters(idx)
+        force.setParticleParameters(idx, 0., sigma, 0.)
+        print(force.getParticleParameters(idx))
+    force.updateParametersInContext(context)
+    print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
+
+    '''
+    for idx in range(force.getNumParticles()):
+        q, sigma, epsilon = _force.getParticleParameters(idx)
+        force.setParticleParameters(idx, 0, sigma, epsilon)
+
+    force.updateParametersInContext(context)
+    print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
 
 
-'''
-ds = tf.data.Dataset.from_generator(
-    data_generator,
-    (tf.float32, tf.float32, tf.float32))
-'''
-
-ds_path = tf.data.Dataset.from_tensor_slices(list(range(500)))
-
-ds = ds_path.map(
-    lambda idx: tf.py_function(
-        data_loader,
-        [idx],
-        [tf.float32, tf.float32, tf.float32]))
-
-for atoms, adjacency_map, energy in ds:
-    print(atoms)
+    for idx in range(sys.getNumForces()):
+        print(context.getState(getEnergy=True, groups=1<<idx).getPotentialEnergy())
+    '''
+    
