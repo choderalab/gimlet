@@ -207,8 +207,8 @@ def get_dihedrals_cos(coordinates, torsion_idxs):
                 normal_right),
             axis=1),
         tf.math.multiply(
-            tf.norm(normal_left),
-            tf.norm(normal_right)))
+            tf.norm(normal_left, axis=1),
+            tf.norm(normal_right, axis=1)))
 
     return dihedrals
 
