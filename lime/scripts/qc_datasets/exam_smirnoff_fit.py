@@ -55,6 +55,7 @@ ds_name = tf.data.Dataset.from_tensor_slices(list(ds_qc.data.records))
 
 def data_generator():
     for record_name in list(ds_qc.data.records):
+        print(record_name)
         r = ds_qc.get_record(record_name, specification='default')
         if r is not None:
             traj = r.get_trajectory()
@@ -70,14 +71,23 @@ def data_generator():
                     atoms = tf.convert_to_tensor(
                         [TRANSLATION[atomic_number] for atomic_number in mol.atomic_numbers],
                         dtype=tf.int64)
+                    
+                    
+                    zeros = tf.zeros(
+                        (
+                            tf.shape(atoms, tf.int64)[0],
+                            tf.shape(atoms, tf.int64)[0]
+                        ),
+                        dtype=tf.float32)
+                    
 
                     adjacency_map = tf.tensor_scatter_nd_update(
                         tf.zeros(
-                            (
-                                tf.shape(atoms, tf.int64)[0],
-                                tf.shape(atoms, tf.int64)[0]
-                            ),
-                            dtype=tf.float32),
+                        (
+                            tf.shape(atoms, tf.int64)[0],
+                            tf.shape(atoms, tf.int64)[0]
+                        ),
+                        dtype=tf.float32),
                         tf.convert_to_tensor(
                             np.array(mol.connectivity)[:, :2],
                             dtype=tf.int64),
@@ -415,13 +425,17 @@ def params_to_potential(
             shape=tf.shape(u_pair_mask)[0],
             dtype=tf.float32))
 
+    u_pair_mask = tf.linalg.band_part(
+        u_pair_mask,
+        0, -1)
+
     _distance_matrix = tf.where(
         tf.greater(
             u_pair_mask,
             tf.constant(0, dtype=tf.float32)),
         distance_matrix,
         tf.ones_like(distance_matrix))
-
+    
     _distance_matrix_inverse = tf.multiply(
         u_pair_mask,
         tf.pow(
@@ -433,7 +447,7 @@ def params_to_potential(
     sigma_over_r = tf.multiply(
         sigma_pair,
         _distance_matrix_inverse)
-
+    
     u_coulomb = tf.multiply(
                 tf.pow(
                     _distance_matrix_inverse,
@@ -454,6 +468,7 @@ def params_to_potential(
                                 tf.shape(torsion_idxs)[0],
                             ),
                             dtype=tf.float32))))
+
     u_lj = tf.multiply(
                 tf.where(
                     tf.less(
@@ -484,11 +499,15 @@ def params_to_potential(
                         sigma_over_r,
                         tf.constant(6, dtype=tf.float32))))
     
-    print(q)
-    print(u_coulomb)
-    print(u_lj)
-
+    
+    # print(tf.reduce_sum(u_coulomb))
     u_pair = u_coulomb + u_lj
+    
+    print(_distance_matrix_inverse)
+    print(q_pair)
+
+    print(tf.reduce_sum(u_coulomb))
+    print(tf.reduce_sum(u_lj))
 
     u_bond_tot = tf.matmul(
         tf.transpose(
@@ -535,7 +554,7 @@ def params_to_potential(
     u_tot = tf.squeeze(
         u_pair_tot + u_bond_tot + u_angle_tot + u_dihedral_tot)
     
-    print(u_angle_tot, u_bond_tot, u_pair_tot)
+    # print(u_angle_tot, u_bond_tot, u_pair_tot)
     return u_tot
 
 def data_loader(idx):
@@ -595,27 +614,18 @@ for atoms, adjacency_map, energy, xyz, jacobian, angles, bonds, torsions,\
     context = openmm.Context(sys, openmm.VerletIntegrator(0.001))
     
     context.setPositions(xyz * 1.0)
-    print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
 
     force = sys.getForce(2)
     force.setNonbondedMethod(openmm.NonbondedForce.NoCutoff)
-    for idx in range(force.getNumParticles()):
-        q, sigma, epsilon = force.getParticleParameters(idx)
-        force.setParticleParameters(idx, 0., sigma, 0.)
-        print(force.getParticleParameters(idx))
     force.updateParametersInContext(context)
     print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
-
-    '''
-    for idx in range(force.getNumParticles()):
-        q, sigma, epsilon = _force.getParticleParameters(idx)
-        force.setParticleParameters(idx, 0, sigma, epsilon)
-
-    force.updateParametersInContext(context)
-    print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
-
-
-    for idx in range(sys.getNumForces()):
-        print(context.getState(getEnergy=True, groups=1<<idx).getPotentialEnergy())
-    '''
     
+    print(tf.stack(
+        [
+            jacobian_hat,
+            context.getState(
+                getVelocities=True,
+                getForces=True).getForces(asNumpy=True)._value,
+            jacobian
+        ],
+        axis=1))
