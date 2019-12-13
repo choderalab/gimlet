@@ -20,10 +20,11 @@ from openforcefield.typing.engines.smirnoff import ForceField
 FF = ForceField('test_forcefields/smirnoff99Frosst.offxml')
 import cmiles
 from simtk import openmm
+import random
 
-HARTREE_TO_KCAL_PER_MOL = 627.509
+HARTREE_TO_KJ_PER_MOL = 2625.5
 BOHR_TO_NM = 0.0529177
-HARTREE_PER_BOHR_TO_KCAL_PER_MOL_PER_NM = 10587.30
+HARTREE_PER_BOHR_TO_KJ_PER_MOL_PER_NM = 49614.77
 
 TRANSLATION = {
     6: 0,
@@ -54,114 +55,117 @@ ds_qc = client.get_collection("OptimizationDataset", "OpenFF Full Optimization B
 ds_name = tf.data.Dataset.from_tensor_slices(list(ds_qc.data.records))
 
 def data_generator():
-    for record_name in list(ds_qc.data.records):
-        print(record_name)
-        r = ds_qc.get_record(record_name, specification='default')
-        if r is not None:
-            traj = r.get_trajectory()
-            if traj is not None:
-                for snapshot in traj:
-                    energy = tf.convert_to_tensor(
-                        snapshot.properties.scf_total_energy * HARTREE_TO_KCAL_PER_MOL,
-                        dtype=tf.float32)
-
-                    mol = snapshot.get_molecule()
-                    # mol = snapshot.get_molecule().dict(encoding='json')
-                    
-                    atoms = tf.convert_to_tensor(
-                        [TRANSLATION[atomic_number] for atomic_number in mol.atomic_numbers],
-                        dtype=tf.int64)
-                    
-                    
-                    zeros = tf.zeros(
-                        (
-                            tf.shape(atoms, tf.int64)[0],
-                            tf.shape(atoms, tf.int64)[0]
-                        ),
-                        dtype=tf.float32)
-                    
-
-                    adjacency_map = tf.tensor_scatter_nd_update(
-                        tf.zeros(
-                        (
-                            tf.shape(atoms, tf.int64)[0],
-                            tf.shape(atoms, tf.int64)[0]
-                        ),
-                        dtype=tf.float32),
-                        tf.convert_to_tensor(
-                            np.array(mol.connectivity)[:, :2],
-                            dtype=tf.int64),
-                        tf.convert_to_tensor(
-                            np.array(mol.connectivity)[:, 2],
-                            dtype=tf.float32))
-
-                    xyz = tf.convert_to_tensor(
-                        mol.geometry * BOHR_TO_NM,
-                        dtype=tf.float32)
-
-                    jacobian = tf.convert_to_tensor(
-                        snapshot.return_result\
-                        * HARTREE_PER_BOHR_TO_KCAL_PER_MOL_PER_NM,
-                        dtype=tf.float32)
-
-                    mol = cmiles.utils.load_molecule(mol.dict(encoding='json'))
-
-                    top = Topology.from_molecules(Molecule.from_openeye(mol))
-                    sys = FF.create_openmm_system(top)
-
-                    angles = tf.convert_to_tensor(
-                            [[x[0], x[1], x[2], 
-                                x[3]._value, 
-                                x[4]._value] for x in\
-                            [sys.getForces(
-                                )[0].getAngleParameters(idx)\
-                                for idx in range(sys.getForces(
-                                    )[0].getNumAngles())]],
-                            dtype=tf.float32)
-                    
-
-                    bonds = tf.convert_to_tensor([[x[0], x[1], 
-                                x[2]._value, 
-                                x[3]._value]  for x in\
-                            [sys.getForces(
-                                )[1].getBondParameters(idx)\
-                                for idx in range(sys.getForces(
-                                    )[1].getNumBonds())]],
+    for record_name in random.sample(list(ds_qc.data.records), 10):
+        try:
+            print(record_name, flush=True)
+            r = ds_qc.get_record(record_name, specification='default')
+            if r is not None:
+                traj = r.get_trajectory()
+                if traj is not None:
+                    for snapshot in traj:
+                        energy = tf.convert_to_tensor(
+                            snapshot.properties.scf_total_energy * HARTREE_TO_KJ_PER_MOL,
                             dtype=tf.float32)
 
+                        mol = snapshot.get_molecule()
+                        # mol = snapshot.get_molecule().dict(encoding='json')
+                        
+                        atoms = tf.convert_to_tensor(
+                            [TRANSLATION[atomic_number] for atomic_number in mol.atomic_numbers],
+                            dtype=tf.int64)
+                        
+                        
+                        zeros = tf.zeros(
+                            (
+                                tf.shape(atoms, tf.int64)[0],
+                                tf.shape(atoms, tf.int64)[0]
+                            ),
+                            dtype=tf.float32)
+                        
 
-                    torsions = tf.convert_to_tensor([
-                        [x[0], x[1], x[2], x[3], x[4], x[5]._value, x[6]._value] for x in\
-                            [sys.getForces(
-                                )[3].getTorsionParameters(idx)\
-                                for idx in range(sys.getForces(
-                                    )[3].getNumTorsions())]],
+                        adjacency_map = tf.tensor_scatter_nd_update(
+                            tf.zeros(
+                            (
+                                tf.shape(atoms, tf.int64)[0],
+                                tf.shape(atoms, tf.int64)[0]
+                            ),
+                            dtype=tf.float32),
+                            tf.convert_to_tensor(
+                                np.array(mol.connectivity)[:, :2],
+                                dtype=tf.int64),
+                            tf.convert_to_tensor(
+                                np.array(mol.connectivity)[:, 2],
+                                dtype=tf.float32))
+
+                        xyz = tf.convert_to_tensor(
+                            mol.geometry * BOHR_TO_NM,
                             dtype=tf.float32)
 
+                        jacobian = tf.convert_to_tensor(
+                            snapshot.return_result\
+                            * HARTREE_PER_BOHR_TO_KJ_PER_MOL_PER_NM,
+                            dtype=tf.float32)
 
-                    particle_params = tf.convert_to_tensor([[
-                            x[0]._value,
-                            x[1]._value,
-                            x[2]._value
-                            ] for x in\
-                            [sys.getForces(
-                                )[2].getParticleParameters(idx)\
-                                for idx in range(sys.getForces(
-                                    )[2].getNumParticles())]])
+                        mol = cmiles.utils.load_molecule(mol.dict(encoding='json'))
 
-                    
-                    yield(
-                        atoms,
-                        adjacency_map,
-                        energy,
-                        xyz,
-                        jacobian,
-                        angles,
-                        bonds,
-                        torsions,
-                        particle_params,
-                        sys)
-    
+                        top = Topology.from_molecules(Molecule.from_openeye(mol))
+                        sys = FF.create_openmm_system(top)
+
+                        angles = tf.convert_to_tensor(
+                                [[x[0], x[1], x[2], 
+                                    x[3]._value, 
+                                    x[4]._value] for x in\
+                                [sys.getForces(
+                                    )[0].getAngleParameters(idx)\
+                                    for idx in range(sys.getForces(
+                                        )[0].getNumAngles())]],
+                                dtype=tf.float32)
+                        
+
+                        bonds = tf.convert_to_tensor([[x[0], x[1], 
+                                    x[2]._value, 
+                                    x[3]._value]  for x in\
+                                [sys.getForces(
+                                    )[1].getBondParameters(idx)\
+                                    for idx in range(sys.getForces(
+                                        )[1].getNumBonds())]],
+                                dtype=tf.float32)
+
+
+                        torsions = tf.convert_to_tensor([
+                            [x[0], x[1], x[2], x[3], x[4], x[5]._value, x[6]._value] for x in\
+                                [sys.getForces(
+                                    )[3].getTorsionParameters(idx)\
+                                    for idx in range(sys.getForces(
+                                        )[3].getNumTorsions())]],
+                                dtype=tf.float32)
+
+
+                        particle_params = tf.convert_to_tensor([[
+                                x[0]._value,
+                                x[1]._value,
+                                x[2]._value
+                                ] for x in\
+                                [sys.getForces(
+                                    )[2].getParticleParameters(idx)\
+                                    for idx in range(sys.getForces(
+                                        )[2].getNumParticles())]])
+
+                        
+                        yield(
+                            atoms,
+                            adjacency_map,
+                            energy,
+                            xyz,
+                            jacobian,
+                            angles,
+                            bonds,
+                            torsions,
+                            particle_params,
+                            sys)
+       
+        except:
+            pass
 
 # @tf.function
 def params_to_potential(
@@ -449,9 +453,7 @@ def params_to_potential(
         _distance_matrix_inverse)
     
     u_coulomb = tf.multiply(
-                tf.pow(
-                    _distance_matrix_inverse,
-                    tf.constant(2, dtype=tf.float32)),
+                _distance_matrix_inverse,
                 tf.multiply(
                     138.93 * q_pair,
                     tf.tensor_scatter_nd_update(
@@ -503,12 +505,6 @@ def params_to_potential(
     # print(tf.reduce_sum(u_coulomb))
     u_pair = u_coulomb + u_lj
     
-    print(_distance_matrix_inverse)
-    print(q_pair)
-
-    print(tf.reduce_sum(u_coulomb))
-    print(tf.reduce_sum(u_lj))
-
     u_bond_tot = tf.matmul(
         tf.transpose(
             tf.where(
@@ -518,7 +514,6 @@ def params_to_potential(
         tf.expand_dims(
             u_bond,
             axis=1))
-
 
     u_angle_tot = tf.matmul(
         tf.transpose(
@@ -554,7 +549,6 @@ def params_to_potential(
     u_tot = tf.squeeze(
         u_pair_tot + u_bond_tot + u_angle_tot + u_dihedral_tot)
     
-    # print(u_angle_tot, u_bond_tot, u_pair_tot)
     return u_tot
 
 def data_loader(idx):
@@ -574,10 +568,16 @@ def data_loader(idx):
     return atoms, adjacency_map, energy
     
 
+
+traj = tf.ones(
+    shape=(1, 6),
+    dtype=tf.float32)
+
 for atoms, adjacency_map, energy, xyz, jacobian, angles, bonds, torsions,\
         particle_params, sys\
     in data_generator():
 
+    '''
     q, sigma, epsilon = tf.split(particle_params, 3, 1)
     e_l = bonds[:, 2]
     e_k = bonds[:, 3]
@@ -606,7 +606,8 @@ for atoms, adjacency_map, energy, xyz, jacobian, angles, bonds, torsions,\
 
     
     jacobian_hat = tape.gradient(u, xyz)
-    
+    '''
+
     for idx in range(sys.getNumForces()):
         force = sys.getForce(idx)
         force.setForceGroup(idx)
@@ -618,14 +619,22 @@ for atoms, adjacency_map, energy, xyz, jacobian, angles, bonds, torsions,\
     force = sys.getForce(2)
     force.setNonbondedMethod(openmm.NonbondedForce.NoCutoff)
     force.updateParametersInContext(context)
-    print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
+    # print(context.getState(getEnergy=True, groups=1<<2).getPotentialEnergy())
     
-    print(tf.stack(
+    traj = tf.concat(
         [
-            jacobian_hat,
-            context.getState(
-                getVelocities=True,
-                getForces=True).getForces(asNumpy=True)._value,
-            jacobian
+            traj,
+            tf.concat(
+                [
+                    context.getState(
+                        getVelocities=True,
+                        getForces=True).getForces(asNumpy=True)._value,
+                    jacobian
+                ],
+                axis=1)
         ],
-        axis=1))
+        axis=0)
+
+
+
+np.save('traj', traj[1:].numpy())
