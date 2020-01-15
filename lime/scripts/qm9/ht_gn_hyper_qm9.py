@@ -14,7 +14,7 @@ mols_ds = gin.i_o.from_sdf.to_ds('gdb9.sdf', has_charge=False)
 
 attr_ds = pd.read_csv('gdb9.sdf.csv').values[:, 1:].astype(np.float32)
 
-attr_ds = attr_ds / np.linalg.norm(attr_ds, axis=0) \\
+attr_ds = attr_ds / np.linalg.norm(attr_ds, axis=0) \
     - np.std(attr_ds, axis=0)
 
 attr_ds = tf.data.Dataset.from_tensor_slices(attr_ds)

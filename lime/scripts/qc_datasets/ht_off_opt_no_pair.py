@@ -340,7 +340,7 @@ def flow(y_e, y_a, y_t, q_pair, sigma_pair, epsilon_pair, atoms, adjacency_map, 
         attr_in_mol)
 
     u_tot = tf.squeeze(
-        u_bond_tot + u_angle_tot + u_dihedral_tot + u_pair_tot)
+        u_bond_tot + u_angle_tot + u_dihedral_tot)
 
     return u_tot
 
