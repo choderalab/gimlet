@@ -137,24 +137,24 @@ ds_vl = ds.skip(n_te).take(n_te)
 ds_tr = ds.skip(2 * n_te).shuffle(1000, seed=2666)
 
 config_space = {
-    'D_V': [16, 32, 64, 128, 256],
-    'D_E': [16, 32, 64, 128, 256],
-    'D_U': [16, 32, 64, 128, 256],
+    'D_V': [16, 32, 64, 128, 256, 512],
+    'D_E': [16, 32, 64, 128, 256, 512],
+    'D_U': [16, 32, 64, 128, 256, 512],
 
-    'phi_e_0': [32, 64, 128, 256],
+    'phi_e_0': [32, 64, 128, 256, 512],
     'phi_e_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_e_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'phi_v_0': [32, 64, 128, 256],
+    'phi_v_0': [32, 64, 128, 256, 512],
     'phi_v_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_v_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'phi_u_0': [32, 64, 128, 256],
+    'phi_u_0': [32, 64, 128, 256, 512],
     'phi_u_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'phi_u_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
-    'f_r_0': [32, 64, 128, 256],
-    'f_r_1': [32, 64, 128, 256],
+    'f_r_0': [32, 64, 128, 256, 512, 1024],
+    'f_r_1': [32, 64, 128, 256, 512, 1024],
     'f_r_a_0': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
     'f_r_a_1': ['elu', 'relu', 'leaky_relu', 'tanh', 'sigmoid'],
 
@@ -203,29 +203,22 @@ def init(point):
                 bias_initializer=tf.constant_initializer(-5))
             self.d_e_l = tf.keras.layers.Dense(1)
 
-            self.d_t_1 = tf.keras.layers.Dense(2,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-1),
-                bias_initializer=tf.random_normal_initializer(0, 1e-3))
-
-            self.d_t_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_t_k = tf.keras.layers.Dense(
-                1,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-5),
-                bias_initializer=tf.constant_initializer(-10))
-            self.d_t_l = tf.keras.layers.Dense(1)
-
-            self.d_a_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_a_k = tf.keras.layers.Dense(
-                1,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-5),
-                bias_initializer=tf.constant_initializer(-10))
-            self.d_a_l = tf.keras.layers.Dense(1)
-
             self.d_e0_0 = lime.nets.for_gn.ConcatenateThenFullyConnect((units,
               'relu', units, 'relu'))
 
             self.d_e0_1 = tf.keras.layers.Dense(1)
+    
 
+            self.d_e_p_1 = tf.keras.layers.Dense(64)
+            self.d_a_p_1 = tf.keras.layers.Dense(64)
+            self.d_t_p_1 = tf.keras.layers.Dense(64)
+            self.d_p_p_1 = tf.keras.layers.Dense(64)
+            
+            self.d_e_p_0 = tf.keras.layers.Dense(units)
+            self.d_a_p_0 = tf.keras.layers.Dense(units)
+            self.d_t_p_0 = tf.keras.layers.Dense(units)
+            self.d_p_p_0 = tf.keras.layers.Dense(units)
+            
             self.units = units
             self.d_v = point['D_V']
             self.d_e = point['D_E']
@@ -240,6 +233,10 @@ def init(point):
                  atom_in_mol, bond_in_mol, attr_in_mol,
                  bond_idxs, angle_idxs, torsion_idxs,
                  coordinates):
+            n_atoms = tf.shape(h_v, tf.int64)[0]
+            n_angles = tf.shape(angle_idxs, tf.int64)[0]
+            n_torsions = tf.shape(torsion_idxs, tf.int64)[0]
+
 
             per_mol_mask = tf.stop_gradient(tf.matmul(
                 tf.where(
@@ -318,6 +315,21 @@ def init(point):
                 ],
                 axis=1)
 
+            h_p = tf.concat(
+                [
+                    tf.tile(
+                        tf.expand_dims(
+                            h_v,
+                            0),
+                        [n_atoms, 1, 1]),
+                    tf.tile(
+                        tf.expand_dims(
+                            h_v,
+                            1),
+                        [1, n_atoms, 1])
+                ],
+                axis=2)
+ 
             # (n_atoms, n_atoms)
             q = self.d_q_1(
                     self.d_q_0(
@@ -355,8 +367,9 @@ def init(point):
  
             y_e_l = tf.squeeze(tf.math.exp(self.d_e_l(self.d_e_0(h_e))))
             y_e_k = tf.squeeze(tf.math.exp(self.d_e_k(self.d_e_0(h_e))))
-            
-            u_bond = tf.math.multiply(
+            y_e_p = tf.squeeze(self.d_e_p_1(self.d_e_p_0(h_e)))
+
+            u_bond_harmonic = tf.math.multiply(
                     y_e_k,
                     tf.math.pow(
                         tf.math.subtract(
@@ -364,31 +377,55 @@ def init(point):
                             y_e_l),
                         tf.constant(2, dtype=tf.float32)))
 
-            y_a_k = tf.squeeze(tf.math.exp(self.d_a_k(self.d_a_0(h_a))))
-            y_a_l = tf.squeeze(tf.nn.tanh(self.d_a_l(self.d_a_0(h_a))))
-            
-            u_angle = tf.math.multiply(
-                y_a_k,
-                tf.math.pow(
-                    tf.math.subtract(
-                        angle_angles,
-                        y_a_l),
-                    tf.constant(2, dtype=tf.float32)))
+            u_bond_poly = tf.reduce_sum(
+                    tf.math.multiply(
+                        y_e_p,
+                        tf.math.pow(
+                            tf.expand_dims(
+                                tf.math.exp(
+                                    -bond_distances),
+                                1),
+                            tf.expand_dims(
+                                tf.range(
+                                    tf.shape(
+                                        y_e_p)[1],
+                                    dtype=tf.float32),
+                                0))),
+                    axis=1)
 
-            y_t_k = tf.squeeze(tf.math.exp(self.d_t_k(self.d_t_0(h_t))))
-            y_t_l = tf.squeeze(tf.nn.tanh(self.d_t_l(self.d_t_0(h_t))))
-            u_dihedral = tf.math.multiply(
-                y_t_k,
-                tf.math.pow(
-                    tf.math.subtract(
-                        torsion_dihedrals,
-                        y_t_l),
-                    tf.constant(2, dtype=tf.float32)))
+            u_bond = u_bond_harmonic + u_bond_poly
 
+            y_a_p = tf.squeeze(self.d_a_p_1(self.d_a_p_0(h_a)))
+            u_angle = tf.reduce_sum(
+                    tf.math.multiply(
+                        y_a_p,
+                        tf.math.pow(
+                            tf.expand_dims(
+                                angle_angles,
+                                1),
+                            tf.expand_dims(
+                                tf.range(
+                                    tf.shape(
+                                        y_a_p)[1],
+                                    dtype=tf.float32),
+                                0))),
+                    axis=1)
 
-            n_atoms = tf.shape(h_v, tf.int64)[0]
-            n_angles = tf.shape(angle_idxs, tf.int64)[0]
-            n_torsions = tf.shape(torsion_idxs, tf.int64)[0]
+            y_t_p = tf.squeeze(self.d_t_p_1(self.d_t_p_0(h_t)))
+            u_dihedral = tf.reduce_sum(
+                    tf.math.multiply(
+                        y_t_p,
+                        tf.math.pow(
+                            tf.expand_dims(
+                                torsion_dihedrals,
+                                1),
+                            tf.expand_dims(
+                                tf.range(
+                                    tf.shape(
+                                        y_t_p)[1],
+                                    dtype=tf.float32),
+                                0))),
+                    axis=1)
 
             # (n_angles, n_atoms)
             angle_is_connected_to_atoms = tf.reduce_any(
@@ -571,8 +608,9 @@ def init(point):
                 sigma_pair,
                 _distance_matrix_inverse)
             
+            y_p_p = tf.squeeze(self.d_p_p_1(self.d_p_p_0(h_p)))
 
-            u_pair = tf.math.add(
+            u_pair_mm = tf.math.add(
                     tf.multiply(
                         _distance_matrix_inverse,
                         q_pair),
@@ -590,8 +628,30 @@ def init(point):
                             tf.pow(
                                 sigma_over_r,
                                 tf.constant(6, dtype=tf.float32)))))
-
-
+            
+            u_pair_poly = tf.reduce_sum(
+                tf.multiply(
+                    tf.multiply(
+                        tf.tile(
+                            tf.expand_dims(
+                                u_pair_mask,
+                                2),
+                            [1, 1, tf.shape(y_p_p)[2]]),
+                        y_p_p),
+                    tf.pow(
+                        tf.expand_dims(
+                            tf.math.exp(
+                                -distance_matrix),
+                            2),
+                        tf.expand_dims(
+                            tf.expand_dims(
+                                tf.range(
+                                    tf.shape(y_p_p)[2],
+                                    dtype=tf.float32),
+                                0),
+                            0))),
+                axis=2)
+            u_pair = u_pair_mm + u_pair_poly
             u_bond_tot = tf.matmul(
                 tf.transpose(
                     tf.where(
@@ -644,7 +704,7 @@ def init(point):
                         self.d_e0_0(
                             h_v)))
 
-            u_tot = tf.squeeze(u0_tot + \
+            u_tot = tf.squeeze(u0_tot +\
                 u_bond_tot + u_angle_tot + u_dihedral_tot + u_pair_tot)
             
             # print(u_pair_tot, u_bond_tot, u_angle_tot, u_dihedral_tot)
@@ -676,7 +736,6 @@ def init(point):
             repeat=5)
 
     opt = tf.keras.optimizers.Adam(1e-3)
-
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
@@ -745,7 +804,7 @@ def obj_fn(point):
                 '''
                 loss = tf.keras.losses.MSE(u, u_hat)
 
-            # print(loss, flush=True)
+            print(loss, flush=True)
             
             variables = gn.variables
             grad = tape.gradient(loss, variables)

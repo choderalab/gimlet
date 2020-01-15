@@ -115,7 +115,7 @@ ds = tf.data.Dataset.from_generator(
     (tf.float32, tf.float32, tf.float32))
 '''
 
-ds_path = tf.data.Dataset.from_tensor_slices(list(range(1500)))
+ds_path = tf.data.Dataset.from_tensor_slices(list(range(500)))
 
 ds = ds_path.map(
     lambda idx: tf.py_function(
@@ -124,17 +124,19 @@ ds = ds_path.map(
         [tf.float32, tf.float32, tf.float32]))
 
 
-# ds = ds.shuffle(10000, seed=2666)
+ds = ds.shuffle(10000, seed=2666)
 
 ds = gin.probabilistic.gn.GraphNet.batch(
-    ds, 512, feature_dimension=18, atom_dtype=tf.float32)
+    ds, 1024, feature_dimension=18, atom_dtype=tf.float32).cache('ds')
 
 n_batches = int(gin.probabilistic.gn.GraphNet.get_number_batches(ds))
 n_te = n_batches // 10
 
 ds_te = ds.take(n_te)
 ds_vl = ds.skip(n_te).take(n_te)
-ds_tr = ds.skip(2 * n_te).shuffle(1000, seed=2666)
+ds_tr = ds.skip(2 * n_te)
+
+
 
 config_space = {
     'D_V': [16, 32, 64, 128, 256],
@@ -181,50 +183,17 @@ def init(point):
         def __init__(self, units=point['f_r_0'], f_r_a=point['f_r_a_0']):
             super(f_r, self).__init__()
 
-            self.d_q_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_q_1 = tf.keras.layers.Dense(
-                1)
-
-            self.d_sigma_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_sigma_1 = tf.keras.layers.Dense(
-                1,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-5),
-                bias_initializer=tf.random_normal_initializer(0, 1e-5))
-
-            self.d_epislon_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_epsilon_1 = tf.keras.layers.Dense(
-                1,
-                bias_initializer=tf.constant_initializer(-15),
-                kernel_initializer=tf.random_normal_initializer(0, 1e-5))
+            self.d_v_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_v_1 = tf.keras.layers.Dense(16)
                 
             self.d_e_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_e_k = tf.keras.layers.Dense(
-                1, 
-                bias_initializer=tf.constant_initializer(-5))
-            self.d_e_l = tf.keras.layers.Dense(1)
-
-            self.d_t_1 = tf.keras.layers.Dense(2,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-1),
-                bias_initializer=tf.random_normal_initializer(0, 1e-3))
-
-            self.d_t_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_t_k = tf.keras.layers.Dense(
-                1,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-5),
-                bias_initializer=tf.constant_initializer(-10))
-            self.d_t_l = tf.keras.layers.Dense(1)
+            self.d_e_1 = tf.keras.layers.Dense(16)
 
             self.d_a_0 = tf.keras.layers.Dense(units, activation='tanh')
-            self.d_a_k = tf.keras.layers.Dense(
-                1,
-                kernel_initializer=tf.random_normal_initializer(0, 1e-5),
-                bias_initializer=tf.constant_initializer(-10))
-            self.d_a_l = tf.keras.layers.Dense(1)
+            self.d_a_1 = tf.keras.layers.Dense(16)
 
-            self.d_e0_0 = lime.nets.for_gn.ConcatenateThenFullyConnect((units,
-              'relu', units, 'relu'))
-
-            self.d_e0_1 = tf.keras.layers.Dense(1)
+            self.d_t_0 = tf.keras.layers.Dense(units, activation='tanh')
+            self.d_t_1 = tf.keras.layers.Dense(units)
 
             self.units = units
             self.d_v = point['D_V']
@@ -269,6 +238,7 @@ def init(point):
             torsion_dihedrals = gin.deterministic.md.get_dihedrals_cos(
                 coordinates,
                 torsion_idxs)
+
 
             h_v_history.set_shape([None, 6, self.d_v])
 
@@ -317,7 +287,6 @@ def init(point):
                             torsion_idxs[:, 2])),
                 ],
                 axis=1)
-
             # (n_atoms, n_atoms)
             q = self.d_q_1(
                     self.d_q_0(
@@ -633,18 +602,7 @@ def init(point):
                         u_pair,
                         axis=1,
                         keepdims=True))
-
-            u0_tot = tf.matmul(
-                    tf.transpose(
-                        tf.where(
-                            atom_in_mol,
-                            tf.ones_like(atom_in_mol, dtype=tf.float32),
-                            tf.zeros_like(atom_in_mol, dtype=tf.float32))),
-                    self.d_e0_1(
-                        self.d_e0_0(
-                            h_v)))
-
-            u_tot = tf.squeeze(u0_tot + \
+            u_tot = tf.squeeze(
                 u_bond_tot + u_angle_tot + u_dihedral_tot + u_pair_tot)
             
             # print(u_pair_tot, u_bond_tot, u_angle_tot, u_dihedral_tot)
@@ -675,14 +633,14 @@ def init(point):
             f_r=f_r(),
             repeat=5)
 
-    opt = tf.keras.optimizers.Adam(1e-3)
+    opt = tf.keras.optimizers.Adam(1e-5)
 
 
 def obj_fn(point):
     point = dict(zip(config_space.keys(), point))
     init(point)
 
-    for dummy_idx in range(10):
+    for dummy_idx in range(50):
         for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_tr:
             atoms = atoms_[:, :12]
             coordinates = tf.Variable(atoms_[:, 12:15] * BORN_TO_ANGSTROM)
@@ -736,16 +694,14 @@ def obj_fn(point):
                             jacobian_hat,
                             axis=1))
 
+                print(loss_0, loss_1)
                 loss = loss_0 + loss_1
-                
+                '''
 
                 loss = tf.reduce_sum(tf.keras.losses.MSE(jacobian,
                     jacobian_hat))
-                
-                '''
-                loss = tf.keras.losses.MSE(u, u_hat)
 
-            # print(loss, flush=True)
+            print(loss, flush=True)
             
             variables = gn.variables
             grad = tape.gradient(loss, variables)
@@ -785,7 +741,7 @@ def obj_fn(point):
 
             jacobian_hat = tape1.gradient(u_hat, coordinates)
 
-            jacobian_hat = -tf.boolean_mask(
+            jacobian_hat = tf.boolean_mask(
                 jacobian_hat,
                 tf.reduce_any(
                     atom_in_mol,
@@ -802,8 +758,8 @@ def obj_fn(point):
                 attr_in_mol)
 
 
-            y_true_tr = tf.concat([y_true_tr, tf.reshape(u, [-1])], axis=0)
-            y_pred_tr = tf.concat([y_pred_tr, tf.reshape(u_hat, [-1])], axis=0)
+            y_true_tr = tf.concat([y_true_tr, tf.reshape(jacobian, [-1])], axis=0)
+            y_pred_tr = tf.concat([y_pred_tr, tf.reshape(jacobian_hat, [-1])], axis=0)
 
     for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_te:
             atoms = atoms_[:, :12]
@@ -826,7 +782,7 @@ def obj_fn(point):
 
             jacobian_hat = tape1.gradient(u_hat, coordinates)
 
-            jacobian_hat = -tf.boolean_mask(
+            jacobian_hat = tf.boolean_mask(
                 jacobian_hat,
                 tf.reduce_any(
                     atom_in_mol,
@@ -843,8 +799,8 @@ def obj_fn(point):
                 attr_in_mol)
 
 
-            y_true_te = tf.concat([y_true_te, tf.reshape(u, [-1])], axis=0)
-            y_pred_te = tf.concat([y_pred_te, tf.reshape(u_hat, [-1])], axis=0)
+            y_true_te = tf.concat([y_true_te, tf.reshape(jacobian, [-1])], axis=0)
+            y_pred_te = tf.concat([y_pred_te, tf.reshape(jacobian_hat, [-1])], axis=0)
 
  
     for atoms_, adjacency_map, atom_in_mol, bond_in_mol, u, attr_in_mol in ds_vl:
@@ -868,7 +824,7 @@ def obj_fn(point):
 
             jacobian_hat = tape1.gradient(u_hat, coordinates)
 
-            jacobian_hat = -tf.boolean_mask(
+            jacobian_hat = tf.boolean_mask(
                 jacobian_hat,
                 tf.reduce_any(
                     atom_in_mol,
@@ -885,8 +841,8 @@ def obj_fn(point):
                 attr_in_mol)
 
 
-            y_true_vl = tf.concat([y_true_vl, tf.reshape(u, [-1])], axis=0)
-            y_pred_vl = tf.concat([y_pred_vl, tf.reshape(u_hat, [-1])], axis=0)
+            y_true_vl = tf.concat([y_true_vl, tf.reshape(jacobian, [-1])], axis=0)
+            y_pred_vl = tf.concat([y_pred_vl, tf.reshape(jacobian_hat, [-1])], axis=0)
 
 
     r2_tr = metrics.r2_score(y_true_tr[1:].numpy(), y_pred_tr[1:].numpy())
