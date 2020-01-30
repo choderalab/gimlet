@@ -143,7 +143,8 @@ def get_idxs(adjacency_map):
     # one four idxs are just the two ends of torsion idxs
     one_four_idxs = tf.gather(
         torsion_idxs,
-        [0, 3])
+        [0, 3],
+        axis=1)
 
     # nonbonded idxs are those that cannot be connected by
     # 1-, 2-, and 3-walks
@@ -153,23 +154,25 @@ def get_idxs(adjacency_map):
             adjacency_map))
 
     nonbonded_idxs = tf.where(
-        tf.reduce_sum(
-            [
-                # 1-walk
-                adjacency_map_full,
-
-                # 2-walk
-                tf.matmul(
+        tf.equal(
+            tf.reduce_sum(
+                [
+                    # 1-walk
                     adjacency_map_full,
-                    adjacency_map_full),
 
-                # 3-walk
-                tf.matmul(
-                    adjacency_map_full,
+                    # 2-walk
                     tf.matmul(
                         adjacency_map_full,
-                        adjacency_map_full))
-            ],
-            axis=0))
+                        adjacency_map_full),
+
+                    # 3-walk
+                    tf.matmul(
+                        adjacency_map_full,
+                        tf.matmul(
+                            adjacency_map_full,
+                            adjacency_map_full))
+                ],
+                axis=0),
+            tf.constant(0, dtype=tf.float32)))
 
     return bond_idxs, angle_idxs, torsion_idxs, one_four_idxs, nonbonded_idxs

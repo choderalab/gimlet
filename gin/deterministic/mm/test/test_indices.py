@@ -15,7 +15,7 @@ def test_get_idxs():
         ],
         dtype=tf.float32)
 
-    bond_idxs, angle_idxs, torsion_idxs, one_four_idxs, nonbonded_idxs = gin.deterministic.mm.get_idxs.get_idxs(
+    bond_idxs, angle_idxs, torsion_idxs, one_four_idxs, nonbonded_idxs = gin.deterministic.mm.indices.get_idxs(
         adjacency_map)
 
     npt.assert_almost_equal(

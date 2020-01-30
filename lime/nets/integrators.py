@@ -30,7 +30,6 @@ SOFTWARE.
 """
 
 import tensorflow as tf
-
 class BAOAB(tf.keras.optimizers.Optimizer):
     """ BAOAB integrator for Bayesian neural networks,
     among other things.
@@ -40,21 +39,18 @@ class BAOAB(tf.keras.optimizers.Optimizer):
 
     A : linear kick
         $$
-        p = p + h \gamma t
+        p = p + \gamma t
         $$
 
     B : linear drift
         $$
-        \theta = \theta + h G(\theta)
+
         $$
 
     O : Ornstein-Uhlenbeck
         $$
-        \alpha p + \sqrt{\tao (1 - \alpha ^ 2)} R_n,
 
         $$
-
-        where $\alpha = e^{-\gamma * h}$ and $R_n \sim \mathcal{N}(0, 1).
 
     """
     def __init__(
@@ -70,9 +66,10 @@ class BAOAB(tf.keras.optimizers.Optimizer):
         self.tao = tf.convert_to_tensor(tao, dtype=tf.float32)
         self.h = tf.convert_to_tensor(h, dtype=tf.float32)
         self.gamma = tf.convert_to_tensor(gamma, dtype=tf.float32)
+        self.c = tf.constant(0, dtype=tf.int64)
 
     def get_config(self):
-        config = super(Adam, self).get_config()
+        config = super(BAOAB, self).get_config()
         return config
 
     def _create_slots(self, var_list):
@@ -90,6 +87,16 @@ class BAOAB(tf.keras.optimizers.Optimizer):
                 var,
                 'p',)
 
+            self.add_slot(
+                var,
+                'c')
+
+    def _prepare(self, var_list):
+        super(BAOAB, self)._prepare(var_list)
+        self.c = tf.math.subtract(
+            tf.constant(1, dtype=tf.int64),
+            self.c)
+
     def _resource_apply_dense(self, grad, var):
         """ Apply gradient to the dense variable.
 
@@ -98,81 +105,84 @@ class BAOAB(tf.keras.optimizers.Optimizer):
             var,
             'p')
 
-        # print(p)
 
-        # B
-        # $$ p = p + \frac{h}{2}G(\theta_n) $$
-        p = tf.math.add(
-            p,
-            tf.math.multiply(
-                tf.multiply(
-                    tf.constant(0.5, var.dtype.base_dtype),
-                    tf.cast(
-                        self.h,
-                        var.dtype.base_dtype)),
-                -grad))
+        if tf.equal(
+            self.c,
+            tf.constant(0, dtype=tf.int64)).numpy():
 
-        # A
-        # $$ \theta = \theta + \frac{h}{2} p $$
-        theta = tf.math.add(
-            var,
-            tf.math.multiply(
-                tf.multiply(
-                    tf.constant(0.5, dtype=var.dtype.base_dtype),
-                    tf.cast(
-                        self.h,
-                        var.dtype.base_dtype)),
-                p))
-
-        # O
-        # $$ p = \alpha p + \sqrt{\tao (1 - \alpha ^ 2)} R_n $$
-        alpha = tf.math.exp(
-            tf.math.multiply(
-                -self.gamma,
-                self.h))
-
-        p = tf.math.add(
+            # B
+            # $$ p = p + \frac{h}{2}G(\theta_n) $$
+            p = tf.math.add(
+                p,
                 tf.math.multiply(
-                    alpha,
-                    p),
+                    tf.multiply(
+                        tf.constant(0.5, var.dtype.base_dtype),
+                        tf.cast(
+                            self.h,
+                            var.dtype.base_dtype)),
+                    -grad))
+
+            # A
+            # $$ \theta = \theta + \frac{h}{2} p $$
+            theta = tf.math.add(
+                var,
                 tf.math.multiply(
-                    tf.math.sqrt(
-                        self.tao,
-                        tf.math.subtract(
-                            tf.constant(1, dtype=var.dtype.base_dtype),
-                            tf.math.square(alpha))),
-                    tf.random.normal(
-                        shape=tf.shape(var))))
+                    tf.multiply(
+                        tf.constant(0.5, dtype=var.dtype.base_dtype),
+                        tf.cast(
+                            self.h,
+                            var.dtype.base_dtype)),
+                    p))
+
+        else:
+            # O
+            # $$ p = \alpha p + \sqrt{\tao (1 - \alpha ^ 2)} R_n $$
+            alpha = tf.math.exp(
+                tf.math.multiply(
+                    -self.gamma,
+                    self.h))
+
+            p = tf.math.add(
+                    tf.math.multiply(
+                        alpha,
+                        p),
+                    tf.math.multiply(
+                        tf.math.sqrt(
+                            self.tao,
+                            tf.math.subtract(
+                                tf.constant(1, dtype=var.dtype.base_dtype),
+                                tf.math.square(alpha))),
+                        tf.random.normal(
+                            shape=tf.shape(var))))
 
 
-        # A
-        # $$ \theta = \theta + \frac{h}{2} p $$
-        theta = tf.math.add(
-            theta,
-            tf.math.multiply(
-                tf.multiply(
-                    tf.constant(0.5, dtype=var.dtype.base_dtype),
-                    tf.cast(
-                        self.h,
-                        var.dtype.base_dtype)),
-                p))
+            # A
+            # $$ \theta = \theta + \frac{h}{2} p $$
+            theta = tf.math.add(
+                var,
+                tf.math.multiply(
+                    tf.multiply(
+                        tf.constant(0.5, dtype=var.dtype.base_dtype),
+                        tf.cast(
+                            self.h,
+                            var.dtype.base_dtype)),
+                    p))
 
-        # B
-        # $$ p = p + \frac{h}{2}G(\theta_n) $$
-        p = tf.math.add(
-            p,
-            tf.math.multiply(
-                tf.multiply(
-                    tf.constant(0.5, var.dtype.base_dtype),
-                    tf.cast(
-                        self.h,
-                        var.dtype.base_dtype)),
-                -grad))
-
+            # B
+            # $$ p = p + \frac{h}{2}G(\theta_n) $$
+            p = tf.math.add(
+                p,
+                tf.math.multiply(
+                    tf.multiply(
+                        tf.constant(0.5, var.dtype.base_dtype),
+                        tf.cast(
+                            self.h,
+                            var.dtype.base_dtype)),
+                    -grad))
 
         var.assign(
             theta)
-
+        
 
         self.get_slot(
                 var,
