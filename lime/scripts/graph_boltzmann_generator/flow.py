@@ -88,7 +88,7 @@ class GraphFlow(tf.keras.Model):
 
         if tf.equal(dimension, 1):
             d_log_det = tf.reduce_sum(
-                w,
+                tf.math.log(tf.math.abs(w) + 1e-1),
                 axis=1)
 
             idx = 0
@@ -96,7 +96,7 @@ class GraphFlow(tf.keras.Model):
 
                 z_i = tf.math.add(
                     tf.math.multiply(
-                        tf.math.exp(w[:, idx]),
+                        tf.math.abs(w[:, idx]) + 1e-1,
                         z_i),
                     b[:, idx])
 
@@ -118,9 +118,9 @@ class GraphFlow(tf.keras.Model):
 
             d = tf.linalg.set_diag(
                     tf.zeros_like(w),
-                    tf.math.exp(
+                    tf.math.abs(
                         tf.linalg.diag_part(
-                            w)))
+                            w)) + 1e-1)
 
             u = tf.linalg.set_diag(
                     tf.linalg.band_part(
@@ -129,10 +129,10 @@ class GraphFlow(tf.keras.Model):
                     tf.ones_like(b))
 
             d_log_det = tf.reduce_sum(
+                tf.math.log(tf.math.abs(1e-1 +
                 tf.linalg.diag_part(
-                    w),
+                    w))),
                 axis=[1, 2])
-
 
             # (batch_size, flow_depth, dimension, dimension)
             w = tf.matmul(
@@ -173,13 +173,13 @@ class GraphFlow(tf.keras.Model):
 
         if dimension == 1:
 
-            log_det = tf.reduce_sum(w, axis=1)
+            log_det = tf.reduce_sum(tf.math.log(tf.math.abs(w + 1e-1)), axis=1)
 
             idx = 0
 
             def loop_body(idx, z_i, w=w, b=b):
                 z_i = tf.math.multiply(
-                    tf.math.exp(-w[:, idx]),
+                    tf.math.pow(tf.math.abs(w[:, idx] + 1e-1), -1.),
                     tf.math.subtract(
                         z_i,
                         b[:, idx]))
@@ -203,7 +203,7 @@ class GraphFlow(tf.keras.Model):
 
             d = tf.linalg.set_diag(
                     tf.zeros_like(w),
-                    tf.math.exp(
+                    tf.math.abs(1e-1 +
                         tf.linalg.diag_part(
                             w)))
 
@@ -213,9 +213,9 @@ class GraphFlow(tf.keras.Model):
                         0, -1),
                     tf.ones_like(b))
 
-            log_det = tf.reduce_sum(
+            log_det = tf.reduce_sum(tf.math.log(tf.math.abs(1e-1 +
                 tf.linalg.diag_part(
-                    w),
+                    w))),
                 axis=[1, 2])
 
             # (batch_size, flow_depth, dimension, dimension)
@@ -253,7 +253,7 @@ class GraphFlow(tf.keras.Model):
 
             d = tf.linalg.set_diag(
                     tf.zeros_like(w),
-                    tf.math.exp(
+                    tf.math.abs(1e-1 +
                         tf.linalg.diag_part(
                             w)))
 
@@ -263,9 +263,9 @@ class GraphFlow(tf.keras.Model):
                         0, -1),
                     tf.ones_like(b))
 
-            log_det = tf.reduce_sum(
+            log_det = tf.reduce_sum(tf.math.log(tf.math.abs(1e-1 +
                 tf.linalg.diag_part(
-                    w),
+                    w))),
                 axis=[1, 3])
 
             w = tf.matmul(

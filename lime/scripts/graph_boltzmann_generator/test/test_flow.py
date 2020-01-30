@@ -52,7 +52,7 @@ def test_flow_zx_det():
             decimal=1)
 
 
-def test_flow_zx_det():
+def test_flow_xz_det():
     w = tf.random.normal(shape=(16, 3))
     b = tf.random.normal(shape=(16, 3))
     x = tf.random.normal(shape=(16, ))
@@ -168,7 +168,7 @@ def test_invertible():
         tf.squeeze(z),
         tf.squeeze(w),
         tf.squeeze(b))
-    npt.assert_almost_equal(x_.numpy(), tf.squeeze(x).numpy(), decimal=2)
+    npt.assert_almost_equal(x_.numpy(), tf.squeeze(x).numpy(), decimal=1)
     npt.assert_almost_equal(log_det_xz.numpy(), log_det_zx.numpy(), decimal=2)
 
 

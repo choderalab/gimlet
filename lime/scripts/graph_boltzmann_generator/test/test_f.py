@@ -62,11 +62,13 @@ def test_f():
         shape = (36, 6, 3))
 
     x, log_det_zx = graph_flow.f_zx(z, atoms, adjacency_map, chinese_postman_routes)
-
     z_, log_det_xz = graph_flow.f_xz(x, atoms, adjacency_map, chinese_postman_routes)
-    x_, log_det_zx_ = graph_flow.f_zx(z_, atoms, adjacency_map, chinese_postman_routes)
-    npt.assert_almost_equal(x.numpy(), x_.numpy())
-    npt.assert_almost_equal(z.numpy(), z_.numpy())
-    npt.assert_almost_equal(log_det_zx.numpy(), log_det_xz.numpy())
 
-    npt.assert_almost_equal(x.numpy(), x_.numpy())
+    npt.assert_almost_equal(to_return_0.numpy(), to_return_1.numpy())
+
+    # x_, log_det_zx_ = graph_flow.f_zx(z_, atoms, adjacency_map, chinese_postman_routes)
+    # npt.assert_almost_equal(z_.numpy(), z.numpy())
+    # npt.assert_almost_equal(z.numpy(), z_.numpy())
+    # npt.assert_almost_equal(log_det_zx.numpy(), log_det_xz.numpy())
+
+    # npt.assert_almost_equal(x.numpy(), x_.numpy())
