@@ -13,7 +13,7 @@ atoms, adjacency_map = mol
 
 walk = tf.constant([[2, 0, 3, 0, 4, 0, 1, 5, 1, 6, 1, 7]], dtype=tf.int64)
 
-graph_flow = flow.GraphFlow(flow_depth=8, whiten=True)
+graph_flow = flow.GraphFlow(flow_depth=3, whiten=True)
 optimizer = tf.keras.optimizers.Adam(1e-3)
 mol_optimizer = tf.keras.optimizers.Adam(10)
 baoab = lime.nets.integrators.BAOAB(h=1e-4)
@@ -61,7 +61,7 @@ for epoch_idx in range(10000):
 
         # loss_xz = tf.reduce_sum(tf.square(z)) - tf.reduce_sum(log_det)
         #
-        z = tf.random.normal((32, 6, 3))
+        z = tf.random.normal((32, 6, 3), stddev=1e-3)
 
         x_, log_det = graph_flow.f_zx(
             z,
@@ -69,7 +69,7 @@ for epoch_idx in range(10000):
             adjacency_map,
             tf.tile(walk, [32, 1]))
 
-        bond_energy, angle_energy, one_four_energy, nonbonded_energy, torsion_energy = gin.deterministic.mm.alkane_energy.alkane_energy(
+        bond_energy, angle_energy, one_four_energy, nonbonded_energy = gin.deterministic.mm.alkane_energy.alkane_energy(
             atoms, adjacency_map, x_)
 
         h_zx = tf.reduce_sum(bond_energy) + tf.reduce_sum(angle_energy) # + tf.reduce_sum(torsion_energy)# + tf.reduce_sum(one_four_energy)
@@ -100,4 +100,4 @@ for epoch_idx in range(10000):
     if epoch_idx % 100 == 0:
         np.save('h', np.array(h_))
         np.save('ts', np.array(ts_))
-        # graph_flow.save_weights('graph_flow.h5')
+        graph_flow.save_weights('graph_flow.h5')

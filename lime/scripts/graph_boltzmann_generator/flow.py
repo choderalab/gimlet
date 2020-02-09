@@ -58,12 +58,29 @@ class GraphFlow(tf.keras.Model):
         self.d1 = tf.keras.layers.Dense(dense_units, activation='tanh')
         self.d2 = tf.keras.layers.Dense(dense_units, activation='tanh')
 
-        for idx in range(1, 4):
+
+        setattr(
+            self,
+            'dw1',
+            tf.keras.layers.Dense(flow_depth))
+
+        setattr(
+            self,
+            'db1',
+            tf.keras.layers.Dense(flow_depth))
+
+        for idx in range(2, 4):
             setattr(
                 self,
-                'dw' + str(idx),
+                'dr' + str(idx),
                 tf.keras.layers.Dense(
-                    flow_depth * idx ** 2))
+                    flow_depth * idx * (idx+1) // 2))
+
+            setattr(
+                self,
+                'dv' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth * idx * idx))
 
             setattr(
                 self,
@@ -71,272 +88,229 @@ class GraphFlow(tf.keras.Model):
                 tf.keras.layers.Dense(
                     flow_depth * idx))
 
+
+            setattr(
+                self,
+                'dalpha' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth))
+
+            setattr(
+                self,
+                'dbeta' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth ))
+
+            setattr(
+                self,
+                'dz0' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth * idx))
+
+            setattr(
+                self,
+                'dwp' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth * idx))
+
+            setattr(
+                self,
+                'dbp' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth))
+
+            setattr(
+                self,
+                'dvp' + str(idx),
+                tf.keras.layers.Dense(
+                    flow_depth * idx))
+
         self.flow_depth = flow_depth
         self.whiten = whiten
 
-        self.p_xy = tf.constant(
-            [[0, 1, 0],
-             [1, 0, 0],
-             [0, 0, 1]],
-            dtype=tf.int64)
 
-        self.p_xz = tf.constant(
-            [[0, 0, 1],
-             [0, 1, 0],
-             [1, 0, 0]],
-            dtype=tf.int64)
-
-        self.p_yz = tf.constant(
-            [[0, 1, 0],
-             [0, 0, 1],
-             [1, 0, 0]],
-            dtype=tf.int64)
 
     @staticmethod
-    def flow_zx(z_i, w, b):
-
-        if tf.shape(tf.shape(z_i))[0] == 2:
-            dimension = tf.shape(z_i)[-1]
-
-        else:
-            dimension = 1
+    def flow_zx_1d(z_i, w, b):
 
         flow_depth = tf.shape(w)[1]
 
-        if tf.equal(dimension, 1):
-            d_log_det = tf.reduce_sum(
-                tf.math.log(tf.math.abs(w) + 1e-1),
-                axis=1)
+        d_log_det = tf.reduce_sum(
+            tf.math.log(tf.math.abs(w) + 1e-1),
+            axis=1)
 
-            idx = 0
-            def loop_body(idx, z_i, w=w, b=b):
+        idx = 0
+        def loop_body(idx, z_i, w=w, b=b):
 
-                z_i = tf.math.add(
-                    tf.math.multiply(
-                        tf.math.abs(w[:, idx]) + 1e-1,
-                        z_i),
-                    b[:, idx])
+            z_i = tf.math.add(
+                tf.math.multiply(
+                    tf.math.abs(w[:, idx]) + 1e-1,
+                    z_i),
+                b[:, idx])
 
-                return idx + 1, z_i
+            return idx + 1, z_i
 
-            _, z_i = tf.while_loop(
-                lambda idx, z_i: tf.less(idx, flow_depth),
-                loop_body,
-                [idx, z_i],
-                parallel_iterations=flow_depth)
-
-        else:
-            # ldu decomposition
-            l = tf.linalg.set_diag(
-                    tf.linalg.band_part(
-                        w,
-                        -1, 0),
-                    tf.ones_like(b))
-
-            d = tf.linalg.set_diag(
-                    tf.zeros_like(w),
-                    tf.math.abs(
-                        tf.linalg.diag_part(
-                            w)) + 1e-1)
-
-            u = tf.linalg.set_diag(
-                    tf.linalg.band_part(
-                        w,
-                        0, -1),
-                    tf.ones_like(b))
-
-            d_log_det = tf.reduce_sum(
-                tf.math.log(tf.math.abs(1e-1 +
-                tf.linalg.diag_part(
-                    w))),
-                axis=[1, 2])
-
-            # (batch_size, flow_depth, dimension, dimension)
-            w = tf.matmul(
-                l,
-                tf.matmul(
-                    d,
-                    u))
-
-            p_xy = tf.constant(
-                [[0, 1, 0],
-                 [1, 0, 0],
-                 [0, 0, 1]],
-                dtype=tf.float32)
-
-            p_xz = tf.constant(
-                [[0, 0, 1],
-                 [0, 1, 0],
-                 [1, 0, 0]],
-                dtype=tf.float32)
-
-            p_yz = tf.constant(
-                [[0, 1, 0],
-                 [0, 0, 1],
-                 [1, 0, 0]],
-                dtype=tf.float32)
-
-            idx = 0
-            def loop_body(idx, z_i, w=w, b=b,
-                    p_xy=p_xy, p_yz=p_yz, p_xz=p_xz):
-                # (batch_size, dimension)
-                z_i = tf.math.add(
-                    tf.einsum(
-                        'ab, abd -> ad',
-                        z_i, # (batch_size, dimension)
-                        w[:, idx, :, :]), # (batch_size, dimension, dimension)
-                    b[:, idx, :]) # (batch_size, dimension)
-
-                if dimension == 3:
-                    p = [p_xy, p_yz, p_xz][idx % 3]
-
-                    z_i = tf.einsum(
-                        'ab, bd -> ad',
-                        z_i,
-                        p)
-
-                return idx + 1, z_i
-
-            _, z_i = tf.while_loop(
-                lambda idx, z_i: tf.less(idx, flow_depth),
-                loop_body,
-                [idx, z_i])
+        _, z_i = tf.while_loop(
+            lambda idx, z_i: tf.less(idx, flow_depth),
+            loop_body,
+            [idx, z_i],
+            parallel_iterations=flow_depth)
 
         return z_i, d_log_det
 
+
     @staticmethod
-    def flow_xz(x, w, b):
+    def flow_zx(z_i, r, v, b, alpha, beta, z0, w_p, v_p, b_p):
+        """ Transform a signal z_i to x, both on R^D, through geometric
+        operations on 3d space.
 
-        dimension = tf.shape(tf.shape(x))[0]
+        Parameters
+        ----------
+        r : tf.Tensor, shape=(batch_size, flow_depth, dimension, dimension)
+        v : tf.Tensor, shape=(batch_size, flow_depth, dimension, dimension)
+        b : tf.Tensor, shape=(batch_size, flow_depth)
+        alpha : tf.tensor, shape=(batch_size, flow_depth)
+        beta : tf.Tensor, shape=(batch_size, flow_depth)
+        z0 : tf.Tensor, shape(batch_size, flow_depth, dimension)
+        w_p : tf.Tensor, shape=(batch_size, flow_depth, dimension)
+        b_p : tf.Tensor, shape=(batch_size, flow_depth)
+        v_p : tf.Tensor, shape=(batch_size, flow_depth, dimension)
 
-        flow_depth = tf.shape(w)[1]
+        """
+        # read the dimensions
+        dimension = tf.shape(z_i)[-1]
+        flow_depth = tf.shape(r)[1]
+        batch_size = tf.shape(z_i)[0]
 
-        z_i = x
+        # ensure the invertibility
+        alpha = tf.math.abs(alpha)
+        beta = -alpha + tf.math.abs(beta)
+        r = tf.linalg.set_diag(
+            r,
+            tf.math.abs(
+                tf.linalg.diag_part(
+                    r)) + 1e-1)
 
-        w = tf.reverse(w, axis=[1])
-        b = tf.reverse(b, axis=[1])
+        q = tf.eye(
+            dimension, dimension,
+            batch_shape=(batch_size, flow_depth),
+            dtype=tf.float32)
 
-        if dimension == 1:
+        for idx in range(dimension):
+            q = tf.matmul(
+                q,
+                tf.math.subtract(
+                    tf.eye(dimension, dimension, batch_shape=(batch_size, flow_depth), dtype=tf.float32),
+                    2 * tf.einsum(
+                        'mnab, mnbc -> mnac',
+                        tf.expand_dims(v[:, :, idx, :], 3),
+                        tf.expand_dims(v[:, :, idx, :], 2))))
 
-            log_det = tf.reduce_sum(tf.math.log(tf.math.abs(w + 1e-1)), axis=1)
+        w = tf.linalg.matmul(
+            q,
+            r)
 
-            idx = 0
+        d_log_det = tf.reduce_sum(
+            tf.math.log(tf.math.abs(1e-1 +
+            tf.linalg.diag_part(
+                r))),
+            axis=[1, 2])
 
-            def loop_body(idx, z_i, w=w, b=b):
-                z_i = tf.math.multiply(
-                    tf.math.pow(tf.math.abs(w[:, idx] + 1e-1), -1.),
+        def loop_body(idx, z_i, d_log_det):
+            # QR
+            z_i = tf.math.add(
+                tf.einsum(
+                    'ab, abd -> ad',
+                    z_i, # (batch_size, dimension)
+                    w[:, idx, :, :]), # (batch_size, dimension, dimension)
+                b[:, idx, :]) # (batch_size, dimension)
+
+            # plannar
+            z_i = tf.math.add(
+                z_i,
+                tf.math.multiply(
+                    v_p[:, idx, :],
+                    tf.nn.tanh(
+                        tf.math.add(
+                            tf.reduce_sum(
+                                tf.math.multiply(
+                                    w_p[:, idx, :],
+                                    z_i),
+                                axis=-1,
+                                keepdims=True),
+                            tf.expand_dims(b_p[:, idx], 1)))))
+
+            d_log_det = tf.math.add(
+                d_log_det,
+                tf.squeeze(
+                    tf.math.log(
+                        tf.math.add(
+                            tf.constant(1, dtype=tf.float32),
+                            tf.math.multiply(
+                                tf.math.subtract(
+                                    tf.constant(1, dtype=tf.float32),
+                                    tf.math.square(
+                                        tf.nn.tanh(
+                                            tf.math.add(
+                                                tf.reduce_sum(
+                                                    tf.math.multiply(
+                                                        w_p[:, idx, :],
+                                                        z_i),
+                                                    axis=-1,
+                                                    keepdims=True),
+                                                tf.expand_dims(b_p[:, idx], 1))))),
+                                tf.math.reduce_sum(
+                                    tf.math.multiply(
+                                        v_p[:, idx, :],
+                                        w_p[:, idx, :]),
+                                    axis=-1,
+                                    keepdims=True))))))
+
+            # radial
+            # (batch_size)
+            r_z = tf.linalg.norm(
+                tf.math.subtract(
+                    z_i,
+                    z0[:, idx, :]),
+                axis=-1)
+
+            z_i = tf.math.add(
+                z_i,
+                tf.math.multiply(
+                    tf.expand_dims(
+                        tf.math.divide_no_nan(
+                            beta[:, idx],
+                            alpha[:, idx] + r_z),
+                        axis=1),
                     tf.math.subtract(
                         z_i,
-                        b[:, idx]))
+                        z0[:, idx, :])))
 
-                return idx + 1, z_i
+            d_log_det = tf.math.add(
+                d_log_det,
+                tf.math.log(tf.math.multiply(
+                    tf.math.add(
+                        tf.constant(1, dtype=tf.float32),
+                        tf.math.divide_no_nan(
+                            alpha[:, idx] * beta[:, idx],
+                            tf.math.square(alpha[:, idx] + r_z))),
+                    tf.math.square(
+                        tf.math.add(
+                            tf.constant(1.0, dtype=tf.float32),
+                            tf.math.divide_no_nan(
+                                beta[:, idx],
+                                alpha[:, idx] + r_z))))))
 
-            _, z_i = tf.while_loop(
-                lambda idx, z_i: tf.less(idx, flow_depth),
-                loop_body,
-                [idx, z_i],
-                parallel_iterations=flow_depth)
+            return idx+1, z_i, d_log_det
 
-        elif dimension == 2:
 
-            # ldu decomposition
-            l = tf.linalg.set_diag(
-                    tf.linalg.band_part(
-                        w,
-                        -1, 0),
-                    tf.ones_like(b))
+        idx = 0
+        _, z_i, d_log_det = tf.while_loop(
+            lambda idx, z_i, d_log_det: tf.less(idx, flow_depth),
+            loop_body,
+            [idx, z_i, d_log_det])
 
-            d = tf.linalg.set_diag(
-                    tf.zeros_like(w),
-                    tf.math.abs(1e-1 +
-                        tf.linalg.diag_part(
-                            w)))
-
-            u = tf.linalg.set_diag(
-                    tf.linalg.band_part(
-                        w,
-                        0, -1),
-                    tf.ones_like(b))
-
-            log_det = tf.reduce_sum(tf.math.log(tf.math.abs(1e-1 +
-                tf.linalg.diag_part(
-                    w))),
-                axis=[1, 2])
-
-            # (batch_size, flow_depth, dimension, dimension)
-            w = tf.matmul(
-                l,
-                tf.matmul(
-                    d,
-                    u))
-
-            idx = 0
-            def loop_body(idx, z_i, w=w, b=b):
-                # (batch_size, dimension)
-                z_i = tf.einsum(
-                        'ab, abd -> ad',
-                        tf.math.subtract(
-                            z_i, # (batch_size, 1, dimension)
-                            b[:, idx, :]),
-                        tf.linalg.inv(w[:, idx, :, :])) # (batch_size, dimension, dimension)
-                return idx + 1, z_i
-
-            _, z_i = tf.while_loop(
-                lambda idx, z_i: tf.less(idx, flow_depth),
-                loop_body,
-                [idx, z_i],
-                parallel_iterations=flow_depth)
-
-        else:
-
-            # ldu decomposition
-            l = tf.linalg.set_diag(
-                    tf.linalg.band_part(
-                        w,
-                        -1, 0),
-                    tf.ones_like(b))
-
-            d = tf.linalg.set_diag(
-                    tf.zeros_like(w),
-                    tf.math.abs(1e-1 +
-                        tf.linalg.diag_part(
-                            w)))
-
-            u = tf.linalg.set_diag(
-                    tf.linalg.band_part(
-                        w,
-                        0, -1),
-                    tf.ones_like(b))
-
-            log_det = tf.reduce_sum(tf.math.log(tf.math.abs(1e-1 +
-                tf.linalg.diag_part(
-                    w))),
-                axis=[1, 3])
-
-            w = tf.matmul(
-                l,
-                tf.matmul(
-                    d,
-                    u))
-
-            idx = 0
-            def loop_body(idx, z_i, w=w, b=b):
-                # (batch_size, n_walks, 3)
-                z_i = tf.einsum(
-                        'abc, abcd -> abd',
-                        tf.math.subtract(
-                            z_i, # (batch_size, 1, dimension)
-                            b[:, idx, :, :]),
-                        tf.linalg.inv(w[:, idx, :, :, :])) # (batch_size, dimension, dimension)
-                return idx + 1, z_i
-
-            _, z_i = tf.while_loop(
-                lambda idx, z_i: tf.less(idx, flow_depth),
-                loop_body,
-                [idx, z_i],
-                parallel_iterations=flow_depth)
-
-        return z_i, log_det
+        return z_i, d_log_det
 
     @staticmethod
     def whitening(seq_xyz):
@@ -720,7 +694,7 @@ class GraphFlow(tf.keras.Model):
                 parent_xyz,
                 parent_neighbor_xyz_sum)
 
-            d_xyz = self.align_z(z_basis, d_xyz)
+            # d_xyz = self.align_z(z_basis, d_xyz)
 
             # only update the new ones
             _xyz = tf.where(
@@ -876,47 +850,10 @@ class GraphFlow(tf.keras.Model):
         return self.gru_xyz(self.gru_xyz_1(self.gru_xyz_0(seq_xyz)))
 
     def get_flow_params(self, h_path, dimension=3):
+        batch_size = tf.shape(h_path)[0]
 
+        if dimension == 1:
 
-        h_path_shape = tf.shape(h_path)
-
-        if tf.shape(h_path_shape)[0] == 3:
-            batch_size = h_path_shape[0]
-            n_walk = h_path_shape[1]
-
-            # NOTE: this is not efficient, but somehow the expression below
-            # reshapes into the wrong result
-            w = tf.stack(
-                [
-                    tf.reshape(
-                        getattr(
-                            self,
-                            'dw' + str(dimension))(h_path[:, idx, :]),
-                        [batch_size, -1, dimension, dimension])\
-                            for idx in range(n_walk)
-                ],
-                axis=2)
-
-            b = tf.stack(
-                [
-                    tf.reshape(
-                        getattr(
-                            self,
-                            'db' + str(dimension))(h_path[:, idx, :]),
-                        [batch_size, -1, dimension])\
-                            for idx in range(n_walk)
-                ],
-                axis=2)
-
-            # w = tf.reshape(
-            #     w,
-            #     [batch_size, -1, n_walk, dimension, dimension])
-            #
-            # b = tf.reshape(
-            #     b,
-            #     [batch_size, -1, n_walk, dimension])
-
-        else:
             w = getattr(
                 self,
                 'dw' + str(dimension))(h_path)
@@ -925,27 +862,104 @@ class GraphFlow(tf.keras.Model):
                 self,
                 'db' + str(dimension))(h_path)
 
-            batch_size = h_path_shape[0]
+            w = tf.reshape(
+                w,
+                [batch_size, -1])
 
-            if dimension == 1:
-                w = tf.reshape(
-                    w,
-                    [batch_size, -1])
+            b = tf.reshape(
+                b,
+                [batch_size, -1])
 
-                b = tf.reshape(
-                    b,
-                    [batch_size, -1])
+            return w, b
 
-            else:
-                w = tf.reshape(
-                    w,
-                    [batch_size, -1, dimension, dimension])
+        else:
 
-                b = tf.reshape(
-                    b,
-                    [batch_size, -1, dimension])
+            r = getattr(
+                self,
+                'dr' + str(dimension))(h_path)
 
-        return w, b
+            v = getattr(
+                self,
+                'dv' + str(dimension))(h_path)
+
+            b = getattr(
+                self,
+                'dv' + str(dimension))(h_path)
+
+            alpha = getattr(
+                self,
+                'dalpha' + str(dimension))(h_path)
+
+            beta = getattr(
+                self,
+                'dbeta' + str(dimension))(h_path)
+
+            z0 = getattr(
+                self,
+                'dz0' + str(dimension))(h_path)
+
+            w_p = getattr(
+                self,
+                'dwp' + str(dimension))(h_path)
+
+            v_p = getattr(
+                self,
+                'dvp' + str(dimension))(h_path)
+
+            b_p = getattr(
+                self,
+                'dbp' + str(dimension))(h_path)
+
+
+            # put r in upper triangular matrix
+            r = tf.reshape(
+                r,
+                [batch_size, -1, dimension * (dimension+1) // 2])
+
+            r = tf.concat(
+                [
+                    r,
+                    tf.reverse(
+                        r,
+                        [2])[:, :, :dimension * (dimension-1)//2]
+                ],
+                axis=2)
+
+            r = tf.linalg.band_part(
+                tf.reshape(
+                    r,
+                    [batch_size, -1, dimension, dimension]),
+                0, -1)
+
+            v = tf.reshape(
+                v,
+                [batch_size, -1, dimension, dimension])
+
+            b = tf.reshape(
+                b,
+                [batch_size, -1, dimension])
+
+            beta = tf.reshape(
+                beta,
+                [batch_size, -1])
+
+            z0 = tf.reshape(
+                z0,
+                [batch_size, -1, dimension])
+
+            w_p = tf.reshape(
+                w_p,
+                [batch_size, -1, dimension])
+
+            v_p = tf.reshape(
+                v_p,
+                [batch_size, -1, dimension])
+
+            b_p = tf.reshape(
+                b_p,
+                [batch_size, -1])
+
+            return r, v, b, alpha, beta, z0, w_p, v_p, b_p
 
     # @tf.function
     def f_zx(self, z, atoms, adjacency_map, walk):
@@ -992,7 +1006,7 @@ class GraphFlow(tf.keras.Model):
 
         w, b = self.get_flow_params(h_path, dimension=1)
 
-        z1, d_log_det = self.flow_zx(
+        z1, d_log_det = self.flow_zx_1d(
             z[:, 0, 0],
             w,
             b)
@@ -1027,12 +1041,11 @@ class GraphFlow(tf.keras.Model):
             ],
             axis=1))))
 
-        w, b = self.get_flow_params(h_path, dimension=2)
+        r, v, b, alpha, beta, z0, w_p, v_p, b_p = self.get_flow_params(h_path, dimension=2)
 
         z2, d_log_det = self.flow_zx(
             z[:, 0, 1:],
-            w,
-            b)
+            r, v, b, alpha, beta, z0, w_p, v_p, b_p)
 
         log_det += d_log_det
 
@@ -1089,8 +1102,6 @@ class GraphFlow(tf.keras.Model):
                     tf.constant(1, dtype=tf.int64)),
                 z_idx)
 
-
-
             h_path = self.d2(self.d1(self.d0(tf.concat(
                 [
                     self.summarize_geometry_state(seq_xyz)[:, -1, :],
@@ -1098,7 +1109,7 @@ class GraphFlow(tf.keras.Model):
                 ],
                 axis=1))))
 
-            w, b = self.get_flow_params(h_path, dimension=3)
+            r, v, b, alpha, beta, z0, w_p, v_p, b_p = self.get_flow_params(h_path, dimension=3)
 
             _xyz, _d_log_det = self.flow_zx(
                 tf.gather_nd(
@@ -1109,8 +1120,7 @@ class GraphFlow(tf.keras.Model):
                             z_idx
                         ],
                         axis=1)),
-                w,
-                b)
+                r, v, b, alpha, beta, z0, w_p, v_p, b_p)
 
             xyz = tf.where(
                 tf.tile(
@@ -1156,161 +1166,43 @@ class GraphFlow(tf.keras.Model):
                 tf.TensorShape([])
             ])
 
-        #
-        # x, d_log_det = self.align(
-        #     seq_xyz, adjacency_map, walk, is_new_)
-        #
-        # log_det += d_log_det
-        #
-        seq_xyz_new = tf.reshape(
-            tf.boolean_mask(
-                seq_xyz,
-                is_new_),
-            [batch_size, -1, 3])
 
-        walk_new = tf.reshape(
-            tf.boolean_mask(
-                walk,
-                is_new_),
-            [batch_size, -1])
+        x, d_log_det = self.align(
+            seq_xyz, adjacency_map, walk, is_new_)
 
-        x = tf.tensor_scatter_nd_update(
-            tf.zeros(
-                (batch_size, n_atoms, 3),
-                dtype=tf.float32),
-            tf.reshape(
-                tf.stack(
-                    [
-                        tf.tile(
-                            tf.expand_dims(
-                                tf.range(batch_size),
-                                axis=1),
-                            [1, n_atoms]),
-                        walk_new
-                    ],
-                    axis=2),
-                [-1, 2]),
-            tf.reshape(
-                seq_xyz_new,
-                [-1, 3]))
+        log_det += d_log_det
+
+        #
+        # seq_xyz_new = tf.reshape(
+        #     tf.boolean_mask(
+        #         seq_xyz,
+        #         is_new_),
+        #     [batch_size, -1, 3])
+        #
+        # walk_new = tf.reshape(
+        #     tf.boolean_mask(
+        #         walk,
+        #         is_new_),
+        #     [batch_size, -1])
+        #
+        # x = tf.tensor_scatter_nd_update(
+        #     tf.zeros(
+        #         (batch_size, n_atoms, 3),
+        #         dtype=tf.float32),
+        #     tf.reshape(
+        #         tf.stack(
+        #             [
+        #                 tf.tile(
+        #                     tf.expand_dims(
+        #                         tf.range(batch_size),
+        #                         axis=1),
+        #                     [1, n_atoms]),
+        #                 walk_new
+        #             ],
+        #             axis=2),
+        #         [-1, 2]),
+        #     tf.reshape(
+        #         seq_xyz_new,
+        #         [-1, 3]))
 
         return x, log_det
-
-    def f_xz(self, x, atoms, adjacency_map, walk):
-        n_atoms = tf.shape(
-            atoms,
-            tf.int64)[0]
-
-        batch_size = tf.shape(
-            x,
-            tf.int64)[0]
-
-        log_det = tf.constant(0, dtype=tf.float32)
-
-        h_graph = self.summarize_graph_state(atoms, adjacency_map, walk)
-
-        # gather xyz sequence
-        # (batch_size, n_walk, 3)
-        seq_xyz = tf.gather_nd(
-            x, # (batch_size, n_atoms, 3)
-            tf.stack(
-                [
-                    tf.tile(
-                        tf.expand_dims(
-                            tf.range(
-                                batch_size,
-                                dtype=tf.int64),
-                            axis=1),
-                        [1, tf.shape(walk)[1]]),
-                    walk # (batch_size, n_walk)
-                ],
-                axis=2))
-
-        if self.whiten:
-            seq_xyz = self.whitening(seq_xyz)
-
-        # (batch_size, n_walk, d)
-        h_xyz = self.summarize_geometry_state(seq_xyz)
-
-        h_xyz = tf.concat(
-            [
-                tf.zeros(
-                    shape=(
-                        batch_size,
-                        tf.constant(1, dtype=tf.int64),
-                        tf.shape(h_xyz, tf.int64)[-1]),
-                    dtype=tf.float32),
-                h_xyz[:, :-1, :]
-            ],
-            axis=1)
-
-        batch_size = tf.shape(h_xyz)[0]
-
-        # (batch_size, n_walk, d)
-        h_path = self.d2(self.d1(self.d0(tf.concat(
-            [
-                h_xyz,
-                h_graph
-            ],
-            axis=2))))
-
-        # ~~~~~~~~~~~~~~~~~~~~
-        # handle the first idx
-        # ~~~~~~~~~~~~~~~~~~~~
-
-        w, b = self.get_flow_params(h_path[:, 1, :], dimension=1)
-
-        z_i = seq_xyz[:, 1, -1]
-        z_0_0, d_log_det = self.flow_xz(z_i, w, b)
-        log_det += d_log_det
-
-        # ~~~~~~~~~~~~~~~~~~~~~
-        # handle the second idx
-        # ~~~~~~~~~~~~~~~~~~~~~
-
-        w, b = self.get_flow_params(h_path[:, 2, :], dimension=2)
-
-        z_i = seq_xyz[:, 2, 1:]
-
-        z_0_12, d_log_det = self.flow_xz(z_i, w, b)
-
-        log_det += d_log_det
-
-
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # handle the rest of the indices
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-        # (batch_size, flow_depth, n_walks, 3, 3)
-        w, b = self.get_flow_params(h_path[:, 3:, :], dimension=3)
-
-        z_i = seq_xyz[:, 3:, :]
-        z_rest, d_log_det = self.flow_xz(z_i, w, b)
-        log_det += tf.reduce_sum(
-            tf.reshape(
-                tf.boolean_mask(
-                    d_log_det,
-                    self.is_new(walk)[:, 3:]),
-                [batch_size, -1]),
-            axis=1)
-
-        # (batch, n_walk - 2)
-        z = tf.concat(
-                [
-                    tf.expand_dims(
-                        tf.concat(
-                            [
-                                tf.expand_dims(z_0_0, 1),
-                                z_0_12
-                            ],
-                            axis=1),
-                        axis=1),
-                    tf.reshape(
-                        tf.boolean_mask(
-                            z_rest,
-                            self.is_new(walk)[:, 3:]),
-                        [batch_size, -1, 3])
-                ],
-                axis=1)
-
-        return z, log_det
